@@ -1,0 +1,48 @@
+# Architecture
+
+## Runtime boundaries
+
+| Boundary | Ownership |
+| --- | --- |
+| Electron main | Window lifecycle, origin checks, IPC handlers, native dialogs, workspace grants, settings and recents, privileged service orchestration. Main validates requests and resolves all paths, identities, and policies before privileged I/O. |
+| Sandboxed preload | Deliberate `contextBridge` methods and subscription wrappers. Method arguments and replies follow shared contracts. The bridge removes Electron event objects and returns explicit unsubscribe functions. |
+| React renderer | Presentation, route state, interaction, theme, and local view models. It consumes typed capabilities and receives display-safe snapshots and diagnostics. |
+| Shared contracts | Runtime-validatable request and response models, domain identifiers, capabilities, and stable error codes. Contracts are platform-neutral and contain no Electron or filesystem authority. |
+| Domain engines | Versioned generation, schema interpretation, and stack compatibility. Pure engines consume snapshots and return plans and diagnostics. Main-owned adapters perform authorized reads and operations. |
+
+Keep the main process responsive. Move expensive parsing and planning to a worker when profiling or bounded-job requirements justify it. Trusted workers get explicit input and never inherit workspace or shell authority as a plugin SDK feature. Error codes such as `INVALID_REQUEST`, `WORKSPACE_MISSING`, `STALE_PLAN`, and `RECOVERY_REQUIRED` allow the renderer to map failures to actionable messages. Error telemetry is local and scrubbed.
+
+## Monorepo structure
+
+Phase 01 starts with `apps/desktop` for main, preload, and renderer entry points, and `packages/contracts` for shared schemas and cross-boundary types used immediately. Keep main services in `apps/desktop/src/main/services` while only the desktop consumes them. Main and preload have separate build entry points, privileges, and compilation contexts. Renderer and contracts cannot import main code. Use import restrictions and TypeScript configuration to enforce the direction.
+
+Introduce `packages/generator` when Phase 04 delivers working plans and `packages/schema` once Phase 05 has a consumer and fixtures. Introduce a separate stack adapter package and public SDK boundary when the Go implementation exercises it in Phase 08. Phase 04 can organize its built-in Node adapter inside the generation package. The future CLI can reuse pure planning and approved platform adapters. Keep workspace package names stable and avoid directories for unused layers.
+
+Use TypeScript in strict mode and pin Node and pnpm for a reproducible frozen-lockfile install. Use Electron, React, Vite, and Tailwind in Phase 01. Select build and test integration after checking Electron's embedded Node/Chromium, host Node, pnpm and native binary support, and the bundler and test matrices. Bundle a sandbox-compatible preload entry and smoke-test it in real Electron. See [Testing strategy](TESTING_STRATEGY.md) for dependency validation.
+
+## Data ownership
+
+| Location | Data and ownership |
+| --- | --- |
+| Electron per-user application data | Phase 01 versioned JSON preferences, validated on read and written via a same-directory temporary file and replace. Later holds recents, indexes, and the operation journal. Serialize updates so theme and panel changes preserve each other. Corrupt data uses safe defaults with a recoverable message. Preserve records from unsupported future versions and report the compatibility issue. |
+| Selected project root | User source code and standard toolchain files. Studio reads only through a session grant. Opening and rescanning create no files here. |
+| `.factory/project.json` | Versioned portable descriptor with stable UUID, project type, and stack/profile identifiers. A path grant remains separate from portable identity. |
+| `.factory/versions.lock.json` and `.factory/modules.json` | Exact stack, template and generator versions and digests, resolved modules and dependencies. Values describe reproducible inputs. |
+| `.factory/generation-manifest.json` | Relative project paths, content fingerprints, template ownership, and generation provenance. |
+| `.factory/schema.json` | Studio diagram layout and supported schema configuration. Migration authority is defined in [Database engine](DATABASE_ENGINE.md). |
+| Main-owned recovery storage | Worktree-local operation records keyed by canonical path and operation ID, with narrowly scoped backups and content digests. Keep outside the source tree. The recovery design records the staging paths needed for same-filesystem operations. |
+| OS-protected credential store | Database and service credentials. Store only opaque references in app data. See [Security](SECURITY.md). |
+
+The portable paths and contract are reserved for their implementing phases. Validate descriptors as untrusted input. Unknown or corrupt versions produce a diagnostic and a read-only view. Schema upgrades use an explicit, versioned operation with recovery. Store relative paths in portable metadata. Keep local absolute paths, machine ports, local database names, and secret references in per-user state. Adopt SQLite for app-local indexes or queries once volume, integrity, or transactional needs justify it. Phase 01 uses built-in filesystem and preference storage APIs and avoids an Electron-native database dependency.
+
+## Workspace lifecycle
+
+Resolve the native selection to a canonical root and issue an opaque session grant scoped to a window and supported actions. Key UI tabs and operation locks by canonical worktree identity. Keep the portable UUID as a separate association for matching relocated managed projects. Unmanaged directories remain inspectable without assigning portable identity. Reopening a recent resolves the recorded directory and revalidates identity, access, and aliasing. A different project at the old path requires explicit admission.
+
+New Project and Clone Repository may authorize a single validated child under a natively selected parent. Bind approval to that destination. Use exclusive directory creation where supported and establish the new workspace grant when the operation succeeds. A project selected inside an existing Git repository can show its enclosing repository context after Phase 03. Git writes that affect the enclosing repository require explicit admission of its root.
+
+Snapshots hold scan revision, access state, Git identity, and relevant file fingerprints. Watchers are hints. Coalesce bursts, bound scans, reject stale responses, and reconcile on focus, watcher overflow, or manual rescan. Close tabs and revoke grants when a window closes. Handle disappearance, permission loss, and root replacement by revoking access and offering Locate or Retry. When several tabs share a Git common directory, serialize Studio ref mutations in addition to per-worktree locks. These locks coordinate Studio operations. External Git and editor processes can still change the same files. Recheck state immediately before mutation and reconcile the observed result afterwards.
+
+## Platform risks
+
+Windows path handling requires native tests for Unicode, spaces, drive and UNC roots, case-insensitive collisions, reserved device names, alternate streams, and junctions. Git for Windows executable discovery, shell-free argument passing, CRLF policy, and watcher behavior require Windows fixtures. File replacement can fail while an editor or antivirus holds a handle. Treat failures as recoverable operations with cleanup and meaningful errors. Electron packaging introduces separate icon, installer, upgrade, signing, and SmartScreen gates. Linux success does not establish the Windows results. Evidence belongs in [Progress](PROGRESS.md).
