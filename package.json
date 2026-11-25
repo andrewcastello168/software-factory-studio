@@ -1,0 +1,32 @@
+{
+  "name": "software-factory-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.13.1",
+  "engines": {
+    "node": "22.16.0",
+    "pnpm": "10.13.1"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @factory/desktop dev",
+    "start": "pnpm --filter @factory/desktop start",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run",
+    "build": "pnpm --filter @factory/desktop build",
+    "test:renderer": "pnpm --filter @factory/desktop test:renderer",
+    "test:electron": "pnpm --filter @factory/desktop test:electron",
+    "dev:web": "pnpm --filter @factory/desktop dev:web"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.12.0",
+    "eslint": "10.15.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.74.0",
+    "vite": "8.3.8",
+    "vitest": "5.1.2"
+  }
+}
