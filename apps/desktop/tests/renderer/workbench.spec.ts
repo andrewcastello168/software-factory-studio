@@ -52,6 +52,7 @@ test.beforeEach(async ({ page }) => {
         apply: async () => ({ ok: false, error: 'GENERATOR_STALE' }),
         pending: async () => ({ ok: true, value: [] }),
         resume: async () => ({ ok: false, error: 'GENERATOR_STALE' }),
+        release: async () => ({ ok: true, value: [] }),
       },
       git: {
         status: async () => ({ ok: true, value: repo }),

@@ -111,7 +111,7 @@ export function GeneratorDialog({ close, opened, recovery }: {
   }
 
   return (
-    <Dialog title={recovery ? 'Generation Recovery' : 'New Project'} className="generator-dialog" onClose={() => { if (!busy) close(); }}>
+    <Dialog title={step === 'recovery' ? 'Generation Recovery' : 'New Project'} className="generator-dialog" onClose={() => { if (!busy) close(); }}>
       <div className="generator-body" aria-busy={Boolean(busy)}>
         {step !== 'recovery' && <ol className="generator-steps" aria-label="New project steps">
           {(['project', 'engineering', 'review', 'complete'] as const).map((item, index) => (
@@ -195,7 +195,7 @@ export function GeneratorDialog({ close, opened, recovery }: {
             ))}</ul>
             <section aria-label="File preview">
               <header><bdi>{selectedFile?.path}</bdi><code title={selectedFile?.sha256}>{selectedFile?.sha256.slice(0, 12)}</code></header>
-              <pre tabIndex={0}><code>{selectedFile?.content}</code></pre>
+              <pre tabIndex={0} data-wrap={selectedFile?.path.endsWith('.md') ? 'true' : undefined}><code>{selectedFile?.content}</code></pre>
             </section>
           </div>
           <p className="generator-muted">Studio verifies the files after writing them. Install dependencies and apply migrations from your own terminal.</p>
@@ -225,8 +225,13 @@ export function GeneratorDialog({ close, opened, recovery }: {
               : <ul className="generator-recovery">{journal.map((entry) => <li key={entry.id}>
                 <div><strong>{entry.name}</strong><p className="generator-path"><bdi>{entry.directory}</bdi></p>
                   <p className="generator-muted">{entry.createdFiles} files recorded</p></div>
-                <Button className="outlined-button" disabled={!bridge || Boolean(busy)}
-                  onClick={() => bridge && void request('Reviewing the saved generation…', () => bridge.resume(entry.id), showReceipt)}>Resume</Button>
+                <div className="generator-recovery-actions">
+                  <Button disabled={!bridge || Boolean(busy)} onClick={() => bridge && void request(
+                    'Reviewing the recovery handoff…', () => bridge.release(entry.id), setJournal,
+                  )}>Close Record</Button>
+                  <Button className="outlined-button" disabled={!bridge || Boolean(busy)}
+                    onClick={() => bridge && void request('Reviewing the saved generation…', () => bridge.resume(entry.id), showReceipt)}>Resume</Button>
+                </div>
               </li>)}</ul>}
           <div className="dialog-actions"><Button onClick={() => go('project')} disabled={Boolean(busy)}>New Project</Button></div>
         </section>}

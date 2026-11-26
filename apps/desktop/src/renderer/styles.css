@@ -715,8 +715,10 @@ kbd {
 .generator-preview header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
 .generator-preview header code { color: var(--muted); }
 .generator-preview pre { min-height: 132px; max-height: 274px; padding: 8px; margin: 0; font-size: 12px; overflow: auto; }
+.generator-preview pre[data-wrap="true"] { white-space: pre-wrap; overflow-wrap: anywhere; }
 .generator-state { border: 1px solid var(--line); background: var(--canvas); padding: 6px 8px; margin: 0 0 8px; }
 .generator-state--error { color: var(--error); }
+.generator-recovery-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .generator-recovery { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 @media (max-width: 600px) {
   .generator-fields { grid-template-columns: minmax(0, 1fr); }

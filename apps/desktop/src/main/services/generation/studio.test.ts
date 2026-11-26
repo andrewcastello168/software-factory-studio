@@ -144,4 +144,19 @@ it('preserves user edits and blocks junction changes before resuming writes', as
   expect((await restarted.resume(plan.id)).ok).toBe(false);
   expect(await readdir(outside)).toEqual([]);
   expect(unwrap(await restarted.pending())).toHaveLength(1);
+  approve = async () => false;
+  expect(unwrap(await restarted.release(plan.id))).toHaveLength(1);
+  approve = async () => true;
+  expect(unwrap(await restarted.release(plan.id))).toEqual([]);
+  expect(await readFile(protectedFile, 'utf8')).toBe(plan.files[0]!.content);
+  expect(await readdir(outside)).toEqual([]);
+});
+
+it('rejects a native parent that resides inside an existing Git working tree', async () => {
+  await mkdir(join(parent, '.git'));
+  await writeFile(join(parent, '.git', 'HEAD'), 'ref: refs/heads/main\n');
+  chosen = join(parent, 'Subdirectory');
+  await mkdir(chosen);
+  expect(await service().chooseParent()).toEqual({ ok: false, error: 'GENERATOR_DESTINATION' });
+  expect(await readdir(chosen)).toEqual([]);
 });

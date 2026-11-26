@@ -205,6 +205,26 @@ export class GeneratorStudio {
     });
   }
 
+  release(id: string): Promise<Result<GeneratorPending[]>> {
+    return this.#exclusive(async () => {
+      const record = (await this.#records()).find((entry) => entry.id === id);
+      if (!record) return failure('GENERATOR_STALE');
+      const approved = await this.dialogs.confirm('Hand off generation recovery?',
+        'Close the saved record and review the folder in your editor. Studio will leave all files in place and will no longer resume this plan.\n\n'
+          + target(record), 'Close Recovery Record');
+      if (!approved) return this.pending();
+      this.#assertActive();
+      const current = (await this.#records()).find((entry) => entry.id === id);
+      if (!current || JSON.stringify(current) !== JSON.stringify(record)) return failure('GENERATOR_STALE');
+      try {
+        await this.journal.finish(id);
+      } catch {
+        return failure('GENERATOR_STORAGE');
+      }
+      return this.pending();
+    });
+  }
+
   async #run(plan: StarterPlan, record: GenerationRecord): Promise<Result<GeneratorReceipt>> {
     this.#writing = target(record);
     let root: ProjectRoot;

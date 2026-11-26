@@ -106,6 +106,8 @@ function installGeneratorBridge() {
     ? generatorStudio?.apply(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
   handle(GENERATOR_CHANNEL.resume, isGeneratorReceipt, (...args) => args.length === 1 && isProjectId(args[0])
     ? generatorStudio?.resume(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(GENERATOR_CHANNEL.release, isGeneratorPending, (...args) => args.length === 1 && isProjectId(args[0])
+    ? generatorStudio?.release(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
 }
 
 async function installProtocol() {

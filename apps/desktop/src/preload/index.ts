@@ -53,6 +53,7 @@ const studio: StudioBridge = {
     apply: (id) => invokeProject(GENERATOR_CHANNEL.apply, isGeneratorReceipt, id),
     pending: () => invoke(GENERATOR_CHANNEL.pending, isGeneratorPending),
     resume: (id) => invokeProject(GENERATOR_CHANNEL.resume, isGeneratorReceipt, id),
+    release: (id) => invokeProject(GENERATOR_CHANNEL.release, isGeneratorPending, id),
   },
   getAppInfo: () => invoke(CHANNEL.appInfo, isAppInfo),
   readPreferences: () => invoke(CHANNEL.readPreferences, isPreferenceSnapshot),

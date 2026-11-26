@@ -8,6 +8,7 @@ export const GENERATOR_CHANNEL = {
   apply: 'factory:generator-apply',
   pending: 'factory:generator-pending',
   resume: 'factory:generator-resume',
+  release: 'factory:generator-release-record',
 } as const;
 
 export const STARTER = {
@@ -77,6 +78,7 @@ export interface GeneratorBridge {
   apply(id: string): Promise<Result<GeneratorReceipt | null>>;
   pending(): Promise<Result<GeneratorPending[]>>;
   resume(id: string): Promise<Result<GeneratorReceipt | null>>;
+  release(id: string): Promise<Result<GeneratorPending[]>>;
 }
 
 export function isStarterName(value: unknown): value is string {
