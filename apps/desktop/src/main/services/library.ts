@@ -6,6 +6,8 @@ import type { LibraryAsset, Result } from '@factory/contracts';
 import { optionalStat, syncDirectory } from './generation/journal';
 import { admitRoot, readBoundedFile, withDirectory } from './projects/filesystem';
 
+const libraryByteLimit = 420_000;
+
 export class LibraryStore {
   #queue = Promise.resolve();
   constructor(private readonly userData: string) {}
@@ -13,7 +15,7 @@ export class LibraryStore {
   async #read(path: string) {
     const stat = await optionalStat(path);
     if (!stat) return [];
-    const value = await readBoundedFile(path, stat, 420_000, (bytes) => JSON.parse(bytes.toString('utf8')) as unknown);
+    const value = await readBoundedFile(path, stat, libraryByteLimit, (bytes) => JSON.parse(bytes.toString('utf8')) as unknown);
     if (!isRecord(value) || value.version !== 1 || !isLibraryAssets(value.assets)
       || value.assets.some(({ id }) => BUILTIN_LIBRARY.some((asset) => asset.id === id))
       || new Set(value.assets.map(({ id, version }) => id + ':' + version)).size !== value.assets.length) {
@@ -43,14 +45,16 @@ export class LibraryStore {
       }
       const versions = assets.filter(({ id }) => id === draft.id);
       const latest = versions.reduce<LibraryAsset | undefined>((best, asset) => !best || asset.version > best.version ? asset : best, undefined);
-      if (latest && (latest.kind !== draft.kind || latest.version !== draft.version || latest.version >= 9999)) {
+      if (latest ? latest.kind !== draft.kind || latest.version !== draft.version || latest.version >= 9999 : draft.version !== 1) {
         return failure('LIBRARY_CONFLICT');
       }
       const saved = { ...draft, version: latest ? latest.version + 1 : draft.version };
+      const content = JSON.stringify({ version: 1, assets: [...assets, saved] }) + '\n';
+      if (Buffer.byteLength(content) > libraryByteLimit) return failure('LIBRARY_CONFLICT');
       const temporary = join(opened, 'engineering-library-' + randomUUID() + '.tmp');
       const handle = await open(temporary, 'wx', 0o600);
       try {
-        try { await handle.writeFile(JSON.stringify({ version: 1, assets: [...assets, saved] }) + '\n'); await handle.sync(); }
+        try { await handle.writeFile(content); await handle.sync(); }
         finally { await handle.close(); }
         await rename(temporary, destination);
         await syncDirectory(opened);

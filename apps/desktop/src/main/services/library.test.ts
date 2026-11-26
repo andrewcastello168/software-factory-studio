@@ -2,7 +2,7 @@ import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
-import { BUSINESS_TEMPLATE, isLibraryAsset, STANDARD_PROFILE } from '@factory/contracts';
+import { BUSINESS_TEMPLATE, isLibraryAsset, PROFILE_TOPICS, STANDARD_PROFILE } from '@factory/contracts';
 import type { EngineeringProfile } from '@factory/contracts';
 import { LibraryStore } from './library';
 
@@ -15,6 +15,7 @@ it('publishes immutable profile and template versions and rejects stale or untru
       advice: { Testing: 'Use isolated database fixtures.' },
     };
     expect(await store.publish(STANDARD_PROFILE)).toEqual({ ok: false, error: 'LIBRARY_CONFLICT' });
+    expect(await store.publish({ ...profile, version: 8 })).toEqual({ ok: false, error: 'LIBRARY_CONFLICT' });
     expect(await store.publish(profile)).toEqual({ ok: true, value: profile });
     expect(await store.publish({ ...profile, advice: { Testing: 'Test API responses before release.' } })).toMatchObject({ ok: true, value: { version: 2 } });
     expect(await store.publish(profile)).toEqual({ ok: false, error: 'LIBRARY_CONFLICT' });
@@ -24,6 +25,22 @@ it('publishes immutable profile and template versions and rejects stale or untru
     expect(reloaded.ok && reloaded.value.find(({ id, version }) => id === profile.id && version === 1)).toEqual(profile);
     for (const input of [{ ...profile, advice: { Testing: 'token=sample-secret' } }, { ...profile, advice: { Testing: 'https://example.invalid' } },
       { ...profile, path: '../outside' }, { ...layout, color: 'url(file://outside)' }]) expect(isLibraryAsset(input)).toBe(false);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+it('keeps the previous library readable when the next release exceeds the UTF-8 storage limit', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'studio-library-'));
+  try {
+    const profile: EngineeringProfile = {
+      ...STANDARD_PROFILE, id: '1a60740d-c9c7-4c39-a56b-8df3b8eec710', name: 'Detailed Engineering',
+      advice: Object.fromEntries(PROFILE_TOPICS.map((topic) => [topic, '한'.repeat(320)])),
+    };
+    const assets = Array.from({ length: 28 }, (_, index) => ({ ...profile, version: index + 1 }));
+    await writeFile(join(root, 'engineering-library.json'), JSON.stringify({ version: 1, assets }));
+    const store = new LibraryStore(root);
+    expect(await store.publish(assets.at(-1)!)).toEqual({ ok: false, error: 'LIBRARY_CONFLICT' });
+    const reloaded = await store.list();
+    expect(reloaded.ok && reloaded.value).toEqual([STANDARD_PROFILE, BUSINESS_TEMPLATE, ...assets]);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
