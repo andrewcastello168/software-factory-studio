@@ -2,12 +2,16 @@ import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { createServer } from 'node:net';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { isHandoff, isPlaygroundRequest, STARTER, success } from '@factory/contracts';
 import type { GitState } from '@factory/contracts';
 import { planProject } from '@factory/generator';
 import { admitRoot } from '../projects/filesystem';
+import { GitStudio } from '../git/studio';
+import { findGit } from '../git/process';
 import { DeveloperStudio } from './studio';
 
 describe('developer workspace native operations', () => {
@@ -125,4 +129,65 @@ createServer((req, res) => {
       await rm(root, { recursive: true, force: true, maxRetries: 5 });
     }
   }, 40_000);
+
+  it('uses distinct native Git worktree grants and approved editor coordinates', async () => {
+    const executable = await findGit();
+    if (!executable) throw new Error('Install native Git in a supported system directory.');
+    const fixture = await realpath(await mkdtemp(join(tmpdir(), 'factory-editor-')));
+    const primary = join(fixture, 'Project a');
+    const linked = join(fixture, 'Feature café');
+    const resultPath = join(fixture, 'code.results');
+    const id = randomUUID();
+    const other = randomUUID();
+    const run = (...args: string[]) => promisify(execFile)(executable, args, { cwd: primary, windowsHide: true });
+    const grants = new Map<string, Awaited<ReturnType<typeof admitRoot>>>();
+    const git = new GitStudio({
+      root: (key) => grants.get(key), canOpen: () => true, allowsAuxiliaryPath: () => true,
+      adopt: async () => ({ ok: false, error: 'ACCESS_DENIED' }), refresh: async () => undefined,
+    }, { chooseDirectory: async () => null, confirm: async () => false }, fixture);
+    const editor = join(fixture, 'code');
+    const revealed = vi.fn<(path: string) => void>();
+    const developer = new DeveloperStudio({
+      root: (key) => grants.get(key), allows: () => true, git: (key) => git.status(key),
+    }, {
+      async confirm(_title, detail) { return detail.includes(fixture); },
+      async chooseEditor() { return editor; },
+      reveal: revealed, copy: () => undefined, openURL: async () => undefined,
+    });
+    try {
+      await mkdir(primary);
+      await run('init', '-b', 'main');
+      await writeFile(join(primary, 'source file.ts'), 'export const workspace = true;\n');
+      await run('add', '--', 'source file.ts');
+      await run('-c', 'user.name=Studio fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'core.hooksPath=' + fixture, 'commit', '-m', 'Fixture');
+      await run('worktree', 'add', '-b', 'parallel', linked);
+      grants.set(id, await admitRoot(primary));
+      grants.set(other, await admitRoot(linked));
+      const one = await git.status(id);
+      const two = await git.status(other);
+      expect(one).toMatchObject({ ok: true, value: { root: primary, branch: 'main' } });
+      expect(two).toMatchObject({ ok: true, value: { root: linked, branch: 'parallel' } });
+      if (!one.ok || !two.ok || one.value.state !== 'repository' || two.value.state !== 'repository') throw new Error('Missing test worktree.');
+      expect(one.value.repositoryId).toBe(two.value.repositoryId);
+      expect(one.value.worktreeId).not.toBe(two.value.worktreeId);
+
+      const file = { projectId: other, path: 'source file.ts', line: null, column: null };
+      expect(await developer.handoff({ ...file, action: 'reveal' })).toEqual({ ok: true, value: true });
+      expect(revealed).toHaveBeenCalledOnce();
+      expect(revealed).toHaveBeenCalledWith(join(linked, 'source file.ts'));
+      if (process.platform !== 'win32') {
+        await writeFile(editor, '#!/bin/sh\nprintf "%s\\n" "$PWD" "$@" > "$0.results"\n', { mode: 0o700 });
+        expect(await developer.handoff({ ...file, action: 'choose-editor', path: null })).toEqual({ ok: true, value: true });
+        expect(await developer.handoff({ ...file, action: 'editor', line: 9, column: 3 })).toEqual({ ok: true, value: true });
+        await expect.poll(async () => readFile(resultPath, 'utf8').catch(() => ''), { timeout: 5000 })
+          .toBe([linked, '--new-window', '--goto', join(linked, 'source file.ts') + ':9:3', ''].join('\n'));
+      }
+      grants.delete(other);
+      expect(await developer.handoff({ ...file, action: 'reveal' })).toEqual({ ok: false, error: 'ACCESS_DENIED' });
+    } finally {
+      await developer.dispose();
+      await git.dispose();
+      await rm(fixture, { recursive: true, force: true, maxRetries: 5 });
+    }
+  }, 30_000);
 });

@@ -225,3 +225,13 @@ The Phase 09 trust boundaries and independent development database setup are doc
 The first Windows native merge smoke clicked Review while its explicit Git refresh was still reading the linked commit. The fixture now waits for the source selector to show the actual new commit ID. Production stale-review checks and test assertions remain in force.
 
 The subsequent Windows run exposed scheduling timeouts in two existing native filesystem and Git fixtures that use Vitest’s five-second default. Windows CI now runs those suites with two workers and a 15-second default fixture budget. The same cases, assertions and production Git process limits remain active.
+
+## Phase 10 · Editor integrations and design extensions
+
+- Base `837e0b7` includes PR #12 and the Phase 00–09 history. Work remains on the isolated task branch.
+- P10-01: Native Git fixture verifies separate repository and worktree identity, Unicode and spaced paths, scoped reveal, grant closure, and exact VS Code arguments using a Linux fixture executable. An installed VS Code instance and native terminal launch still need interactive Windows desktop verification.
+- P10-02: The real Node.js and Go inventory applications passed reviewed build, test, backend and Vite startup, health and readiness, PostgreSQL-backed requests, and process shutdown locally. Integration coverage includes occupied ports, stale approvals, cross-worktree access, byte limits, log redaction and link/junction rejection.
+- P10-03: Sandboxed Electron verified a saved built-in API design, native OpenAPI export, handoff to a live HTTP request, and a structured response. The service fixture exercised invalid Host, redirect and oversized response handling.
+- P10-04: Sandboxed Electron verified reviewed page application and exact preservation of a customized Vite configuration. Standalone verification built and rendered `/studio-page.html` against PostgreSQL inventory rows using the Business Workspace template.
+- P10-05: Sandboxed Electron saved a requirement linked to a schema table, built-in API, page and workspace source, followed the table and requirement links, saved a workflow, and detected an externally modified source.
+- P10-06: Linux local frozen install, lint, typecheck, production build and browser renderer suite passed. The Windows workflow runs native Electron and the disposable PostgreSQL fixtures before uploading screenshots. Review the final pull request checks for the candidate commit.
