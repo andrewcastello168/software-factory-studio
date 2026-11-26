@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import {
+  SCHEMA_CHANNEL, isMigrationPreview, isNullableSchemaSnapshot, isSchemaConnection, isSchemaEdit,
+  isSchemaLayout, isSchemaPhysical, isSchemaPoints, isSchemaProposal, isSchemaPublish, isSchemaSnapshot, isSqlImport,
   CHANNEL, failure, isAppInfo, isPreferences, isPreferenceSnapshot, isPreferenceWrite,
   isSystemTheme, validateReply, PROJECT_CHANNEL, isProjectCatalog, isProjectId, isProjectSelection,
   GIT_CHANNEL, isGitAction, isGitCloneRequest, isGitCloneResult, isGitCompareRequest, isGitDiff, isGitDiffRequest,
@@ -21,7 +23,23 @@ function invokeProject<T>(channel: string, validate: Validator<T>, id: unknown):
   return isProjectId(id) ? invoke(channel, validate, id) : Promise.resolve(failure('INVALID_REQUEST'));
 }
 
+function checkedInvoke<T>(
+  channel: string, input: unknown, validInput: (value: unknown) => boolean, validReply: Validator<T>,
+): Promise<Result<T>> {
+  return validInput(input) ? invoke(channel, validReply, input) : Promise.resolve(failure('INVALID_REQUEST'));
+}
+
 const studio: StudioBridge = {
+  schema: {
+    inspect: (id) => invokeProject(SCHEMA_CHANNEL.inspect, isSchemaSnapshot, id),
+    parse: (input) => checkedInvoke(SCHEMA_CHANNEL.parse, input, isSqlImport, isSchemaProposal),
+    preview: (input) => checkedInvoke(SCHEMA_CHANNEL.preview, input, isSchemaEdit, isMigrationPreview),
+    publish: (input) => checkedInvoke(SCHEMA_CHANNEL.publish, input, isSchemaPublish, isNullableSchemaSnapshot),
+    release: (input) => checkedInvoke(SCHEMA_CHANNEL.release, input, isSchemaPublish, isNullableSchemaSnapshot),
+    layout: (input) => checkedInvoke(SCHEMA_CHANNEL.layout, input, isSchemaLayout, isSchemaPoints),
+    physical: (input) => checkedInvoke(SCHEMA_CHANNEL.physical, input, isSchemaConnection, isSchemaPhysical),
+    apply: (input) => checkedInvoke(SCHEMA_CHANNEL.apply, input, isSchemaConnection, isSchemaPhysical),
+  },
   projects: {
     list: () => invoke(PROJECT_CHANNEL.list, isProjectCatalog),
     openFolder: () => invoke(PROJECT_CHANNEL.openFolder, isProjectSelection),

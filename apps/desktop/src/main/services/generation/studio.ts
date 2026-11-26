@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { failure, GENERATOR_LIMITS, isStarterConfig, PROJECT_LIMITS, success } from '@factory/contracts';
 import type {
-  ErrorCode, GeneratorParent, GeneratorPending, GeneratorPreview, GeneratorReceipt, GeneratorRequest, ProjectSelection, Result,
+  ErrorCode, GeneratorParent, GeneratorPending, GeneratorPreview, GeneratorReceipt, GeneratorRequest, ProjectSelection, Result, StarterConfig,
 } from '@factory/contracts';
-import { planLegacyProject, planProject } from '@factory/generator';
+import { planLegacyProject, planProject, InvalidCrud } from '@factory/generator';
 import type { StarterPlan } from '@factory/generator';
 import { admitRoot, checkedDirectory, pathKey, sameDirectory } from '../projects/filesystem';
 import type { ProjectRoot } from '../projects/filesystem';
@@ -103,7 +103,9 @@ export class GeneratorStudio {
       this.#plan = undefined;
       const parent = this.#parent;
       if (!parent || parent.id !== request.parentId) return failure('ACCESS_DENIED');
-      const plan = planProject(request.config, randomUUID());
+      let plan: StarterPlan<StarterConfig>;
+      try { plan = planProject(request.config, randomUUID()); }
+      catch (error) { if (error instanceof InvalidCrud) return failure('SCHEMA_CONFLICT'); throw error; }
       const directory = join(parent.root.path, plan.config.slug);
       if (directory.length > PROJECT_LIMITS.absolutePath - 200) return failure('GENERATOR_DESTINATION');
       await inspectParent(parent.root);

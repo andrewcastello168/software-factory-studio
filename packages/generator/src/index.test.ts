@@ -1,3 +1,4 @@
+import { parseSql } from '@factory/schema';
 import { describe, expect, it } from 'vitest';
 import { isGeneratorPath, isStarterConfig, moduleCompatibility, STARTER, WELCOME_EXAMPLE } from '@factory/contracts';
 import type { StarterConfig } from '@factory/contracts';
@@ -90,4 +91,24 @@ it('reproduces the previously released v1 plan byte for byte for recovery only',
   expect(isStarterConfig(legacy)).toBe(false);
   expect(planLegacyProject(legacy, '92500fcd-63be-4e81-b0dd-918e935ab0d3').digest)
     .toBe('7cb9f1e960819c4c1cc1889323831176cd08b30b10746bed3391fa44cc893f03');
+});
+
+it('locks the explicit schema and generates only compatible selected CRUD layers', () => {
+  const { schema, diagnostics } = parseSql('CREATE TABLE products (id integer PRIMARY KEY, name text NOT NULL);');
+  expect(diagnostics).toEqual([]);
+  const migrationOnly = planProject({ ...config, crud: { schema, migrations: true, backend: [], frontend: [] } }, id);
+  expect(migrationOnly.files.some(({ path }) => path === 'db/migrations/0002_schema.sql')).toBe(true);
+  expect(migrationOnly.files.some(({ path }) => path.includes('/crud/'))).toBe(false);
+  const api = { schema, migrations: true as const, backend: ['products'], frontend: [] };
+  const backendOnly = planProject({ ...config, crud: api }, id);
+  expect(backendOnly.files.some(({ path }) => path === 'server/features/crud/register.ts')).toBe(true);
+  expect(backendOnly.files.some(({ path }) => path.includes('web/features/crud'))).toBe(false);
+  const full = planProject({ ...config, crud: { ...api, frontend: ['products'] }, modules: [WELCOME_EXAMPLE] }, id);
+  const manifest = full.files.find(({ path }) => path === '.factory/generation-manifest.json')!;
+  expect(JSON.parse(manifest.content)).toMatchObject({
+    versions: { schema: { version: '1.0.0', migration: 'db/migrations/0003_schema.sql', backend: ['products'], frontend: ['products'] } },
+    files: expect.arrayContaining([expect.objectContaining({ path: 'web/features/crud/Crud.tsx', owner: 'postgresql-crud', action: 'create' })]),
+  });
+  expect(full.files.find(({ path }) => path === 'pnpm-lock.yaml')).toEqual(migrationOnly.files.find(({ path }) => path === 'pnpm-lock.yaml'));
+  expect(() => planProject({ ...config, crud: { ...api, backend: [], frontend: ['products'] } }, id)).toThrow(/requires the generated API/u);
 });

@@ -3,8 +3,11 @@ import {
   GENERATOR_LIMITS, isGeneratorPath, isLegacyStarterConfig, isProjectId, isStarterConfig, MODULE_CATALOG, STARTER,
 } from '@factory/contracts';
 import type { GeneratorFile, LegacyStarterConfig, StarterConfig } from '@factory/contracts';
+import { composeCrud, CRUD_OWNER, InvalidCrud, normalizeCrud } from './crud';
 import { composeModules, foundationTemplates } from './modular';
 import { nodeTemplates } from './templates';
+
+export { InvalidCrud } from './crud';
 
 export interface StarterPlan<Config = StarterConfig | LegacyStarterConfig> {
   projectId: string;
@@ -101,27 +104,46 @@ export function planProject(input: StarterConfig, projectId: string): StarterPla
   if (!isStarterConfig(input) || !isProjectId(projectId)) throw new Error('Unsupported project configuration.');
   const config: StarterConfig = {
     ...coreConfig(input), database: input.database,
+    ...(input.crud ? { crud: normalizeCrud(input.crud) } : {}),
     modules: input.modules.map(({ id, version }) => ({ id, version })).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   };
+  if (config.crud && Buffer.byteLength(json(config)) > 36_000) throw new InvalidCrud('Schema exceeds the portable generation limit.');
   const { modules, slots, testPaths } = composeModules(config.modules);
+  const crud = config.crud && composeCrud(config.crud, modules.length > 0);
+  if (crud) {
+    for (const key of Object.keys(slots) as (keyof typeof slots)[]) slots[key] += crud.slots[key];
+    testPaths.push(...crud.testPaths);
+  }
   const versions = {
     generator: STARTER.engineVersion,
     stack: { id: config.stack, version: STARTER.templateVersion, templateSha256: sha256(json(templateHashes(foundationTemplates))) },
     architecture: { id: config.architecture, version: STARTER.architectureVersion },
     engineering: { id: config.engineering, version: STARTER.engineeringVersion },
     database: config.database,
+    ...(crud ? { schema: { id: CRUD_OWNER, version: '1.0.0', migration: crud.migrationPath,
+      templateSha256: sha256(json({ files: templateHashes(crud.files), slots: crud.slots, values: crud.values })),
+      backend: config.crud!.backend, frontend: config.crud!.frontend } } : {}),
     modules: modules.map(({ id, version, templates, slots, tests }) => ({
       id, version, templateSha256: sha256(json({ files: templateHashes(templates), slots, tests })),
       requires: MODULE_CATALOG.find((module) => module.id === id)!.requires,
     })),
   };
-  const values = { ...renderingValues(config), ...slots };
+  const values = { ...renderingValues(config), ...slots, ...crud?.values };
   const files = render(foundationTemplates, config.slug, values, testPaths);
   const owners = new Map<string, string>();
   for (const module of modules) {
     for (const planned of render(module.templates, config.slug, values)) {
       files.push(planned);
       owners.set(planned.path, module.id);
+    }
+  }
+  if (crud) {
+    for (const [path, content] of crud.files) {
+      // SQL and documentation are finalized data, not template expressions.
+      const planned = path.startsWith('db/') || path.startsWith('docs/')
+        ? file(path, content) : render([[path, content]], config.slug, values)[0]!;
+      files.push(planned);
+      owners.set(path, CRUD_OWNER);
     }
   }
   files.push(

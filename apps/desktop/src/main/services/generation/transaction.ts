@@ -57,7 +57,7 @@ async function fileMatches(path: string, digest: string) {
   return stat ? readBoundedFile(path, stat, GENERATOR_LIMITS.fileBytes, (bytes) => sha256(bytes) === digest) : null;
 }
 
-async function publish(root: ProjectRoot, name: string, temporary: string, content: string, digest: string) {
+export async function publish(root: ProjectRoot, name: string, temporary: string, content: string, digest: string, authorize?: () => Promise<void>) {
   await withDirectory(root.path, root.identity, async (opened) => {
     const target = join(opened, name);
     const stage = join(opened, temporary);
@@ -79,6 +79,7 @@ async function publish(root: ProjectRoot, name: string, temporary: string, conte
       await checkedDirectory(root.path, root.identity);
       // A same-directory hard link publishes the complete bytes and fails on
       // any occupied target name, including a link or file created by an editor.
+      await authorize?.();
       await link(stage, target);
       await syncDirectory(opened);
       existing = await fileMatches(target, digest);

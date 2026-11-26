@@ -1,0 +1,11 @@
+.crud-toolbar, .crud-toolbar form { display: flex; align-items: end; gap: .6rem; flex-wrap: wrap; }
+.crud-toolbar { margin-block: 1rem; }
+.crud-overflow { overflow: auto; }
+.crud-workspace table { width: 100%; table-layout: auto; border-collapse: collapse; }
+.crud-workspace td, .crud-workspace th { text-align: left; padding: .5rem; border-bottom: 1px solid currentColor; overflow-wrap: anywhere; }
+.crud-workspace input, .crud-workspace select, .crud-workspace button { font: inherit; padding: .3rem .45rem; }
+.crud-workspace button + button { margin-inline-start: .4rem; }
+.crud-editor { border: 1px solid currentColor; padding: .8rem; margin-block: .8rem; }
+.crud-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .6rem; margin-block: .7rem; }
+.crud-field label { display: grid; gap: .2rem; }
+.crud-field .crud-null { display: flex; align-items: center; }
