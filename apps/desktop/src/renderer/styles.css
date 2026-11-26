@@ -174,7 +174,9 @@ kbd {
 .workbench {
   display: grid;
   grid-template-columns: min(var(--sidebar-width), 45vw) 1px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   min-width: 0;
+  min-height: 0;
 }
 .workbench--collapsed { grid-template-columns: minmax(0, 1fr); }
 .sidebar {
@@ -243,7 +245,7 @@ kbd {
 .separator:hover:not([aria-disabled="true"]), .separator:focus-visible { background: var(--accent); }
 .separator[aria-disabled="true"] { cursor: default; }
 
-.workspace { display: grid; grid-template-rows: 40px minmax(0, 1fr); min-width: 0; }
+.workspace { display: grid; grid-template-rows: 40px minmax(0, 1fr); min-width: 0; min-height: 0; }
 .workspace-tabs-bar {
   display: flex;
   align-items: stretch;
@@ -289,7 +291,7 @@ kbd {
 .workspace-tab > .tooltip-anchor { margin-right: 3px; }
 .workspace-tab .button--icon { width: 25px; min-height: 26px; }
 .workspace-scope { align-self: center; font-size: 11px; color: var(--muted); white-space: nowrap; }
-.workspace-main { min-width: 0; overflow: auto; }
+.workspace-main { min-width: 0; min-height: 0; overflow: auto; }
 .workspace-main:focus { outline: none; }
 
 .page, .notice-wrap { max-width: 1056px; padding: 28px clamp(16px, 3.4vw, 44px); }

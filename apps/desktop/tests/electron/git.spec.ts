@@ -90,10 +90,13 @@ test('Git Studio clones, commits and switches real native workspaces with read-o
     await expect(page.getByText('Selected change staged.', { exact: true })).toBeVisible();
     const staged = page.getByRole('region', { name: 'Staged changes' });
     await expect(staged).toContainText('service.txt');
+    await instance.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0]?.setSize(700, 520); });
+    await expect.poll(() => page.evaluate(() => window.innerWidth)).toBeLessThan(750);
     await page.getByRole('textbox', { name: 'Commit message' }).fill('Update project mode');
     await page.getByRole('button', { name: 'Commit', exact: true }).click();
     await expect(page.getByText('Staged changes committed.')).toBeVisible();
     expect(git(clone, 'log', '-1', '--format=%s')).toBe('Update project mode');
+    await instance.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0]?.setSize(1280, 800); });
 
     await page.getByRole('button', { name: 'Create branch', exact: true }).click();
     await page.getByLabel('Branch name', { exact: true }).fill('review');

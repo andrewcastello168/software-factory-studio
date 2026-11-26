@@ -216,4 +216,13 @@ test('Git Studio supports keyboard diff inspection and cancel-only dirty checkou
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect(page.getByRole('heading', { name: 'Git Studio' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1024);
+
+  await page.setViewportSize({ width: 660, height: 480 });
+  expect(await page.evaluate(() => {
+    const workbench = document.querySelector('main')!;
+    const bar = document.querySelector('footer')!;
+    return workbench.getBoundingClientRect().bottom <= bar.getBoundingClientRect().top
+      && workbench.scrollHeight > workbench.clientHeight
+      && document.documentElement.scrollWidth === 660;
+  })).toBe(true);
 });
