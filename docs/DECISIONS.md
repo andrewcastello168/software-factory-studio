@@ -96,3 +96,11 @@ Linux and macOS use nonrecursive watchers for a bounded set of inspected directo
 | Track the standalone lock and use Node's TypeScript development mode | Node 22.16.0 and pnpm 10.13.1 align with Studio. TypeScript 6 rewrites relative extensions for the production server build. The project needs no Studio runtime. |
 | Publish new files exclusively and record recovery in app data | Same-directory staged hard links avoid overwriting existing content. The wizard supports absent destinations on filesystems with hard links. Recovery is resume or manual handoff, and avoids deletions of user files. |
 | Verify file bytes in Studio and run code separately | A successful generation does not execute scripts or connect to a database. Platform workflow fixtures install, run, build and verify the generated app with their own disposable PostgreSQL databases. |
+
+## Phase 04 modular composition follow-up
+
+| Decision | Rationale and trade-off |
+| --- | --- |
+| Generate a foundation without domain features by default | PostgreSQL readiness and migration tooling remain real and reusable. The opt-in Welcome example shows how a module contributes a route, component, migration, test, and documentation without defining the client's requirements. |
+| Plan from trusted, versioned contributions | Exact module pins, a compatibility catalog, and provenance keep the preview reproducible. Existing dependencies are reused. Installing modules after generation, authoring custom modules, and resolving full dependency graphs remain Phase 06–07 work. |
+| Retain the released v1 renderer for recovery | Preserve approval hashes for interrupted jobs and avoid rewriting deployed projects. The wizard uses the modular v2 contract for new plans. |

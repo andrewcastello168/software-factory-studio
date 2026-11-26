@@ -20,9 +20,9 @@ Use **Clone Repository** on Home or from the command palette. Select a public HT
 
 ## Generate a standalone project
 
-Open **New Project** from Home or the command palette. Enter a project name and API port and choose a parent folder outside an existing Git working tree. The wizard creates a new child and offers the full-stack Node.js, TypeScript, Express, React, Vite and PostgreSQL combination with Layered Web v1 and Standard Engineering v1. Review the exact files, confirm in the native dialog, and open the verified managed project.
+Open **New Project** from Home or the command palette. Enter a project name and API port and choose a parent folder outside an existing Git working tree. The wizard creates a new child and offers full-stack Node.js, TypeScript, Express, React, Vite and PostgreSQL with Layered Web v1 and Standard Engineering v1. The default foundation includes API liveness, live database readiness and the migration ledger. Enable the Welcome example only when you want its sample route, React panel, seeded migration and test. Review the exact files, confirm in the native dialog, and open the verified managed project.
 
-The output includes independent backend and frontend source, a PostgreSQL migration, a frozen dependency graph, portable fingerprints, and project-specific instructions for people and coding assistants. Use **Generation Recovery** in the command palette to reauthorize and resume an interrupted operation. The [generator specification](docs/GENERATOR_SPECIFICATION.md) describes destination, file integrity, and recovery limits.
+The output includes independent backend and frontend source, a PostgreSQL migration, a frozen dependency graph, portable fingerprints, and project-specific instructions for people and coding assistants. The portable module lock records the version and source digest of each selected feature. Planned options are described in the wizard and unavailable for selection. Use **Generation Recovery** in the command palette to reauthorize and resume an interrupted operation. The [generator specification](docs/GENERATOR_SPECIFICATION.md) describes destination, file integrity, and recovery limits.
 
 Use the generated README to configure a disposable local PostgreSQL database and run the app with Node.js 22.16.0 and pnpm 10.13.1. From the project root:
 
@@ -66,7 +66,7 @@ Use `pnpm dev:web` for a separate Vite renderer preview at `http://127.0.0.1:448
 | `pnpm start` | Run the built desktop app through its production renderer origin |
 | `pnpm test:renderer` | Playwright tests against the built renderer with a test-only bridge and the browser development mode |
 | `pnpm test:electron` | Playwright flows through sandboxed Electron with disposable profiles, projects, and Git repositories |
-| `pnpm verify:starter` | Generate a disposable app, install the frozen graph, run checks and serve the production build |
+| `pnpm verify:starter` | Generate both starter configurations, install each frozen graph, and verify development and production startup |
 
 The [Windows verification workflow](.github/workflows/windows.yml) runs automatically on pull requests to `main`. It builds the application on Windows x64 and runs the renderer and native Electron suites. To reproduce those checks locally and open the built app on Windows x64:
 
