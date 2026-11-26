@@ -204,3 +204,5 @@ Phase 08 starts at `9e8bb22` on the isolated `work` branch. The second parent ma
 | P08-05 | Local Linux passed frozen installation, lint, typecheck, production build, 81 Vitest checks and 11 renderer checks. The pull request records the platform jobs, screenshots and dependency audit evidence for the delivered head. |
 
 The Go vulnerability check uses upstream advisory data. The initial scan reported reachable transitive dependency advisories. The resulting lock pins golang.org/x/net v0.63.0 and quic-go v0.59.1. The Linux workflow scans generated source with govulncheck v1.10.0 and the upstream advisory snapshot recorded in the workflow. See the [stack matrix](STACK_PLUGIN_SDK.md#built-in-sdk-v1) for boundaries and exact versions.
+
+The initial Windows run exceeded Vitest’s default five-second budget in the existing Git initialization and staging fixture. Its test budget now matches the other multistep Git integration cases. The Git execution limits and assertions are unchanged.
