@@ -1,3 +1,7 @@
+import { builtFiles, payloadDigest, revisionSnapshot } from '../delivery/files';
+import type { DeliveryStore } from '../delivery/store';
+import { isQualityTask } from '@factory/contracts';
+import type { QualityEvidence } from '@factory/contracts';
 import { spawn, execFile } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -39,7 +43,8 @@ const liveProcess = (child: ChildProcess | undefined) => child?.exitCode === nul
 const isStopping = (job: Job) => job.process.state === 'stopping';
 const escapeSequence = new RegExp(String.fromCharCode(27) + '\\[[0-?]*[ -/]*[@-~]', 'gu');
 type Inspection = Awaited<ReturnType<DeveloperStudio['capture']>>;
-type Launch = { preview: RuntimePreview; env: NodeJS.ProcessEnv; secrets: string[] };
+type Launch = { preview: RuntimePreview; env: NodeJS.ProcessEnv; secrets: string[];
+  evidence: QualityEvidence | null; goBackend: boolean; rejectStdout: boolean };
 type Ticket = { projectId: string; key: string; selection: RuntimeSelection; preview: RuntimePreview; at: number };
 interface Job {
   projectId: string;
@@ -77,7 +82,7 @@ export class DeveloperStudio {
   #tickets = new Map<string, Ticket>();
   #jobs = new Map<string, Job>();
 
-  constructor(private readonly grant: Grant, private readonly dialogs: DeveloperDialogs) {}
+  constructor(private readonly grant: Grant, private readonly dialogs: DeveloperDialogs, private readonly delivery?: DeliveryStore) {}
 
   #root(id: string) {
     const root = !this.#disposed && this.grant.root(id);
@@ -144,7 +149,7 @@ export class DeveloperStudio {
         : config?.state === 'unsafe' ? 'The .env path is unsafe. Use a regular, UTF-8 file in this worktree.'
           : !isDevPort(port) ? 'Set PORT to a number between 1024 and 65535 in the local .env file.' : null,
     };
-    return { info, project, stack, root, files, local, context, node, go };
+    return { info, project, stack, root, files, local, context, node, go, pnpm };
   }
 
   inspect(id: string) { return this.#result(async () => (await this.capture(id)).info); }
@@ -215,8 +220,14 @@ export class DeveloperStudio {
     if (context[0] !== 'repository' && context[0] !== 'not-repository') throw new Blocked('DEVELOPER_UNSUPPORTED');
     if (context[5]) throw new Blocked('PROJECT_BUSY');
     const goBackend = project.config.stack === GO_STACK;
-    const needGo = goBackend && input.task !== 'frontend';
-    const needNode = input.task === 'frontend' || input.task === 'build' || !goBackend;
+    const goTasks = ['backend', 'test', 'build', 'format', 'vet', 'vulnerability'];
+    const needGo = goBackend && goTasks.includes(input.task);
+    const needNode = ['frontend', 'build', 'lint', 'typecheck', 'audit', 'postgres'].includes(input.task) || !goBackend;
+    if (input.quality && !this.delivery) throw new Blocked('DELIVERY_BLOCKED');
+    if ((!goBackend && ['format', 'vet', 'vulnerability'].includes(input.task)) || (goBackend && input.task === 'postgres')) {
+      throw new Blocked('DELIVERY_BLOCKED');
+    }
+    const tracked = input.quality ? await this.#qualitySource(input.projectId, root) : null;
     const tool = (name: string) => info.tools.find((row) => row.name === name)?.version;
     if ((needNode && tool('Node.js') !== stack.execution.node) || (needGo && tool('Go') !== stack.execution.go)) {
       throw new Blocked('DEVELOPER_TOOL');
@@ -232,6 +243,21 @@ export class DeveloperStudio {
       if (files.get(goBackend ? 'cmd/server/main.go' : 'server/server.ts')?.state !== 'text') throw new Blocked('DEVELOPER_UNSUPPORTED');
       add(goBackend ? go?.target : node?.target, ...stack.execution.backend);
     }
+    if (input.task === 'build' && input.quality) {
+      try {
+        for (const path of ['dist', 'dist/web', ...(!goBackend ? ['dist/server'] : [])]) await readDirectory(root, path);
+        if (goBackend) {
+          for (const name of ['factory-server', 'factory-migrate']) {
+            const binary = join(root.path, 'dist', name + (windows ? '.exe' : ''));
+            const stat = await lstat(binary, { bigint: true }).catch((error: unknown) => {
+              if (isRecord(error) && error.code === 'ENOENT') return null;
+              throw error;
+            });
+            if (stat && (!stat.isFile() || stat.nlink !== 1n || pathKey(await realpath(binary)) !== pathKey(binary))) throw new Error('Unsafe production output.');
+          }
+        }
+      } catch { throw new Blocked('DELIVERY_BLOCKED'); }
+    }
     if (input.task === 'frontend' || input.task === 'build') {
       const vite = await dependencyBin(root, 'vite').catch(() => null);
       if (!vite || files.get('vite.config.ts')?.state !== 'text') throw new Blocked('DEVELOPER_TOOL');
@@ -243,14 +269,19 @@ export class DeveloperStudio {
           add(node?.target, tsc, '-p', 'tsconfig.server.json');
         }
         add(node?.target, vite, 'build');
-        if (goBackend) add(go?.target, 'build', '-mod=readonly', '-buildvcs=false', './cmd/...');
+        if (goBackend && !input.quality) add(go?.target, 'build', '-mod=readonly', '-buildvcs=false', './cmd/...');
       }
     }
-    if (input.task === 'test') {
+    if (input.quality && input.task === 'build' && goBackend) {
+      for (const name of ['server', 'migrate']) add(go?.target, 'build', '-mod=readonly', '-trimpath', '-buildvcs=false',
+        '-o', 'dist/factory-' + name + (windows ? '.exe' : ''), './cmd/' + name);
+    }
+    if (input.task === 'test' || input.task === 'postgres') {
       if (goBackend) add(go?.target, 'test', '-mod=readonly', '-buildvcs=false', './...');
       else {
-        const tests = project.files.map(({ path }) => path).filter((path) => /^test\/[a-z]+\.test\.ts$/u.test(path)).sort();
-        if (!tests.length) throw new Blocked('DEVELOPER_UNSUPPORTED');
+        const tests = (tracked?.paths ?? project.files.map(({ path }) => path))
+          .filter((path) => /^test\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.test\.ts$/u.test(path)).sort();
+        if (!tests.length || tests.length > 40) throw new Blocked('DEVELOPER_UNSUPPORTED');
         for (const path of tests) {
           const observed = await inspectFile(root, path);
           if (observed.state !== 'text') throw new Blocked('DEVELOPER_UNSUPPORTED');
@@ -259,7 +290,34 @@ export class DeveloperStudio {
         add(node?.target, '--experimental-strip-types', '--test', ...tests);
       }
     }
-    const selected = Object.fromEntries(knownConfig.flatMap((key) => local[key] ? [[key, local[key]]] : []));
+    if (input.task === 'lint' || input.task === 'typecheck') {
+      const bin = await dependencyBin(root, input.task === 'lint' ? 'eslint' : 'typescript').catch(() => null);
+      if (!bin) throw new Blocked('DEVELOPER_TOOL');
+      add(node?.target, bin, ...(input.task === 'lint' ? ['.', '--max-warnings', '0'] : ['-p', 'tsconfig.json']));
+    }
+    if (input.task === 'audit') {
+      if (!snapshot.pnpm || tool('pnpm') !== stack.execution.pnpm) throw new Blocked('DEVELOPER_TOOL');
+      add(node?.target, snapshot.pnpm, 'audit', '--prod', '--audit-level', 'high', '--registry=https://registry.npmjs.org');
+    }
+    if (input.task === 'vet') add(go?.target, 'vet', '-mod=readonly', './...');
+    if (input.task === 'format' || input.task === 'vulnerability') {
+      const alternate = await openTool(input.task === 'format' ? 'gofmt' : 'govulncheck', this.grant.allows,
+        input.task === 'format' && go ? join(dirname(go.target), windows ? 'gofmt.exe' : 'gofmt') : undefined);
+      if (!alternate) throw new Blocked('DEVELOPER_TOOL');
+      add(alternate.target, ...(input.task === 'format' ? ['-l', 'cmd', 'internal', ...(tracked?.paths.includes('delivery/healthcheck.go') ? ['delivery'] : [])] : ['./...']));
+    }
+    const selected = Object.fromEntries(knownConfig.flatMap((key) =>
+      local[key] && (!input.quality || !sensitiveKey(key)) ? [[key, local[key]]] : []));
+    if (input.task === 'postgres') {
+      try {
+        const target = new URL(local.TEST_DATABASE_URL ?? '');
+        if (!['postgres:', 'postgresql:'].includes(target.protocol) || target.hostname !== '127.0.0.1'
+          || !/^\/factory_[a-z0-9_]{1,48}$/u.test(target.pathname)
+          || (target.search && (target.searchParams.size !== 1 || !/^-csearch_path=[a-z_][a-z0-9_]{0,62}$/u.test(target.searchParams.get('options') ?? '')))
+          || target.hash) throw new Error('Unsafe test target.');
+        selected.TEST_DATABASE_URL = target.href;
+      } catch { throw new Blocked('DEVELOPER_ENVIRONMENT'); }
+    }
     if (selected.DATABASE_URL) {
       try {
         const url = new URL(selected.DATABASE_URL);
@@ -284,19 +342,35 @@ export class DeveloperStudio {
       environment: ['HOST=127.0.0.1', 'PORT=' + info.backendPort, ...Object.keys(selected).filter((key) => !['HOST', 'PORT'].includes(key))
         .map((key) => key + ' (configured in .env)'), ...(needGo ? ['GOTOOLCHAIN=local', 'GOWORK=off', 'CGO_ENABLED=0', ...Object.keys(goCache).map((key) => key + ' (host cache)')] : [])] };
     const binaries = await Promise.all([...new Set(steps.flatMap(({ executable, args }) =>
-      [executable, ...args.filter((arg) => arg === args[0] && (arg.endsWith('/vite.js') || arg.endsWith('\\vite.js') || basename(arg) === 'tsc'))]))]
+      [executable, ...args.slice(0, 1).filter(isAbsolute)]))]
       .map(async (path) => {
         const stat = await lstat(path, { bigint: true });
         return [path, String(stat.ino), String(stat.size), String(stat.mtimeNs)];
       }));
-    const key = sha256(JSON.stringify([root, preview, context, binaries, goCache, [...files].map(([path, file]) => [path, hashFile(file)])]));
-    return { key, preview, env, secrets: knownConfig.filter(sensitiveKey).flatMap((name) => {
+    const key = sha256(JSON.stringify([root, preview, context, binaries, goCache, tracked?.source, [...files].map(([path, file]) => [path, hashFile(file)])]));
+    const now = new Date().toISOString();
+    const evidence: QualityEvidence | null = tracked && isQualityTask(input.task) ? {
+      id, task: input.task, revision: key, source: tracked.source, head: tracked.head, started: now, ended: now,
+      outcome: 'interrupted', code: null, output: null,
+    } : null;
+    return { key, preview, env, evidence, goBackend, rejectStdout: input.task === 'format',
+      secrets: [...knownConfig, 'TEST_DATABASE_URL'].filter(sensitiveKey).flatMap((name) => {
       const value = selected[name];
       if (!value) return [];
-      if (name !== 'DATABASE_URL') return [value];
+      if (!name.endsWith('DATABASE_URL')) return [value];
       const url = new URL(value);
       return [value, url.password, decodeURIComponent(url.password)].filter(Boolean);
     }) };
+  }
+
+  async #qualitySource(id: string, root: ProjectRoot) {
+    const current = await this.grant.git(id);
+    if (!current.ok) throw new Blocked('DELIVERY_BLOCKED');
+    try {
+      const snapshot = await revisionSnapshot(root, current.value);
+      await this.#guard(id, root);
+      return snapshot;
+    } catch { throw new Blocked('DELIVERY_BLOCKED'); }
   }
 
   preview(input: RuntimeSelection) {
@@ -349,6 +423,7 @@ export class DeveloperStudio {
         await this.#guard(projectId, root);
         if (job.process.port !== null && [...this.#jobs.values()].some(({ process: active }) =>
           active.port === job.process.port && ['starting', 'running', 'stopping'].includes(active.state))) throw new Blocked('DEVELOPER_PORT');
+        if (plan.evidence) await this.delivery?.quality(root, plan.evidence);
         this.#jobs.set(key, job);
         void this.#run(job, plan, stopTool ? stopTool.target : undefined);
         return { ...job.process };
@@ -374,6 +449,7 @@ export class DeveloperStudio {
   }
 
   async #run(job: Job, plan: Launch, stopTool?: string) {
+    let outcome: 'completed' | 'failed' | 'stopped' = 'failed';
     try {
       for (const { executable, args } of plan.preview.steps) {
         if (isStopping(job)) break;
@@ -427,16 +503,36 @@ export class DeveloperStudio {
         job.stop = undefined;
         job.process.code = code;
         if (isStopping(job)) break;
-        if (code !== 0) throw new Error('Failed step');
+        if (code !== 0 || (plan.rejectStdout && job.lines.some(({ stream, text }) => stream === 'stdout' && text.trim()))) {
+          throw new Error('Failed step');
+        }
       }
-      job.process.state = job.process.state === 'stopping' ? 'stopped' : 'completed';
+      outcome = job.process.state === 'stopping' ? 'stopped' : 'completed';
     } catch {
-      job.process.state = 'failed';
+      outcome = 'failed';
       this.#record(job, 'studio', 'The approved command did not complete. Check its diagnostics and prerequisites.');
     } finally {
       job.child = undefined;
       job.stop = undefined;
       job.process.ready = false;
+      if (plan.evidence && this.delivery) {
+        const evidence = plan.evidence;
+        try {
+          const live = await this.#qualitySource(job.projectId, job.root);
+          evidence.ended = new Date().toISOString();
+          evidence.code = job.process.code;
+          if (live.source === evidence.source) {
+            evidence.outcome = outcome === 'completed' ? 'passed' : outcome === 'failed' ? 'failed' : 'interrupted';
+            if (evidence.task === 'build' && evidence.outcome === 'passed') {
+              evidence.output = payloadDigest(await builtFiles(job.root, plan.goBackend));
+            }
+          } else this.#record(job, 'studio', 'Sources or configuration changed during verification. The result cannot be used for release.');
+          await this.delivery.quality(job.root, evidence);
+        } catch {
+          this.#record(job, 'studio', 'Delivery evidence or build output could not be verified. Inspect the worktree and try again.');
+        }
+      }
+      job.process.state = outcome;
       job.finish();
     }
   }

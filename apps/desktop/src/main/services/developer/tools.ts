@@ -33,9 +33,9 @@ async function executable(path: string, allowed: (path: string) => boolean) {
   } catch { return null; }
 }
 
-export async function openTool(name: 'node' | 'go' | 'code' | 'terminal' | 'taskkill', allowed: (path: string) => boolean, selected?: string) {
+export async function openTool(name: 'node' | 'go' | 'gofmt' | 'govulncheck' | 'code' | 'terminal' | 'taskkill', allowed: (path: string) => boolean, selected?: string) {
   const filename = name + (windows ? '.exe' : '');
-  const candidates = name === 'terminal'
+  const candidates = name === 'gofmt' && selected ? [selected] : name === 'terminal'
     ? windows ? [join(system, 'System32', 'cmd.exe')] : ['/usr/bin/gnome-terminal', '/usr/bin/konsole', '/usr/bin/xfce4-terminal', '/usr/bin/xterm']
     : name === 'taskkill' ? [join(system, 'System32', 'taskkill.exe')]
       : name === 'code' ? selected ? [selected]
@@ -44,7 +44,7 @@ export async function openTool(name: 'node' | 'go' | 'code' | 'terminal' | 'task
           : ['/usr/bin/code', '/usr/local/bin/code', '/snap/bin/code', '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code']
         : [...(process.env.PATH ?? '').split(delimiter).filter((path) => isAbsolute(path)).map((path) => join(path, filename)),
           ...programFiles.map((path) => name === 'node' ? join(path, 'nodejs', filename) : join(path, 'Go', 'bin', filename)),
-          ...(name === 'go' ? ['/usr/local/go/bin/go'] : [])];
+          ...(name === 'go' || name === 'gofmt' ? ['/usr/local/go/bin/' + name] : [])];
   for (const path of new Set(candidates)) {
     const target = await executable(path, allowed);
     if (target) return { target, launcher: path };
@@ -68,7 +68,7 @@ export async function pnpmScript(node: { target: string; launcher: string } | nu
   const paths = [dirname(node.launcher), ...(process.env.PATH ?? '').split(delimiter).filter((path) => isAbsolute(path)),
     join(homedir(), 'AppData', 'Roaming', 'npm')];
   for (const path of new Set(paths)) {
-    for (const candidate of [join(path, 'pnpm'), join(path, 'node_modules', 'pnpm', 'bin', 'pnpm.cjs')]) {
+    for (const candidate of [join(path, 'pnpm'), join(path, '..', 'pnpm', 'bin', 'pnpm.cjs'), join(path, 'node_modules', 'pnpm', 'bin', 'pnpm.cjs')]) {
       try {
         if (!allowed(candidate)) continue;
         const script = await realpath(candidate);
@@ -79,10 +79,10 @@ export async function pnpmScript(node: { target: string; launcher: string } | nu
   return null;
 }
 
-export async function dependencyBin(root: ProjectRoot, name: 'vite' | 'typescript') {
+export async function dependencyBin(root: ProjectRoot, name: 'vite' | 'typescript' | 'eslint') {
   const modules = await readDirectory(root, 'node_modules');
   if (!modules) return null;
-  const script = await realpath(join(modules.path, name, 'bin', name === 'vite' ? 'vite.js' : 'tsc'));
+  const script = await realpath(join(modules.path, name, 'bin', { vite: 'vite.js', typescript: 'tsc', eslint: 'eslint.js' }[name]));
   const within = relative(pathKey(modules.path), pathKey(script));
   if (!within || within.startsWith('..') || isAbsolute(within) || !(await lstat(script)).isFile()) return null;
   await checkedDirectory(modules.path, modules.identity);

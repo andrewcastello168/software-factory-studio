@@ -1,4 +1,8 @@
 import {
+  DELIVERY_CHANNEL, isDeliveryInspection, isNullableRelease, isPackageRequest, isShareExport, isShareExportResult,
+  isSharedLibrary, isShareImport, isShareImportResult,
+} from '@factory/contracts';
+import {
   DEVELOPER_CHANNEL, DESIGN_CHANNEL, isDesignSnapshot, isFlag, isHandoff, isPlaygroundRequest, isPlaygroundResponse,
   isRuntimeControl, isRuntimeCopy, isRuntimeEnvironment, isRuntimeInspection, isRuntimeLogs, isRuntimePreview, isRuntimeProcess, isRuntimeScope, isRuntimeSelection,
 } from '@factory/contracts';
@@ -39,6 +43,13 @@ function checkedInvoke<T>(
 }
 
 const studio: StudioBridge = {
+  delivery: {
+    inspect: (id) => invokeProject(DELIVERY_CHANNEL.inspect, isDeliveryInspection, id),
+    package: (input) => checkedInvoke(DELIVERY_CHANNEL.package, input, isPackageRequest, isNullableRelease),
+    shares: (id) => invokeProject(DELIVERY_CHANNEL.shares, isSharedLibrary, id),
+    export: (input) => checkedInvoke(DELIVERY_CHANNEL.export, input, isShareExport, isShareExportResult),
+    import: (input) => checkedInvoke(DELIVERY_CHANNEL.import, input, isShareImport, isShareImportResult),
+  },
   developer: {
     inspect: (id) => invokeProject(DEVELOPER_CHANNEL.inspect, isRuntimeInspection, id),
     handoff: (input) => checkedInvoke(DEVELOPER_CHANNEL.handoff, input, isHandoff, isFlag),

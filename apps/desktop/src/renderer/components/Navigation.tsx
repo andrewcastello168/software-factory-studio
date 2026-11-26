@@ -1,4 +1,4 @@
-import { Code2, Database, ListChecks } from 'lucide-react';
+import { Code2, Database, FileCheck2, ListChecks } from 'lucide-react';
 import {
   Blocks, BookOpen, Box, Clock3, Folder, GitBranch, House, Layers3, Library, Package, Settings2, Users, Waypoints,
 } from 'lucide-react';
@@ -41,7 +41,7 @@ const groups: { title: string; entries: { title: string; icon: LucideIcon; page?
 ];
 
 export function Navigation({
-  page, onSelect, projectView, onProjectView, database, generation, developer,
+  page, onSelect, projectView, onProjectView, database, generation, developer, delivery,
 }: {
   page: Page | null;
   onSelect: (page: Page) => void;
@@ -49,6 +49,7 @@ export function Navigation({
   database: boolean;
   generation: boolean;
   developer: boolean;
+  delivery: boolean;
   onProjectView: (view: ProjectView) => void;
 }) {
   return (
@@ -71,6 +72,9 @@ export function Navigation({
             </Button></li>}
             {developer && <li><Button aria-current={projectView === 'developer' ? 'page' : undefined} onClick={() => onProjectView('developer')}>
               <Code2 size={16} aria-hidden="true" />Developer Tools
+            </Button></li>}
+            {delivery && <li><Button aria-current={projectView === 'delivery' ? 'page' : undefined} onClick={() => onProjectView('delivery')}>
+              <FileCheck2 size={16} aria-hidden="true" />Client Delivery
             </Button></li>}
             {generation && <li><Button aria-current={projectView === 'generation' ? 'page' : undefined} onClick={() => onProjectView('generation')}>
               <ListChecks size={16} aria-hidden="true" />Generation Review

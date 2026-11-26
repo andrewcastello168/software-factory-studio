@@ -1,3 +1,5 @@
+import { isDeliveryOption } from './delivery';
+import type { DeliveryOption } from './delivery';
 import { isDesignMutation } from './design';
 import type { DesignMutation } from './design';
 import { isModuleSelection } from './generator-modules';
@@ -28,7 +30,7 @@ export interface IncrementalInspection {
   recovery: IncrementalPreview | null;
 }
 export interface IncrementalSelection {
-  projectId: string; revision: string; backend: string[]; frontend: string[]; modules?: ModuleSelection[]; design?: DesignMutation;
+  projectId: string; revision: string; backend: string[]; frontend: string[]; modules?: ModuleSelection[]; design?: DesignMutation; delivery?: DeliveryOption;
 }
 export interface IncrementalApproval { projectId: string; id: string }
 export interface IncrementalChange {
@@ -59,9 +61,10 @@ const choices = (x: Record<string, unknown>): x is Record<string, unknown> & { b
   && (!Object.hasOwn(x, 'modules') || list(x.modules, 12, isModuleSelection));
 
 export function isIncrementalSelection(x: unknown): x is IncrementalSelection {
-  return isRecord(x) && hasExactKeys(x, ['projectId', 'revision', 'backend', 'frontend', ...(Object.hasOwn(x, 'modules') ? ['modules'] : []), ...(Object.hasOwn(x, 'design') ? ['design'] : [])])
+  return isRecord(x) && hasExactKeys(x, ['projectId', 'revision', 'backend', 'frontend', ...(Object.hasOwn(x, 'modules') ? ['modules'] : []), ...(Object.hasOwn(x, 'design') ? ['design'] : []), ...(Object.hasOwn(x, 'delivery') ? ['delivery'] : [])])
     && isProjectId(x.projectId) && isGeneratorDigest(x.revision) && choices(x)
-    && (!Object.hasOwn(x, 'design') || (isDesignMutation(x.design) && !x.backend.length && !x.frontend.length && !x.modules?.length));
+    && (!Object.hasOwn(x, 'design') || (isDesignMutation(x.design) && !x.backend.length && !x.frontend.length && !x.modules?.length))
+    && (!Object.hasOwn(x, 'delivery') || (isDeliveryOption(x.delivery) && !x.design && !x.backend.length && !x.frontend.length && !x.modules?.length));
 }
 
 export function isIncrementalApproval(x: unknown): x is IncrementalApproval {

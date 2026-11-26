@@ -249,3 +249,6 @@ const stackAdapters = {
 } satisfies Record<StarterConfig['stack'], BuiltInStackAdapter>;
 
 export { artifactLinks, composeDesign, describeDesign, readDesign } from './design';
+
+export { composeDelivery, deliveryTemplates } from './delivery';
+export { canonicalAsset, readSharedBundle, sharedBundle } from './sharing';

@@ -1,4 +1,10 @@
 import {
+  DELIVERY_CHANNEL, isDeliveryInspection, isNullableRelease, isPackageRequest, isShareExport, isShareExportResult,
+  isSharedLibrary, isShareImport, isShareImportResult,
+} from '@factory/contracts';
+import { DeliveryStudio } from './services/delivery/studio';
+import { DeliveryStore } from './services/delivery/store';
+import {
   DEVELOPER_CHANNEL, DESIGN_CHANNEL, formatOpenApi, isDesignSnapshot, isFlag, isHandoff, isPlaygroundRequest, isPlaygroundResponse,
   isRuntimeControl, isRuntimeCopy, isRuntimeEnvironment, isRuntimeInspection, isRuntimeLogs, isRuntimePreview, isRuntimeProcess, isRuntimeScope, isRuntimeSelection, isWorkspacePath,
 } from '@factory/contracts';
@@ -48,6 +54,7 @@ let generatorStudio: GeneratorStudio | undefined;
 let databaseStudio: DatabaseStudio | undefined;
 let incrementalStudio: IncrementalStudio | undefined;
 let developerStudio: DeveloperStudio | undefined;
+let deliveryStudio: DeliveryStudio | undefined;
 let shutdown: Promise<void> | undefined;
 
 protocol.registerSchemesAsPrivileged([
@@ -72,8 +79,7 @@ function handle<T>(channel: string, validator: Validator<T>, operation: (...args
   });
 }
 
-function installBridge(store: PreferenceStore) {
-  const library = new LibraryStore(app.getPath('userData'));
+function installBridge(store: PreferenceStore, library: LibraryStore) {
   handle(LIBRARY_CHANNEL.list, isLibraryAssets, (...args) => args.length ? failure('INVALID_REQUEST') : library.list());
   handle(LIBRARY_CHANNEL.publish, isLibraryAsset, (...args) => args.length === 1 && isLibraryAsset(args[0])
     ? library.publish(args[0]) : failure('INVALID_REQUEST'));
@@ -110,6 +116,18 @@ function installProjectBridge() {
   handle(PROJECT_CHANNEL.removeRecent, isProjectCatalog, forWorkspace((workspace, id) => workspace.removeRecent(id)));
   handle(PROJECT_CHANNEL.rescan, isProjectCatalog, forWorkspace((workspace, id) => workspace.rescan(id)));
   handle(PROJECT_CHANNEL.close, isProjectCatalog, forWorkspace((workspace, id) => workspace.close(id)));
+}
+
+function installDeliveryBridge() {
+  function operation<I, O>(channel: string, input: Validator<I>, output: Validator<O>, run: (studio: DeliveryStudio, value: I) => Promise<Result<O>>) {
+    handle(channel, output, (...args) => args.length === 1 && input(args[0])
+      ? deliveryStudio ? run(deliveryStudio, args[0]) : failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  }
+  operation(DELIVERY_CHANNEL.inspect, isProjectId, isDeliveryInspection, (studio, id) => studio.inspect(id));
+  operation(DELIVERY_CHANNEL.package, isPackageRequest, isNullableRelease, (studio, input) => studio.package(input));
+  operation(DELIVERY_CHANNEL.shares, isProjectId, isSharedLibrary, (studio, id) => studio.shares(id));
+  operation(DELIVERY_CHANNEL.export, isShareExport, isShareExportResult, (studio, input) => studio.export(input));
+  operation(DELIVERY_CHANNEL.import, isShareImport, isShareImportResult, (studio, input) => studio.import(input));
 }
 
 function installDeveloperBridge() {
@@ -246,7 +264,7 @@ async function installProtocol() {
   });
 }
 
-async function openWindow() {
+async function openWindow(library: LibraryStore) {
   const current = new BrowserWindow({
     title: 'Software Factory Studio',
     width: 1280,
@@ -339,6 +357,7 @@ async function openWindow() {
     refresh: (id) => workspace.rescan(id),
   }, projectDialogs);
   incrementalStudio = incremental;
+  const deliveryStore = new DeliveryStore(app.getPath('userData'));
   const developer = new DeveloperStudio({
     root: (id) => workspace.root(id), allows: (path) => workspace.allowsAuxiliaryPath(path), git: (id) => git.status(id),
   }, {
@@ -351,7 +370,13 @@ async function openWindow() {
     reveal: (path) => shell.showItemInFolder(path),
     openURL: (url) => shell.openExternal(url),
     copy: (text) => clipboard.writeText(text),
-  });
+  }, deliveryStore);
+  const delivery = new DeliveryStudio({
+    root: (id) => workspace.root(id), git: (id) => git.status(id), available: (path) => workspace.allowsAuxiliaryPath(path),
+    pending: async (path) => git.isWriting() || Boolean(await generator.protectsGit(path)) || await database.protectsGit(path) || await incremental.protectsGit(path),
+    refresh: (id) => workspace.rescan(id),
+  }, projectDialogs, developer, deliveryStore, library);
+  deliveryStudio = delivery;
   developerStudio = developer;
   current.on('focus', () => { void workspace.reconcile(); });
   current.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -372,6 +397,7 @@ async function openWindow() {
   });
   current.once('ready-to-show', () => current.show());
   current.on('closed', () => {
+    delivery.dispose();
     shutdown = developer?.dispose();
     workspace.dispose();
     generator.dispose();
@@ -385,6 +411,7 @@ async function openWindow() {
       databaseStudio = undefined;
       incrementalStudio = undefined;
       developerStudio = undefined;
+      deliveryStudio = undefined;
       window = undefined;
     }
   });
@@ -432,8 +459,10 @@ if (!app.requestSingleInstanceLock()) {
     installSchemaBridge();
     installIncrementalBridge();
     installDeveloperBridge();
-    installBridge(new PreferenceStore(join(app.getPath('userData'), 'preferences.json')));
-    await openWindow();
-    app.on('activate', () => { if (!window) void openWindow().catch(reportStartupError); });
+    installDeliveryBridge();
+    const library = new LibraryStore(app.getPath('userData'));
+    installBridge(new PreferenceStore(join(app.getPath('userData'), 'preferences.json')), library);
+    await openWindow(library);
+    app.on('activate', () => { if (!window) void openWindow(library).catch(reportStartupError); });
   }).catch(reportStartupError);
 }
