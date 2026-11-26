@@ -117,7 +117,7 @@ export class DeliveryStudio {
           const prior = history.releases.find(({ version }) => version === input.version);
           const required = requiredQuality(app.stack.id);
           const failedOptional = ['audit', 'vulnerability', 'postgres'].some((task) =>
-            history.quality.find((item) => item.task === task && item.source === source.source)?.outcome === 'failed');
+            history.quality.find((item) => item.task === task && item.source === source.source && item.outcome !== 'interrupted')?.outcome === 'failed');
           if (failedOptional) throw new Rejected('DELIVERY_BLOCKED');
           const verified = required.map((task) => history.quality.find((item) => item.task === task && item.source === source.source));
           const output = verified.find((item) => item?.task === 'build')?.output;
@@ -160,10 +160,16 @@ export class DeliveryStudio {
         };
         const files = await prepare();
         const platform = go ? process.platform + '-' + process.arch : 'Node.js 22.16.0';
+        const extension = go && process.platform === 'win32' ? '.exe' : '';
+        const migration = go ? 'dist/factory-migrate' + extension : 'node dist/server/migrate.js';
+        const identity = planned.app.project!.config.modules.some(({ id }) => id === 'authentication');
         const docs = '# Client release\n\nRuntime: ' + platform + '\n\n'
           + (go ? 'Run the included dist/factory-server executable from the extracted root. On Windows use the .exe suffix.\n'
-            : 'Run pnpm 10.13.1 install --prod --frozen-lockfile --ignore-scripts, then node dist/server/server.js from the extracted root.\n')
-          + '\nProvide a reviewed DATABASE_URL, HOST and PORT. Check /api/health and /api/ready. Run the included migration entry separately after reviewing the destination.\n';
+            : 'Use pnpm 10.13.1. Run pnpm install --prod --frozen-lockfile --ignore-scripts, then node dist/server/server.js from the extracted root.\n')
+          + '\nProvide a reviewed DATABASE_URL, HOST and PORT. Check /api/health and /api/ready.\n'
+          + '\nAfter reviewing the database target and backup, apply migrations explicitly with `' + migration + '`.\n'
+          + (identity ? '\nSet AUTH_ORIGIN to the exact HTTPS origin. For initial admin setup, provide AUTH_BOOTSTRAP_EMAIL and run '
+            + '`node dist/server/features/identity/bootstrap.js` from an interactive terminal. Supply the password at the prompt.\n' : '');
         const proof = {
           version: input.version, project: planned.app.project!.projectId, stack: planned.app.stack!.id, revision: planned.head, platform, locks: planned.locks,
           quality: requiredQuality(planned.app.stack!.id), files: files.map(({ path, bytes }) => ({ path, sha256: shaBytes(bytes) })),

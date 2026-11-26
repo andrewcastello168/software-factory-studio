@@ -227,7 +227,7 @@ export function DeliveryWorkspace({ project, signal, openSource, openRecovery }:
   const selectedLog = logs.find(({ process }) => process.task === currentTask);
   const selectedFile = plan?.changes.find(({ path }) => path === file);
   const failedSecurityCheck = ['audit', 'vulnerability', 'postgres'].some((task) => inspection?.quality
-    .find((row) => row.task === task && row.source === inspection.source)?.outcome === 'failed');
+    .find((row) => row.task === task && row.source === inspection.source && row.outcome !== 'interrupted')?.outcome === 'failed');
   const releaseReady = Boolean(!failedSecurityCheck && inspection?.clean && inspection.stack && inspection.source
     && requiredQuality(inspection.stack).every((task) => {
       const record = inspection.quality.find((item) => item.task === task && item.source === inspection.source);
