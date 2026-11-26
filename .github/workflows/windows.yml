@@ -66,3 +66,10 @@ jobs:
 
       - name: Test native Electron
         run: pnpm test:electron
+
+      - name: Upload project workspace screenshots
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: windows-project-workspace
+          path: apps/desktop/test-results/**/project-*.png
+          retention-days: 7

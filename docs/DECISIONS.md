@@ -67,3 +67,13 @@ Desktop development enables the exact Vite loopback URL only from the Electron d
 **Status** Implemented in Phase 01.
 
 Store a small settings file at a fixed Electron user-data path. Serialize reads and changes, then sync and replace via a fresh same-directory file. IPC exposes application metadata, validated theme and sidebar preference changes, and native theme events. Unknown future versions remain intact. A corrupted known record uses safe defaults and an explicit repair confirmation. I/O failure preserves the last supported state and provides a reload path. This keeps local settings usable while avoiding a database or broader user-data bridge.
+
+## 0012 · Admit read-only project roots through Electron
+
+**Status** Implemented in Phase 02.
+
+The native chooser confirms the directory. Each window receives opaque project tokens for canonical roots and read-only actions. The renderer sends tokens to refresh or close a workspace. Main stores recent references in a separate versioned JSON file under the application profile. A different directory at a saved path needs fresh admission. Moving a managed project's portable UUID can establish identity at a new location without collapsing two accessible worktrees that share the same descriptor. Successful relocation revokes the previous token.
+
+Project Structure is a bounded snapshot of names and metadata. The scanner examines at most 1,600 entries across ten levels and skips dependency and Git internals. A scan only reads file bytes from the fixed, size-bounded portable descriptor. Linux enumerates through a verified directory handle using procfs. Windows and macOS recheck canonical paths and directory identity around their path-based directory listing. Detected replacements invalidate the affected results. The Windows check uses the exact file ID and confirmed creation time when the path stat omits a volume serial. Links and junctions are leaves throughout the scan.
+
+Nonrecursive watchers emit invalidations for a bounded set of inspected directories. Watcher bursts coalesce before rescanning. Window focus, manual refresh, and a periodic reconciliation cover missed events and watcher limits. This keeps the watcher set bounded and preserves read-only behavior for the admitted folder.
