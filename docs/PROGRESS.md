@@ -164,3 +164,15 @@ No application dependencies changed. Foundation and example share the frozen dep
 | P05-06 | Local Debian 13 Linux x64 passed frozen install, lint, typecheck, production build, 71 Vitest checks, 11 Playwright renderer checks, and five built Electron checks. The public HTTPS Git smoke requires the Windows workflow's explicit opt-in. GitHub Actions reuses Linux x64 and Windows Server 2025 x64 workflows, and the delivery pull request records the job links and screenshot artifact. |
 
 Database apply is confined to a separately approved development target. The UI support matrix and manual native dialog, remote trust store and installer checks are documented in [Database engine](DATABASE_ENGINE.md), [Testing strategy](TESTING_STRATEGY.md) and the [README](../README.md). CRUD composition is create-only in this phase. Phase 06 will extend application writes using ownership, conflict and recovery rules.
+
+## Phase 06 · Continuous Generation and Code Protection
+
+| Gate | Verification |
+| --- | --- |
+| P06-01 | Verified modular project locks and ownership, manual supplier migration detection, missing files and protected paths on disposable roots. The existing read-only schema workflow remains available. |
+| P06-02 | Built Electron reviewed exact created and modified files, a protected custom service, cancelled native consent, applied an approved plan, and then showed zero writes for the same selection. Captured dark and light plans. |
+| P06-03 | Exercised Git branch and migration staleness, modified entrypoints, a revoked workspace grant, and an escaping symlink or Windows junction. Retained custom source and client instructions. |
+| P06-04 | Simulated an interruption after creating a verified backup. Restarted the service, rejected a conflicting edit, and resumed with fresh approval when the conflict was removed. Manual handoff preserves backup and workspace bytes and records a receipt. |
+| P06-05 | Debian 13 x64 passed frozen install, lint, typecheck, 76 Vitest checks with a PostgreSQL 17 fixture, 11 renderer checks, six sandboxed Electron checks, and a production build. The standalone verifier passed the foundation, Welcome, original inventory and expanded inventory with PostgreSQL. Windows CI opts into the public HTTPS Git smoke. Delivery links the CI runs and screenshots from the pull request. |
+
+Supported scope is the deterministic modular v2 layout, approved CRUD types, existing supported migration sources and untouched required integration files. Editable application extension points and optional module installation remain future work. Resume and handoff are explicit filesystem recovery operations independent of database and Git history.

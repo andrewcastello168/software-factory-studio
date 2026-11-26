@@ -42,6 +42,12 @@ Open a managed Node/PostgreSQL project and select **Database Studio**. Use **Sch
 
 In **New Project**, enable **Define a database schema** to import DDL or design tables before generation. Enable Backend API and optional React page per compatible table. The generated data routes have no built-in authentication and require appropriate deployment access controls. Existing application files are preserved when Database Studio publishes a migration.
 
+## Incremental generation
+
+Open **Generation Review** in a compatible modular Node/PostgreSQL starter. Studio reads your declared migration files and shows compatible API and React layers. Select the tables, inspect creates, updates and protected files, then confirm the exact plan. Manual migrations and client code are preserved. Run migration or application commands separately using the project's own tools.
+
+Use **History** to inspect generation receipts. If a publication is interrupted, open the same workspace to review and resume or hand it off for manual inspection. See [Generator specification](docs/GENERATOR_SPECIFICATION.md) for compatibility and recovery limits.
+
 ## Development setup
 
 Use Node.js **22.16.0** and pnpm **10.13.1**. The application has no service or credential setup. Install Git for the project workflows and integration tests. Install the binary explicitly before running the desktop app. These commands work from PowerShell after installing the pinned Windows x64 Node release.

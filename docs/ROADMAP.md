@@ -12,7 +12,7 @@ Each phase delivers a demonstrable slice. Alongside the feature gate below, comp
 | 03 · Developer Workspace | 02 | Add Git Studio core to the actual project workspace. Pass P03-01 through P03-07 below. |
 | 04 · AI-ready Application Generator | 02, 03 | Deliver one verified Node.js and PostgreSQL stack with the default foundation and optional Welcome example. Pass P04-01 through P04-08 below. |
 | 05 · Database-driven Software Factory | 02, 04 | Render and edit a supported PostgreSQL schema with multiple tables, keys, constraints and indexes. Deliver ERD, reviewed DDL import, append-only source migration creation, read-only introspection, comparison, and reviewed dev migration apply. Deliver optional inventory-style CRUD in a new scaffold. Pass P05-01 through P05-06 below. |
-| 06 · Continuous Generation and Code Protection | 03, 04, 05 | Extend Phase 05 CRUD to supported incremental generation from a Studio proposal or manual SQL migration with no duplicate migration. Preserve owned and user-authored code. Prove stale branch and file rejection, ownership and conflicts, crash recovery, and no loss of intervening changes. |
+| 06 · Continuous Generation and Code Protection | 03, 04, 05 | Extend Phase 05 CRUD to supported incremental generation from a Studio proposal or manual SQL migration with no duplicate migration. Preserve owned and user-authored code and verify P06-01 through P06-05 below. |
 | 07 · Engineering Library and AI Context Studio | 06 | Versioned built-in, personal and Git-shared libraries of architecture, UI, module, component, and deployment templates. Install a supported audited module after project creation, preview dependency changes, lock digests, reject cycles and conflicts, and verify repeatable generation with a reusable appearance customization. Apply a reviewed, version-pinned reusable AI context profile without secrets or a provider integration. This is the primary MVP gate. |
 | 08 · Multi-stack support and SDK validation | 05, 06, 07 | Generate an idiomatic Go/Gin + React/Vite + PostgreSQL app using the versioned SDK. Both reference stacks pass replay, standalone build and PostgreSQL HTTP tests. Record migrations and tooling per stack. |
 | 09 · Advanced Git and worktrees | 03, 06 | Deliver reviewed commit/stash/worktree dirty-switch paths, guarded branch mutations, comparison and directional merge/rebase/cherry-pick/selected-file operations. Use fixtures to prove linked worktree isolation, ref and file revalidation, conflict preservation, stash recovery, and dirty removal prevention. Gate history, graph, conflict editor, stash, tags, remotes and provider integration on their own operation and permission evidence. |
@@ -25,6 +25,16 @@ Each phase delivers a demonstrable slice. Alongside the feature gate below, comp
 Phase 07 is the first complete factory workflow. A developer opens a real repository, generates an independent app with project instructions, proposes a schema and source migration, adds or updates code without losing custom work, and reuses a versioned template, module, and context profile on another project. This workflow runs locally with the ordinary stack toolchain and without a mandatory AI account. A coding assistant can consume the same human-readable context alongside VS Code. Verify the whole workflow before claiming MVP readiness.
 
 Phases 08–12 retain the approved multi-stack, advanced Git, design, development, quality, collaboration, deployment, and distribution requirements. Prioritize interoperability and external editor handoff ahead of full IDE duplication and complex page authoring. Verify extended capability claims individually. Phase 04 begins after Phase 03 approval and merge.
+
+## Phase 06 acceptance criteria
+
+| ID | Gate | Observable pass criteria |
+| --- | --- | --- |
+| P06-01 | Read-only inspection | Inspect modular starter locks and ownership, distinguish changed, missing and discovered files, and detect a supplier migration saved outside Studio. Reject unsupported layouts and DDL. |
+| P06-02 | Deterministic generation and review | Preview exact creates and updates, protected files, conflicts, content differences, migration references, and unchanged dependencies. Generate compatible API and React layers without a new migration. Repeat the same selection with zero writes. |
+| P06-03 | Workspace and code protection | Preserve custom source, modules and requirements. Block unknown or modified required integration files, staged targets, symlinks, junctions, revoked grants, and changed refs or migration checksums. |
+| P06-04 | Applied work and recovery | Require native authorization bound to the plan, publish verified writes with app-data history, and exercise interruption, restart, conflicting external edits, resume, and explicit handoff. |
+| P06-05 | Independent verification | Verify the inventory project before and after supplier generation with disposable PostgreSQL and browser CRUD. Pass Studio lint, typecheck, tests, builds and Linux and Windows workflows. Capture the built desktop review in both themes. |
 
 ## Phase 05 acceptance criteria
 

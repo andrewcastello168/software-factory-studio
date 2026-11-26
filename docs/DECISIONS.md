@@ -119,3 +119,10 @@ Treat durable SQL files as schema authority and keep ERD coordinates in local ap
 **Status** · Accepted for Phase 05.
 
 A closed DDL grammar handles a focused model and reports unsupported syntax; Studio does not execute SQL to discover its structure. Main uses the already-established pure JavaScript pg dependency for catalog queries and eligible development migrations. The catalog snapshot, source history, and ledger are separate views. Apply requires a dedicated loopback target, a native confirmation and a matching ledger and schema under lock. The stricter apply surface leaves unsupported and destructive operations with a separately reviewed database workflow.
+
+
+## Phase 06 decisions
+
+Use exact prior template bytes plus manifest ownership for the first incremental adapter. This supports deterministic updates to modular starter integrations and contracts while guarding customized entrypoints. Projects with changed integration code need a separate design for scoped transformations. The planner preserves client instructions and unrelated feature edits. Lock the ordered source history for each incremental application instead of generating duplicate migrations.
+
+Use same-directory backups with an app-data journal for verified replacements. The platform does not expose a portable atomic compare-and-swap operation for an existing pathname. Moving the original aside and publishing exclusively preserves competing bytes and supports resume or manual handoff at the cost of a recoverable intermediate state. Keep receipt history separate from Git and PostgreSQL.

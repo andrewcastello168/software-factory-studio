@@ -59,3 +59,8 @@ Windows path handling requires native tests for Unicode, spaces, drive and UNC r
 ## Phase 05 database boundaries
 
 The pure Schema package validates the bounded PostgreSQL model, interprets SQL, compares snapshots, and plans deterministic additive changes. Shared contracts validate the narrow schema IPC. The desktop main service owns scope checks, source files, recovery storage, Git rechecks and the pinned JavaScript PostgreSQL client. The renderer owns drafts and ERD interaction. The generator consumes the schema and explicit table selections for independent new applications. Opening folders and switching branches do not connect to a database.
+
+
+## Phase 06 incremental generation
+
+The existing generator composes initial and incremental files for the pinned starter. The desktop incremental service captures the granted workspace, ordered migration bytes and Git identity, owns the approval and recovery journal, and verifies each output. Generation Review displays the plan and delegates operations over named IPC commands. History and pending before/after bytes are bounded in per-user application data. Project source remains independent of Studio.

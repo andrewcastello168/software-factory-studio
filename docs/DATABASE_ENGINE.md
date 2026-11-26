@@ -41,3 +41,8 @@ Development apply is restricted to loopback IPs and a database named `factory_de
 ## Verification
 
 Use the [inventory DDL fixture](../tests/fixtures/inventory.sql) and disposable PostgreSQL schemas. Verify foreign keys, checks, exact checksums, stale source, drift, failed apply, and independent CRUD. Use [Testing strategy](TESTING_STRATEGY.md) for Linux, Windows, and native renderer evidence.
+
+
+## Phase 06 migration handoff
+
+Generation Review uses supported checked-out migration files directly. It flags external files, preserves their sequence and checksums, and detects eligible tables that lack an API or page. Approval writes only the reviewed application files and metadata. The source, applied ledger, pending status and physical database retain their existing authorities. Unsupported DDL or edits to earlier schema sources block incremental generation until reviewed.
