@@ -432,11 +432,11 @@ kbd {
 
 @media (max-width: 920px) {
   .home-grid { grid-template-columns: minmax(0, 1fr); gap: 19px; }
-  .context-detail:last-child { display: none; }
+  .context-detail:last-child:not(.context-git) { display: none; }
 }
 @media (max-width: 740px) {
   .command-trigger { min-width: 30px; }
-  .command-trigger span, .command-trigger kbd, .context-detail { display: none; }
+  .command-trigger span, .command-trigger kbd, .context-detail:not(.context-git, .context-directory), .context-directory > span { display: none; }
   .brand-name { display: none; }
   .topbar { gap: 10px; padding: 0 8px; }
   .nav-planned small { display: none; }
@@ -533,7 +533,7 @@ kbd {
 }
 
 /* Git Studio */
-.context-git { min-width: 0; flex: 0 1 auto; }
+.context-git { min-width: 0; flex: 0 0 auto; max-width: min(48%, 310px); }
 .context-git bdi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .context-git-status { color: var(--muted); border-left: 1px solid var(--line); padding-left: 7px; white-space: nowrap; }
 .git-page { max-width: 1440px; }
@@ -651,5 +651,7 @@ kbd {
 @media (max-width: 980px) {
   .git-split { grid-template-columns: 1fr; }
   .git-files { border-right: 0; border-bottom: 1px solid var(--line); }
+}
+@media (max-width: 430px) {
   .context-git-status { display: none; }
 }

@@ -2,12 +2,11 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowDown, ArrowUp, CircleAlert, FileText, GitBranch, GitCommitHorizontal, GitFork, Minus, Plus, RefreshCw } from 'lucide-react';
 import { isGitAction, isGitCloneRequest } from '@factory/contracts';
-import type { GitAction, GitArea, GitCloneRequest, GitDiff, GitOutcome, GitRepository, OpenProject } from '@factory/contracts';
+import type { GitAction, GitActionInput, GitArea, GitCloneRequest, GitDiff, GitOutcome, GitRepository, OpenProject } from '@factory/contracts';
 import { gitBridge, gitLabel } from '../useGit';
 import type { useGit } from '../useGit';
 import { Button, Dialog, IconButton, Input } from './Controls';
 
-type ActionInput = GitAction extends infer Action ? Action extends GitAction ? Omit<Action, 'id' | 'revision'> : never : never;
 type Inspection = { title: string; diff?: GitDiff; error?: string; pending?: boolean };
 
 const compactRef = (ref: string) => ref.replace(/^refs\/(?:heads|remotes)\//u, '');
@@ -31,7 +30,7 @@ export function CloneDialog({ close, clone, busy }: {
           <option value="https">Public HTTPS URL</option>
           <option value="local">Local bare Git repository</option>
         </select></label>
-        {source === 'https' && <label>Repository URL<Input autoFocus type="url" value={url} placeholder="https://github.com/owner/project.git"
+        {source === 'https' && <label>Repository URL<Input data-dialog-focus type="url" value={url} placeholder="https://github.com/owner/project.git"
           maxLength={2048} onChange={(event) => setUrl(event.target.value)} required disabled={busy} /></label>}
         <label>New folder name<Input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} required disabled={busy} /></label>
         <p className="muted">Choose the parent folder in the native dialog, then review the destination before cloning.</p>
@@ -73,7 +72,7 @@ function Changes({ repository, area, selected, choose, busy, request }: {
   selected: string | null;
   choose: (row: number, area: GitArea) => void;
   busy: boolean;
-  request: (operation: ActionInput) => void;
+  request: (operation: GitActionInput) => void;
 }) {
   const staged = area === 'staged';
   const entries = repository.changes.flatMap((change, row) => {
@@ -118,7 +117,7 @@ export function GitPanel({ project, git }: { project: OpenProject; git: ReturnTy
   const remote = (transfer.some((item) => item.name === selectedRemote) ? selectedRemote : transfer[0]?.name) ?? '';
   const tracks = Boolean(repo?.upstreamRemote && transfer.some((item) => item.name === repo.upstreamRemote) && repo.head && repo.branch);
 
-  async function request(input: ActionInput) {
+  async function request(input: GitActionInput) {
     const action = { ...input, id: project.id, revision };
     if (busy || !isGitAction(action)) return;
     setPending(input.operation);
@@ -187,10 +186,10 @@ export function GitPanel({ project, git }: { project: OpenProject; git: ReturnTy
       <div className="git-refbar">
         <div><GitBranch size={16} aria-hidden="true" /><strong><bdi>{repo.branch ?? 'Detached HEAD'}</bdi></strong></div>
         <div><GitCommitHorizontal size={16} aria-hidden="true" /><code title={repo.head ?? undefined}>{repo.head?.slice(0, 12) ?? 'Unborn HEAD'}</code></div>
-        <div className="git-tracking"><bdi>{repo.upstream ?? 'No upstream'}</bdi>{repo.upstream && <>
+        <div className="git-tracking"><bdi>{repo.upstream ?? 'No upstream'}</bdi>{repo.upstream && (repo.ahead !== null && repo.behind !== null ? <>
           <span aria-label={`${repo.ahead} commits ahead`} title={`${repo.ahead} commits ahead`}><ArrowUp size={13} aria-hidden="true" />{repo.ahead}</span>
           <span aria-label={`${repo.behind} commits behind`} title={`${repo.behind} commits behind`}><ArrowDown size={13} aria-hidden="true" />{repo.behind}</span>
-        </>}</div>
+        </> : <span>Not fetched</span>)}</div>
         <strong className="git-tree-state">{gitLabel(repo)}</strong>
       </div>
       <div className="git-tools">
@@ -217,7 +216,7 @@ export function GitPanel({ project, git }: { project: OpenProject; git: ReturnTy
         </div>
       </div>
       {repo.operation && <StatusMessage result={{ level: 'warning', message: `Git ${repo.operation} is in progress. Finish or abort it in your Git client. Studio has blocked changes.` }} />}
-      {repo.ahead > 0 && repo.behind > 0 && <StatusMessage result={{ level: 'warning', message: 'Local and upstream history have diverged. Compare the upstream branch before reconciling in your Git client.' }} />}
+      {(repo.ahead ?? 0) > 0 && (repo.behind ?? 0) > 0 && <StatusMessage result={{ level: 'warning', message: 'Local and upstream history have diverged. Compare the upstream branch before reconciling in your Git client.' }} />}
       {repo.remotes.some((item) => item.kind === 'unsupported') && <p className="git-hint">Some remotes use transports outside Studio’s HTTPS and local bare repository policy.</p>}
       {repo.changes.length > 0 && tracks && <p className="git-hint">Fast-forward pull is available when the working tree is clean.</p>}
       <div className="git-split">
@@ -250,7 +249,7 @@ export function GitPanel({ project, git }: { project: OpenProject; git: ReturnTy
         setBranchDialog(false);
         void request({ operation: 'create', name: branchName });
       }}>
-        <label>Branch name<Input autoFocus value={branchName} onChange={(event) => setBranchName(event.target.value)} maxLength={240} required /></label>
+        <label>Branch name<Input data-dialog-focus value={branchName} onChange={(event) => setBranchName(event.target.value)} maxLength={240} required /></label>
         <div className="dialog-actions">
           <Button onClick={() => setBranchDialog(false)}>Cancel</Button>
           <Button variant="primary" type="submit" disabled={!isGitAction({ operation: 'create', id: project.id, revision, name: branchName })}>Review Branch</Button>
@@ -261,7 +260,7 @@ export function GitPanel({ project, git }: { project: OpenProject; git: ReturnTy
       <p className="confirm-copy">The working tree has staged, unstaged, or untracked changes. Keep your work in the current branch and review these paths.</p>
       <ul className="git-review">{repo?.changes.map((change) =>
         <li key={change.path}><code>{change.index}{change.worktree}</code><bdi>{change.path}</bdi></li>)}</ul>
-      <div className="dialog-actions"><Button autoFocus onClick={() => setDirtyDialog(false)}>Cancel</Button></div>
+      <div className="dialog-actions"><Button data-dialog-focus onClick={() => setDirtyDialog(false)}>Cancel</Button></div>
     </Dialog>}
   </div>;
 }

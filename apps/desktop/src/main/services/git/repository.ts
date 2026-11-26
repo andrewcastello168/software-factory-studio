@@ -261,9 +261,13 @@ export async function inspectRepository(git: NativeGit, root: ProjectRoot): Prom
   const [status, refs, index, operation] = await Promise.all([
     git.repo(root.path, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all', '--ignore-submodules=all', '--renames'], options),
     git.repo(root.path, ['for-each-ref', '--format=%(refname)%09%(objectname)%09%(symref)', 'refs/heads/', 'refs/remotes/'], options),
-    git.repo(root.path, ['ls-files', '-v', '-z'], options),
+    git.repo(root.path, ['ls-files', '-v', '--stage', '-z'], options),
     operationState(marker),
   ]);
+  const indexEntries = index.bytes.toString('utf8').split('\0');
+  if (indexEntries.some((record) => /^[A-Za-z] 160000 /u.test(record))) {
+    throw new RestrictedRepository('Tracked submodules are outside the Phase 03 Git boundary.');
+  }
   const parsed = readStatus(status.bytes);
   const branches: GitBranch[] = [];
   for (const line of refs.bytes.toString('utf8').split('\n').filter(Boolean)) {
@@ -312,14 +316,14 @@ export async function inspectRepository(git: NativeGit, root: ProjectRoot): Prom
     head: head === '(initial)' ? null : head,
     upstream,
     upstreamRemote: isGitRemoteName(upstreamRemote) ? upstreamRemote : null,
-    ahead: Number(ab?.[1] ?? 0),
-    behind: Number(ab?.[2] ?? 0),
+    ahead: ab ? Number(ab[1]) : null,
+    behind: ab ? Number(ab[2]) : null,
     operation,
     changes: parsed.changes,
     branches,
     remotes: config.remotes.map(({ name, kind }) => ({ name, kind })),
   };
-  const hiddenChanges = index.bytes.toString('utf8').split('\0').some((record) => /^[Sa-z] /u.test(record));
+  const hiddenChanges = indexEntries.some((record) => /^[Sa-z] /u.test(record));
   return { state, raw: parsed.raw, config, hiddenChanges };
 }
 

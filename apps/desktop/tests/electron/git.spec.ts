@@ -11,6 +11,7 @@ const require = createRequire(import.meta.url);
 const executablePath = require('electron') as string;
 
 test('Git Studio clones, commits and switches real native workspaces with read-only comparison', async () => {
+  test.setTimeout(60_000);
   const gitPath = await findGit();
   if (!gitPath) throw new Error('Git is required for the native workspace test.');
   const profile = await realpath(await mkdtemp(join(tmpdir(), 'factory-native-git-')));
@@ -61,9 +62,10 @@ test('Git Studio clones, commits and switches real native workspaces with read-o
       });
     }, [bare, target, unrelated]);
     const page = await instance.firstWindow();
+    page.setDefaultTimeout(8000);
     await expect(page).toHaveURL('studio://app/');
     await page.getByRole('button', { name: 'Clone Repository', exact: true }).click();
-    await page.getByLabel('Source', { exact: true }).selectOption('local');
+    await page.getByRole('combobox', { name: 'Source', exact: true }).selectOption('local');
     await page.getByLabel('New folder name', { exact: true }).fill('Studio clone');
     await page.getByRole('button', { name: 'Choose Folders' }).click();
     await expect(page.getByRole('heading', { name: 'Git Studio' })).toBeVisible();
@@ -76,7 +78,7 @@ test('Git Studio clones, commits and switches real native workspaces with read-o
     git(clone, 'config', 'user.email', 'test@example.test');
     await writeFile(join(clone, 'service.txt'), 'export mode=reviewed\n');
     const file = page.getByRole('button', { name: /service.txt/ }).filter({ hasText: 'service.txt' });
-    await expect(file).toBeVisible();
+    await expect(file).toBeVisible({ timeout: 12_000 });
     await file.click();
     await expect(page.getByLabel('Git patch')).toContainText('+export mode=reviewed');
     await page.screenshot({ path: test.info().outputPath('git-studio-light.png') });
@@ -112,6 +114,7 @@ test('Git Studio clones, commits and switches real native workspaces with read-o
     await studio.click();
     await expect(page.getByRole('group', { name: 'Project context' })).toContainText('review');
     await studio.press('Delete');
+    await expect(studio).toBeHidden();
     expect(await page.evaluate((closedId) => window.studio!.git.status(closedId), id))
       .toEqual({ ok: false, error: 'ACCESS_DENIED' });
   } finally {

@@ -24,6 +24,7 @@ interface GitDialogs {
 interface GitWorkspace {
   root(id: string): ProjectRoot | undefined;
   canOpen(): boolean;
+  allowsAuxiliaryPath(path: string): boolean;
   adopt(root: ProjectRoot): Promise<Result<ProjectSelection>>;
   refresh(id: string): Promise<unknown>;
 }
@@ -68,8 +69,16 @@ export class GitStudio {
 
   constructor(private readonly workspace: GitWorkspace, private readonly dialogs: GitDialogs) {}
 
-  #git() {
-    return this.#native ??= NativeGit.open();
+  async #git() {
+    this.#native ??= NativeGit.open((path) => this.workspace.allowsAuxiliaryPath(path)).catch((error: unknown) => {
+      this.#native = undefined;
+      throw error;
+    });
+    const git = await this.#native;
+    if (git && [git.executable, git.scratch].some((path) => !this.workspace.allowsAuxiliaryPath(path))) {
+      throw new GitFailure('An open project contains the Git executable or temporary storage. Open a narrower project folder.');
+    }
+    return git;
   }
 
   async dispose() {
@@ -101,7 +110,7 @@ export class GitStudio {
     const cached = this.#reading.get(id);
     if (cached) return cached;
     const reading = this.#git().then(async (git) => success(stateOf(await this.#inspect(git, id))))
-      .catch(() => success<GitState>({ state: 'unavailable', detail: 'Studio could not prepare native Git.' }))
+      .catch((error: unknown) => success<GitState>({ state: 'unavailable', detail: errorMessage(error) }))
       .finally(() => this.#reading.delete(id));
     this.#reading.set(id, reading);
     return reading;
@@ -230,7 +239,7 @@ export class GitStudio {
       }
       this.#assertGrant(id, root);
       await git.repo(root.path, stage ? ['add', '--', ...paths]
-        : state.head ? ['reset', '--quiet', state.head, '--', ...paths]
+        : state.head ? ['restore', '--staged', `--source=${state.head}`, '--', ...paths]
           : ['update-index', '--force-remove', '--', ...paths]);
       return stage ? 'Selected change staged.' : 'Selected change unstaged.';
     }
@@ -423,8 +432,7 @@ export class GitStudio {
         if (isGitOid(head)) {
           await checkoutTree(git, root, head, true);
           if (this.#disposed || config.hash !== (await repositoryConfig(git, root)).hash) throw new StaleRepository();
-          await git.repo(root.path, ['read-tree', head]);
-          await git.repo(root.path, ['checkout-index', '--all']);
+          await git.repo(root.path, ['read-tree', '-m', '-u', head]);
         } else if (resolved.code === 0) {
           throw new GitFailure('Git returned an invalid HEAD.');
         }

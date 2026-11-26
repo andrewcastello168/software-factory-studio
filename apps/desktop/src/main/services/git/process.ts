@@ -66,15 +66,26 @@ type Output = { bytes: Buffer; truncated: boolean; code: number };
 export class NativeGit {
   private constructor(readonly executable: string, readonly scratch: string) {}
 
-  static async open(): Promise<NativeGit | null> {
+  static async open(canUse: (path: string) => boolean): Promise<NativeGit | null> {
     const executable = await findGit();
     if (!executable) return null;
-    const scratch = await mkdtemp(join(tmpdir(), 'factory-git-policy-'));
+    const temporary = await realpath(tmpdir());
+    if (!canUse(executable) || !canUse(temporary)) {
+      throw new GitFailure('An open project contains the Git executable or temporary storage. Open a narrower project folder.');
+    }
+    const scratch = await mkdtemp(join(temporary, 'factory-git-policy-'));
     try {
       await writeFile(join(scratch, 'empty'), '', { flag: 'wx', mode: 0o600 });
-      return new NativeGit(executable, scratch);
-    } catch {
+      const git = new NativeGit(executable, scratch);
+      const version = (await git.run(scratch, ['--version'], { readOnly: true, limit: 256 })).bytes.toString('ascii');
+      const parts = /^git version (\d+)\.(\d+)\./u.exec(version);
+      if (!parts || Number(parts[1]) < 2 || (Number(parts[1]) === 2 && Number(parts[2]) < 39)) {
+        throw new GitFailure('Install Git 2.39 or newer in the supported system location.');
+      }
+      return git;
+    } catch (error) {
       await rm(scratch, { recursive: true, force: true });
+      if (error instanceof GitFailure) throw error;
       throw new GitFailure('Studio could not prepare its Git execution policy.');
     }
   }

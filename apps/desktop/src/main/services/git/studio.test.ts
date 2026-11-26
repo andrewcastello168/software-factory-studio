@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { success } from '@factory/contracts';
-import type { GitAction, GitRepository, Result } from '@factory/contracts';
+import type { GitAction, GitActionInput, GitRepository, Result } from '@factory/contracts';
 import { admitRoot } from '../projects/filesystem';
 import type { ProjectRoot } from '../projects/filesystem';
 import { findGit } from './process';
@@ -41,12 +41,10 @@ async function status() {
   return result;
 }
 
-async function act(input: Guild, expected?: GitRepository) {
+async function act(input: GitActionInput, expected?: GitRepository) {
   const snap = input.operation === 'init' ? null : (expected ?? await status()).revision;
   return unwrap(await service.action({ ...input, id, revision: snap } as GitAction));
 }
-
-type Guild = GitAction extends infer Action ? Action extends GitAction ? Omit<Action, 'id' | 'revision'> : never : never;
 
 async function initialize() {
   await writeFile(join(work, 'app.txt'), 'original\n');
@@ -77,6 +75,7 @@ beforeEach(async () => {
   service = new GitStudio({
     root: (key) => grants.get(key),
     canOpen: () => true,
+    allowsAuxiliaryPath: () => true,
     adopt: async (root) => {
       grants.set(cloned, root);
       return success({ projectId: cloned, catalog: { projects: [], recents: [], revision: 0, recentsStatus: 'ready' } });
@@ -116,6 +115,9 @@ describe('native Git workspace', () => {
     expect(outcome.level, outcome.message).toBe('success');
     expect(git(work, 'show', 'HEAD:app.txt')).toBe('original');
     expect(await readFile(join(work, 'app.txt'), 'utf8')).toBe('editor still working\n');
+    expect(await status()).toMatchObject({ changes: [{ index: '.', worktree: 'M' }] });
+    expect((await act({ operation: 'stage', row: 0 })).level).toBe('success');
+    expect((await act({ operation: 'unstage', row: 0 })).level).toBe('success');
     expect(await status()).toMatchObject({ changes: [{ index: '.', worktree: 'M' }] });
   });
 
@@ -203,7 +205,31 @@ describe('native Git workspace', () => {
     expect((await act({ operation: 'create', name: 'blocked' })).message).toContain('assume-unchanged');
   });
 
-  it('clones into a fresh folder, fetches, fast-forwards, pushes and preserves divergent history', async () => {
+  it('refreshes re-edited files and shows real rename and conflict records', { timeout: 15_000 }, async () => {
+    const initial = await baseline();
+    git(work, 'mv', 'app.txt', 'renamed.txt');
+    expect((await status()).changes[0]).toMatchObject({ path: 'renamed.txt', original: 'app.txt', index: 'R' });
+    git(work, 'commit', '-m', 'Rename');
+    await writeFile(join(work, 'renamed.txt'), 'external edit longer\n');
+    const dirty = await status();
+    await writeFile(join(work, 'renamed.txt'), 'different edit\n');
+    expect(await service.diff({ id, revision: dirty.revision, row: 0, area: 'working' }))
+      .toEqual({ ok: false, error: 'GIT_STALE' });
+    expect((await act({ operation: 'stage', row: 0 }, dirty)).level).toBe('error');
+    git(work, 'commit', '-am', 'Edit main');
+    git(work, 'switch', '-c', 'topic', initial.head!);
+    await writeFile(join(work, 'app.txt'), 'topic content\n');
+    git(work, 'commit', '-am', 'Edit topic');
+    git(work, 'switch', 'main');
+    expect(() => git(work, 'merge', 'topic')).toThrow();
+    const conflict = await status();
+    expect(conflict.operation).toBe('merge');
+    expect(conflict.changes.some((change) => change.index === 'U' || change.worktree === 'U')).toBe(true);
+    expect((await act({ operation: 'commit', message: 'Do not finish a conflict' })).level).toBe('error');
+    expect(git(work, 'rev-parse', 'MERGE_HEAD')).toBe(git(work, 'rev-parse', 'topic'));
+  });
+
+  it('clones into a fresh folder, fetches, fast-forwards, pushes and preserves divergent history', { timeout: 30_000 }, async () => {
     await baseline();
     const remote = join(fixture, 'Bare café.git');
     const other = join(fixture, 'External');
@@ -211,6 +237,8 @@ describe('native Git workspace', () => {
     git(remote, 'init', '--bare', '--template=', '--initial-branch=main');
     git(work, 'remote', 'add', 'origin', remote);
     git(work, 'push', '--set-upstream', 'origin', 'main');
+    git(work, 'update-ref', '-d', 'refs/remotes/origin/main');
+    expect(await status()).toMatchObject({ upstream: 'origin/main', ahead: null, behind: null });
     choices = [remote, fixture];
     const clone = unwrap(await service.clone({ source: 'local', name: 'Studio clone' }));
     expect(clone.level, clone.message).toBe('success');

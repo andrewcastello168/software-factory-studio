@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { watch } from 'node:fs';
 import type { FSWatcher } from 'node:fs';
-import { basename } from 'node:path';
+import { basename, isAbsolute, relative, sep } from 'node:path';
 import { failure, PROJECT_LIMITS, success } from '@factory/contracts';
 import type {
   OpenProject, ProjectAvailability, ProjectCatalog, ProjectMetadata, ProjectSelection, RecentProject, Result,
@@ -186,6 +186,13 @@ export class ProjectWorkspace {
   root(id: string): ProjectRoot | undefined {
     const tab = this.#tabs.get(id);
     return !this.#closed && tab?.snapshot.availability === 'ready' ? tab.root : undefined;
+  }
+
+  allowsAuxiliaryPath(path: string): boolean {
+    return [...this.#tabs.values()].every(({ root }) => {
+      const fromRoot = relative(pathKey(root.path), pathKey(path));
+      return isAbsolute(fromRoot) || fromRoot === '..' || fromRoot.startsWith(`..${sep}`);
+    });
   }
 
   canOpen(): boolean {

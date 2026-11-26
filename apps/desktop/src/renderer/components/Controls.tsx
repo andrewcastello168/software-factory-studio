@@ -39,6 +39,7 @@ export function Dialog({
     const element = dialog.current;
     const previous = document.activeElement;
     element?.showModal();
+    element?.querySelector<HTMLElement>('[data-dialog-focus]')?.focus();
     return () => {
       element?.close();
       if (previous instanceof HTMLElement) previous.focus();

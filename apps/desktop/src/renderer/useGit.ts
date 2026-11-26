@@ -37,7 +37,6 @@ export function useGit(project: OpenProject | undefined) {
     if (!id || !gitBridge) return;
     const lifecycle = clock.current;
     lifecycle.active = id;
-    void refresh();
     const poll = setInterval(() => { void refresh(); }, 5000);
     function onFocus() { void refresh(); }
     window.addEventListener('focus', onFocus);
@@ -48,6 +47,8 @@ export function useGit(project: OpenProject | undefined) {
       window.removeEventListener('focus', onFocus);
     };
   }, [id, refresh]);
+
+  useEffect(() => { void refresh(); }, [project, refresh]);
 
   async function action(request: GitAction) {
     const result = await gitBridge?.action(request);

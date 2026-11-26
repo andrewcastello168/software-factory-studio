@@ -39,8 +39,8 @@ export interface GitRepository {
   head: string | null;
   upstream: string | null;
   upstreamRemote: string | null;
-  ahead: number;
-  behind: number;
+  ahead: number | null;
+  behind: number | null;
   operation: 'merge' | 'rebase' | 'cherry-pick' | 'revert' | 'bisect' | 'sequencer' | null;
   changes: GitChange[];
   branches: GitBranch[];
@@ -68,7 +68,7 @@ export interface GitCompareRequest {
   ref: string;
 }
 
-type GitActionFields =
+export type GitActionInput =
   | { operation: 'init' | 'pull' | 'push' }
   | { operation: 'stage' | 'unstage'; row: number }
   | { operation: 'commit'; message: string }
@@ -76,7 +76,7 @@ type GitActionFields =
   | { operation: 'switch'; ref: string }
   | { operation: 'fetch'; remote: string };
 
-export type GitAction = { id: string; revision: string | null } & GitActionFields;
+export type GitAction = { id: string; revision: string | null } & GitActionInput;
 
 export interface GitOutcome {
   status: GitState;
@@ -206,7 +206,7 @@ export function isGitState(value: unknown): value is GitState {
     && isRevision(value.revision) && bounded(value.root, PROJECT_LIMITS.absolutePath)
     && optional(value.branch, 1024) && (value.head === null || isGitOid(value.head))
     && optional(value.upstream, 1024) && (value.upstreamRemote === null || isGitRemoteName(value.upstreamRemote))
-    && count(value.ahead) && count(value.behind)
+    && ((value.ahead === null && value.behind === null) || (count(value.ahead) && count(value.behind)))
     && [null, 'merge', 'rebase', 'cherry-pick', 'revert', 'bisect', 'sequencer'].some((item) => item === value.operation)
     && Array.isArray(value.changes) && value.changes.length <= GIT_LIMIT.changes && value.changes.every(isChange)
     && Array.isArray(value.branches) && value.branches.length <= GIT_LIMIT.branches && value.branches.every(isBranch)

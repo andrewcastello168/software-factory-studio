@@ -191,7 +191,7 @@ export function App() {
             <span>Directory</span><bdi>{activeProject?.directory ?? '—'}</bdi>
           </span>
           {activeProject ? <Button className="context-detail context-git" onClick={() => openProjectView('git')}
-            title={repo?.head ?? git.status?.state ?? 'Open Git Studio'}>
+            title={repo ? `${repo.branch ?? 'Detached HEAD'} · ${gitLabel(repo)} · ${repo.head ?? 'Unborn HEAD'}` : 'Open Git Studio'}>
             <GitBranch size={14} aria-hidden="true" /><bdi>{repo?.branch ?? (repo ? 'Detached HEAD' : gitLabel(git.status))}</bdi>
             {repo && <span className="context-git-status">{gitLabel(repo)}</span>}
           </Button> : <span className="context-detail"><GitBranch size={14} aria-hidden="true" /><span>Git unavailable</span></span>}

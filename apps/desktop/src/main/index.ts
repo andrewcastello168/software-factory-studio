@@ -165,6 +165,7 @@ async function openWindow() {
   const git = new GitStudio({
     root: (id) => workspace.root(id),
     canOpen: () => workspace.canOpen(),
+    allowsAuxiliaryPath: (path) => workspace.allowsAuxiliaryPath(path),
     adopt: (root) => workspace.adoptCloned(root),
     refresh: (id) => workspace.rescan(id),
   }, {
