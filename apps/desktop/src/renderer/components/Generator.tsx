@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, CircleCheck, FileText, FolderOpen, ShieldCheck } from 'lucide-react';
-import { isStarterConfig, MODULE_CATALOG, SCHEMA_LIMITS, STARTER, WELCOME_EXAMPLE } from '@factory/contracts';
+import { BUILTIN_LIBRARY, IDENTITY_MODULES, isStarterConfig, moduleCompatibility, MODULE_CATALOG, SCHEMA_LIMITS, STANDARD_PROFILE, STARTER, WELCOME_EXAMPLE } from '@factory/contracts';
 import type {
-  CrudSelection, DatabaseSchema, ErrorCode, GeneratorParent, GeneratorPending, GeneratorPreview, GeneratorReceipt, ProjectSelection, Result, SchemaDiagnostic, StarterConfig,
+  CrudSelection, DatabaseSchema, ErrorCode, LibraryAsset, LibrarySelection, ModuleSelection, GeneratorParent, GeneratorPending, GeneratorPreview, GeneratorReceipt, ProjectSelection, Result, SchemaDiagnostic, StarterConfig,
 } from '@factory/contracts';
 import { browserPreview } from '../usePreferences';
 import { Button, Dialog, Input } from './Controls';
 import { emptySchema, validateCrud } from '@factory/schema';
 import { Diagnostics, SchemaDesigner } from './schema/Designer';
 import { schemaBridge } from './schema/DatabaseStudio';
+
+import { assetKey, libraryBridge } from './EngineeringLibrary';
 
 export const generatorBridge = browserPreview ? undefined : window.studio?.generator;
 
@@ -41,6 +43,16 @@ export function GeneratorDialog({ close, opened, recovery }: {
   const [customSlug, setCustomSlug] = useState(false);
   const [port, setPort] = useState('3000');
   const [welcome, setWelcome] = useState(false);
+  const [assets, setAssets] = useState<LibraryAsset[]>([...BUILTIN_LIBRARY]);
+  const [profileKey, setProfileKey] = useState(assetKey(STANDARD_PROFILE));
+  const [templateKey, setTemplateKey] = useState('');
+  const [brand, setBrand] = useState<LibrarySelection['branding']>();
+  const [identity, setIdentity] = useState<ModuleSelection[]>([]);
+  useEffect(() => {
+    let live = true;
+    void libraryBridge?.list().then((result) => { if (live && result.ok) setAssets(result.value); });
+    return () => { live = false; };
+  }, []);
   const [databaseEnabled, setDatabaseEnabled] = useState(false);
   const [schema, setSchema] = useState<DatabaseSchema>(emptySchema);
   const [table, setTable] = useState('');
@@ -59,10 +71,17 @@ export function GeneratorDialog({ close, opened, recovery }: {
 
   const crud: CrudSelection = { schema, migrations: true, backend, frontend };
   const crudIssues = databaseEnabled ? validateCrud(crud) : [];
+  const profile = assets.find((item) => assetKey(item) === profileKey && item.kind === 'profile');
+  const template = assets.find((item) => assetKey(item) === templateKey && item.kind === 'template');
+  const library = (profile && profile.kind === 'profile' && (profile.id !== STANDARD_PROFILE.id || template))
+    ? { profile, ...(template?.kind === 'template' ? { template, ...(brand ? { branding: brand } : {}) } : {}) } : undefined;
+  const modules = [...(welcome ? [WELCOME_EXAMPLE] : []), ...identity];
+  const compatibility = moduleCompatibility(STARTER.appType, STARTER.database, modules);
   const config: StarterConfig = {
     name: name.trim().normalize('NFC'), slug, port: Number(port),
     appType: STARTER.appType, stack: STARTER.stack, database: STARTER.database,
-    architecture: STARTER.architecture, engineering: STARTER.engineering, modules: welcome ? [WELCOME_EXAMPLE] : [],
+    architecture: STARTER.architecture, engineering: STARTER.engineering, modules,
+    ...(library ? { library } : {}),
     ...(databaseEnabled ? { crud } : {}),
   };
   const valid = isStarterConfig(config);
@@ -192,10 +211,39 @@ export function GeneratorDialog({ close, opened, recovery }: {
           <div className="generator-fields generator-fields--profiles">
             <label>Technology stack<select defaultValue={STARTER.stack}><option value={STARTER.stack}>{STARTER.stackLabel}</option></select></label>
             <label>Architecture profile<select defaultValue={STARTER.architecture}><option value={STARTER.architecture}>Layered Web · v1</option></select></label>
-            <label>Engineering profile<select defaultValue={STARTER.engineering}><option value={STARTER.engineering}>Standard Engineering · v1</option></select></label>
+            <label>Engineering profile<select value={profileKey} onChange={(event) => setProfileKey(event.target.value)}>
+              {assets.filter(({ kind }) => kind === 'profile').map((asset) => <option key={assetKey(asset)} value={assetKey(asset)}>{asset.name} · v{asset.version}</option>)}</select></label>
           </div>
+          {libraryBridge && <fieldset className="generator-modules">
+            <legend>Application template</legend>
+            <label>UI template<select value={templateKey} onChange={(event) => {
+              const key = event.target.value;
+              setTemplateKey(key);
+              const picked = assets.find((item) => item.kind === 'template' && assetKey(item) === key);
+              setBrand(picked?.kind === 'template' ? { color: picked.color, mark: picked.mark, theme: picked.theme } : undefined);
+            }}><option value="">Foundation layout</option>
+              {assets.filter(({ kind }) => kind === 'template').map((asset) => <option key={assetKey(asset)} value={assetKey(asset)}>{asset.name} · v{asset.version}</option>)}</select></label>
+            {brand && <div className="generator-fields">
+              <label>Primary color<Input type="color" value={brand.color} onChange={(event) => setBrand({ ...brand, color: event.target.value })} /></label>
+              <label>Brand mark<Input value={brand.mark} maxLength={4} onChange={(event) => setBrand({ ...brand, mark: event.target.value })} /></label>
+              <label>Theme<select value={brand.theme} onChange={(event) => setBrand({ ...brand, theme: event.target.value as typeof brand.theme })}>
+                <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+            </div>}
+          </fieldset>}
           <fieldset className="generator-modules">
             <legend>Optional features</legend>
+            {libraryBridge && <div className="library-module-picks">
+              {IDENTITY_MODULES.map((pin) => {
+                const item = MODULE_CATALOG.find(({ id }) => id === pin.id)!;
+                return <label className="generator-module" key={pin.id}>
+                  <input type="checkbox" checked={identity.some(({ id }) => id === pin.id)}
+                    aria-label={item.label} onChange={(event) => setIdentity(event.target.checked
+                      ? [...identity, pin] : identity.filter(({ id }) => id !== pin.id))} />
+                  <span><strong>{item.label} · v{pin.version}</strong><small>{item.requires.length ? 'Requires ' + item.requires.join(', ') : item.description}</small></span>
+                </label>;
+              })}
+              {compatibility.length > 0 && <p role="alert" className="schema-error">{compatibility.join(' ')}</p>}
+            </div>}
             <label className="generator-module">
               <input type="checkbox" checked={welcome} disabled={Boolean(busy)}
                 aria-describedby="welcome-description" onChange={(event) => setWelcome(event.target.checked)} />

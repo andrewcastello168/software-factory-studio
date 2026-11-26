@@ -45,7 +45,7 @@ test.beforeEach(async ({ page }) => {
         { ref: 'refs/remotes/origin/main', oid: 'd'.repeat(40) }],
       remotes: [{ name: 'origin', kind: 'https' }],
     };
-    const studio: Omit<StudioBridge, 'incremental'> = {
+    const studio: Omit<StudioBridge, 'incremental' | 'library'> = {
       schema: {
         inspect: async () => ({ ok: true, value: {
           revision: 'f'.repeat(64), migrations: [], diagnostics: [], layout: [], recovery: null,

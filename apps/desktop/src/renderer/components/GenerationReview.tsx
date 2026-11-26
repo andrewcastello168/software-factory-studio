@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { IDENTITY_MODULES, MODULE_CATALOG } from '@factory/contracts';
+import type { ModuleSelection } from '@factory/contracts';
+import { useEffect, useRef, useState } from 'react';
 import { FileCode, FilePlus2, FileWarning, GitBranch, ListChecks, RefreshCw, ShieldCheck } from 'lucide-react';
 import type { ErrorCode, IncrementalChange, IncrementalInspection, IncrementalPreview, OpenProject, Result } from '@factory/contracts';
 import { browserPreview } from '../usePreferences';
@@ -62,21 +64,29 @@ export function GenerationReview({ project, signal }: { project: OpenProject; si
   const [inspection, setInspection] = useState<IncrementalInspection>();
   const [backend, setBackend] = useState<string[]>([]);
   const [frontend, setFrontend] = useState<string[]>([]);
+  const [modules, setModules] = useState<ModuleSelection[]>([]);
   const [review, setReview] = useState<{ value: IncrementalPreview; revision: string }>();
   const [selected, select] = useState('');
   const [section, setSection] = useState<'plan' | 'files' | 'history'>('plan');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+  const backgroundInspection = useRef<Promise<void> | null>(null);
+  const foregroundAction = useRef(false);
 
   useEffect(() => {
     if (!bridge || project.availability !== 'ready') return;
     let live = true;
     const refresh = () => {
-      void bridge.inspect(project.id).then((reply) => {
+      if (backgroundInspection.current || foregroundAction.current) return;
+      backgroundInspection.current = bridge.inspect(project.id).then((reply) => {
         if (!live) return;
         if (reply.ok) setInspection(reply.value);
         else if (reply.error !== 'PROJECT_BUSY') setError(failureMessages[reply.error] ?? 'Workspace inspection failed.');
+      }).catch(() => {
+        if (live) setError('Studio could not reach the desktop generation service.');
+      }).finally(() => {
+        backgroundInspection.current = null;
       });
     };
     refresh();
@@ -85,8 +95,11 @@ export function GenerationReview({ project, signal }: { project: OpenProject; si
   }, [bridge, project.id, project.availability, signal]);
 
   async function run<T>(label: string, action: () => Promise<Result<T>>, finish: (value: T) => void) {
+    if (foregroundAction.current) return;
+    foregroundAction.current = true;
     setBusy(label); setError(''); setStatus('');
     try {
+      await backgroundInspection.current;
       const result = await action();
       if (result.ok) finish(result.value);
       else {
@@ -97,7 +110,7 @@ export function GenerationReview({ project, signal }: { project: OpenProject; si
         }
       }
     } catch { setError('Studio could not reach the desktop generation service.'); }
-    finally { setBusy(''); }
+    finally { foregroundAction.current = false; setBusy(''); }
   }
 
   const recovery = inspection?.recovery;
@@ -109,7 +122,7 @@ export function GenerationReview({ project, signal }: { project: OpenProject; si
   const toggle = (rows: string[], name: string, checked: boolean) => checked ? [...rows, name] : rows.filter((item) => item !== name);
   const showResult = (value: IncrementalInspection | null) => {
     if (value) {
-      setInspection(value); setReview(undefined); setBackend([]); setFrontend([]);
+      setInspection(value); setReview(undefined); setBackend([]); setFrontend([]); setModules([]);
       setStatus(value.history[0]?.outcome === 'handed-off' ? 'Recovery handed off. Workspace files and backups were preserved.'
         : 'Generation result verified. See History for the receipt.');
     }
@@ -118,7 +131,7 @@ export function GenerationReview({ project, signal }: { project: OpenProject; si
   return <section className="schema-panel incremental-panel" aria-label="Generation Review">
     <header className="schema-header">
       <div className="schema-title"><ListChecks size={22} aria-hidden="true" /><div>
-        <h2>Generation Review</h2><p><bdi>{project.name}</bdi> · Incremental CRUD</p>
+        <h2>Generation Review</h2><p><bdi>{project.name}</bdi> · Incremental CRUD and modules</p>
       </div></div>
       <Button className="outlined-button" disabled={!bridge || Boolean(busy)} onClick={() => bridge
         && void run('Inspecting checked-out sources…', () => bridge.inspect(project.id), setInspection)}><RefreshCw size={14} />Refresh</Button>
@@ -171,6 +184,31 @@ export function GenerationReview({ project, signal }: { project: OpenProject; si
             <FileCode size={14} />Preview Changes
           </Button>
         </div>}
+        {!recovery && inspection.profile && <details className="incremental-sources">
+          <summary>Install optional modules</summary>
+          <fieldset className="generator-modules">
+            <legend>Choose exact releases and dependencies</legend>
+            {IDENTITY_MODULES.map((pin) => {
+              const item = MODULE_CATALOG.find(({ id }) => id === pin.id)!;
+              const installed = inspection.profile?.modules.some((name) => name.startsWith(pin.id + ' ·'));
+              return <label className="generator-module" key={pin.id}>
+                <input type="checkbox" aria-label={'Install ' + item.label} checked={Boolean(installed || modules.some(({ id }) => id === pin.id))}
+                  disabled={Boolean(installed || busy)} onChange={(event) => {
+                    setModules(event.target.checked ? [...modules, pin] : modules.filter(({ id }) => id !== pin.id));
+                    setReview(undefined);
+                  }} />
+                <span><strong>{item.label} · v{pin.version}</strong>
+                  <small>{installed ? 'Installed' : item.requires.length ? 'Requires ' + item.requires.join(', ') : item.description}</small></span>
+              </label>;
+            })}
+          </fieldset>
+          <Button variant="primary" disabled={!bridge || !modules.length || Boolean(busy) || inspection.issues.length > 0}
+            onClick={() => bridge && void run('Checking module compatibility…', () => bridge.preview({
+              projectId: project.id, revision: inspection.revision, backend: [], frontend: [], modules,
+            }), (value) => { setReview({ value, revision: inspection.revision }); select(''); })}>
+            Preview Module Installation
+          </Button>
+        </details>}
         <details className="incremental-sources">
           <summary>Declared migration sources · {inspection.sources.length}</summary>
           <p>Existing SQL stays in place. Apply generation affects project files only and adds no dependencies.</p>
@@ -178,6 +216,7 @@ export function GenerationReview({ project, signal }: { project: OpenProject; si
             {' '}<small title={sha256}>{sha256.slice(0, 12)}</small></li>)}</ul>
         </details>
         {preview && <section className="incremental-plan" aria-label="Planned changes">
+          {preview.modules && <p className="schema-message">Version pins · {preview.modules.map(({ id, version }) => id + ' v' + version).join(', ')}</p>}
           <header><h3>Planned files</h3><small>{writes} writes · SHA-256 <code title={preview.digest}>{preview.digest.slice(0, 12)}</code></small></header>
           {stale && <p className="schema-message schema-warning" role="alert">The inspected sources changed. Preview the plan again.</p>}
           {preview.issues.length > 0 && <ul role="alert" className="schema-diagnostics">

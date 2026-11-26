@@ -1,5 +1,6 @@
-import { WELCOME_EXAMPLE } from '@factory/contracts';
+import { orderedModules, WELCOME_EXAMPLE } from '@factory/contracts';
 import { nodeTemplates } from './templates';
+import { identityContributions } from './identity';
 import foundation0 from '../templates/modular/foundation/AGENTS.md?raw';
 import foundation1 from '../templates/modular/foundation/README.md?raw';
 import foundation2 from '../templates/modular/foundation/db/migrations/0001_baseline.sql?raw';
@@ -51,6 +52,7 @@ interface Contribution {
   id: string;
   version: string;
   templates: readonly Template[];
+  migration?: readonly [string, string];
   slots: Partial<typeof emptySlots>;
   tests: readonly string[];
 }
@@ -79,10 +81,10 @@ const contributions: readonly Contribution[] = [{
     REQFEATURES: '- The optional Welcome example retrieves a seeded message through the same-origin API. This example is separate from client requirements.\n',
   },
   tests: ['test/welcome.test.ts'],
-}];
+}, ...identityContributions];
 
 export function composeModules(selected: readonly { id: string; version: string }[]) {
-  const modules = selected.map(({ id, version }) => {
+  const modules = orderedModules(selected).map(({ id, version }) => {
     const source = contributions.find((item) => item.id === id && item.version === version);
     if (!source) throw new Error('Selected module has no bundled template.');
     return source;
@@ -91,6 +93,6 @@ export function composeModules(selected: readonly { id: string; version: string 
   for (const module of modules) {
     for (const name of Object.keys(slots) as (keyof typeof slots)[]) slots[name] += module.slots[name] ?? '';
   }
-  const testPaths = ['test/http.test.ts', ...modules.flatMap(({ tests }) => tests)];
+  const testPaths = [...new Set(['test/http.test.ts', ...modules.flatMap(({ tests }) => tests)])];
   return { modules, slots, testPaths };
 }

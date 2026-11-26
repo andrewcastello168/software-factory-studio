@@ -47,7 +47,8 @@ test('native New Project opens a verified managed starter after the reviewed app
     const example = wizard.getByRole('checkbox', { name: 'Welcome example' });
     await expect(example).not.toBeChecked();
     await wizard.getByText('Planned options', { exact: true }).click();
-    await expect(wizard.getByRole('list', { name: 'Planned optional modules' })).toContainText('Authentication');
+    await expect(wizard.getByRole('list', { name: 'Planned optional modules' })).toContainText('Reporting');
+    await expect(wizard.getByRole('checkbox', { name: 'Authentication', exact: true })).not.toBeChecked();
     await page.screenshot({ path: test.info().outputPath('new-project-modules-light.png') });
     await wizard.getByRole('button', { name: 'Review Files' }).click();
     await expect(wizard.getByRole('heading', { name: 'Review generation plan' })).toBeVisible();

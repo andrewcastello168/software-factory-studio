@@ -20,6 +20,7 @@ import { ProjectList, ProjectPanel, WorkspaceTabs } from './components/Projects'
 import type { ProjectView } from './components/Projects';
 import { Navigation } from './components/Navigation';
 import type { Page } from './components/Navigation';
+import { EngineeringLibrary, isLibraryPage, libraryBridge, libraryPages, libraryTitles } from './components/EngineeringLibrary';
 import { Home, OpenCommandButton, Settings } from './components/Pages';
 
 const clamp = (value: number) => Math.round(Math.max(SIDEBAR.minimum, Math.min(SIDEBAR.maximum, value)));
@@ -166,6 +167,9 @@ export function App() {
     );
   }
 
+  if (libraryBridge) for (const destination of libraryPages) {
+    commands.push({ id: destination, title: libraryTitles[destination], icon: Settings2, run: () => openPage(destination) });
+  }
   if (generation) commands.push({ id: 'generation', title: 'Generation Review', icon: ListChecks, run: () => openProjectView('generation') });
   if (database) commands.push({ id: 'database', title: 'Database Studio', icon: Database, run: () => openProjectView('database') });
   const notice = state.error ?? (state.storage === 'corrupt'
@@ -334,6 +338,7 @@ export function App() {
                     sidebarOpen={!collapsed}
                     toggleSidebar={toggleSidebar}
                   />
+                : isLibraryPage(page) ? <EngineeringLibrary key={page} page={page} />
                 : page === 'projects' ? <ProjectList
                     title="Projects"
                     rows={workspace.catalog.projects}
