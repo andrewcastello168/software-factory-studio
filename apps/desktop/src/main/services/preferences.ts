@@ -42,13 +42,18 @@ export class PreferenceStore {
 
   async #read(): Promise<Result<StoredPreferences>> {
     try {
-      const info = await lstat(this.file);
+      const info = await lstat(this.file, { bigint: true });
       if (!info.isFile()) return failure('PREFERENCES_READ_FAILED');
       if (info.size > MAX_BYTES) return failure('PREFERENCES_READ_FAILED');
       const handle = await open(this.file, 'r');
       try {
-        const opened = await handle.stat();
-        if (!opened.isFile() || opened.dev !== info.dev || opened.ino !== info.ino) {
+        const opened = await handle.stat({ bigint: true });
+        // Windows may omit the volume serial in path-based stats. Require the
+        // same creation time as well as the full file ID in that case.
+        const sameVolume = opened.dev === info.dev;
+        const sameCreationWithUnknownVolume = process.platform === 'win32' && info.dev === 0n
+          && opened.birthtimeNs === info.birthtimeNs;
+        if (!opened.isFile() || opened.ino !== info.ino || (!sameVolume && !sameCreationWithUnknownVolume)) {
           return failure('PREFERENCES_READ_FAILED');
         }
         const buffer = Buffer.alloc(MAX_BYTES + 1);

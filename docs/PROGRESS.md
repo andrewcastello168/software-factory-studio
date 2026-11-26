@@ -66,7 +66,7 @@ The isolated `work` branch was fast-forwarded to approved `origin/main` at `99cf
 | P01-04 | Passed on Linux. Playwright verified 1280×800, 1024×768, and 640×400 in the renderer. Pointer and keyboard resizing and the 180–320 px limits passed. Native Electron verified the shell at 200% zoom with no document-level horizontal overflow. |
 | P01-05 | Passed on Linux. File integration tested serialized writes, corruption, explicit restore, future-version preservation, and controlled filesystem failure. Native Electron followed a System theme change and restored the saved theme and width after a clean relaunch with a disposable profile. |
 | P01-06 | Passed in Playwright and manually inspected in Cloud Chrome. Checked `Ctrl+K`, filtering, empty results, keyboard command execution, and Escape focus restoration. |
-| P01-07 | Linux renderer and built Electron suites passed. Windows x64 native verification remains pending. |
+| P01-07 | Renderer and native Electron suites passed on Linux and on the GitHub-hosted Windows Server 2025 x64 runner. |
 | P01-08 | README documents all root commands, exact Windows setup and smoke checks, and runtime boundaries. Security review and dependency audit completed for Phase 01. |
 
 `pnpm test` passed 21 tests across three Vitest suites. `pnpm test:renderer` passed seven Playwright cases with system Chromium and Chromium sandboxing enabled. The default Chromium download endpoint was denied by the Cloud allowlist. The preinstalled Chromium worked on the host runner with its sandbox intact. `pnpm audit --audit-level high` reported no known vulnerabilities.
@@ -77,4 +77,8 @@ Cloud Chrome visual review covered Home in Light, Settings in Dark, the collapse
 
 ## Windows x64 verification
 
-Run the exact PowerShell commands in [README](../README.md#development-setup) after installing the pinned Node release. Run the two Playwright suites and perform the documented native smoke checks at the actual Windows display scaling. Record OS and Electron versions, theme changes through System mode, resize and 200% zoom, restart persistence, and test outcomes. Windows installer, upgrade, uninstall, and signing checks remain Phase 12.
+The Windows Server 2025 x64 GitHub Actions job passed the frozen installation, lint, type checking, production build, 21 unit and filesystem integration tests, seven renderer tests, and one native Electron smoke test. The Electron suite verified sandboxed launch, denied operations, resizing at 200% zoom, and theme and sidebar persistence after relaunch. [Successful Windows CI run](https://github.com/andrewcastello168/software-factory-studio/actions/runs/45742068229)
+
+The initial run exposed a preferences read failure because Node's Windows path stats omitted the volume serial for a file whose opened handle reported it. The fix retains the exact file ID comparison and checks creation time when that volume serial is unavailable. The Windows filesystem integration and native Electron suites both cover successful reads after a write.
+
+Use the [PowerShell commands](../README.md#development-setup) to reproduce the checks on a local Windows system. Windows installer, upgrade, uninstall, and signing checks remain Phase 12.

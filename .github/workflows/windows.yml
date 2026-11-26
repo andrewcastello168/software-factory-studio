@@ -1,0 +1,68 @@
+name: Windows verification
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-x64:
+    name: Windows x64
+    runs-on: windows-2025
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          architecture: x64
+
+      - name: Install pinned pnpm
+        run: |
+          $packageManager = (Get-Content package.json -Raw | ConvertFrom-Json).packageManager
+          npm install --global $packageManager --no-audit --no-fund
+          node -p "process.platform + ' ' + process.arch + ' Node.js ' + process.version"
+          pnpm --version
+
+      - name: Install dependencies from lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Unit and filesystem integration tests
+        run: pnpm test
+
+      - name: Build desktop application
+        run: pnpm build
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @factory/desktop exec playwright install chromium
+
+      - name: Test renderer
+        run: pnpm test:renderer --workers=2
+
+      - name: Install Electron binary
+        run: pnpm --filter @factory/desktop exec install-electron
+
+      - name: Test native Electron
+        run: pnpm test:electron
