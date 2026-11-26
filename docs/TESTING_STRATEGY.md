@@ -27,3 +27,7 @@ Phase 01 needs Electron, React, strict TypeScript, Vite, Tailwind, pnpm, Vitest,
 For each code phase record the commit or reviewed working tree, host and tool versions, commands, fixture assumptions, outcomes, and open checks. Verify standard commands from the repository root with the frozen lockfile. Review the normal UI and IPC path, permission and input checks, errors and recovery, cross-platform behavior, and regressions from previous phases. Add tests for acceptance behaviors and any regression an existing suite would miss. Scope high-risk tests to disposable fixtures. Avoid real user repositories and databases.
 
 Record `passed`, `failed`, `blocked`, or `not applicable` per check and describe the actual limits. Application typecheck, lint, build, and test gates start in Phase 01 when their entry points exist. [Roadmap](ROADMAP.md) defines feature-specific acceptance.
+
+## Git Studio fixtures
+
+Use standard Git for Windows and a system Git on Linux. Generate separate ordinary repositories, project directories and bare remotes in the test process. Integration tests verify stored refs, index state and preserved files through Git and the filesystem. Electron tests drive the built app with native sandboxing and controlled chooser and confirmation outcomes. Renderer tests cover keyboard decisions and theme rendering through a test-only bridge. Keep screenshots and temporary credentials outside the repository. HTTPS transport policy is checked locally. Record any independent public HTTPS smoke with its actual host and platform.

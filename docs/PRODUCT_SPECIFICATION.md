@@ -2,9 +2,17 @@
 
 ## Product contract
 
-Software Factory Studio serves developers and engineering teams working in real local repositories. It helps them inspect projects, choose an engineering stack, generate editable source, design databases and APIs, manage Git, and build and release applications. Teams share standards, modules, and templates through Git. Repository and service permissions govern remote access.
+Software Factory Studio is a local-first, Git-native, AI-ready personal engineering platform. It helps developers build independent applications, design databases and migrations, and turn proven architectures, modules, and engineering practices into reusable assets. It protects custom code during repeated generation and supplies portable project context for people and coding assistants. Teams can share the same assets and standards through Git with permissions enforced by the repository host.
+
+Studio complements VS Code, Codex, and other coding assistants. The primary workflow keeps ordinary repositories, editors, and toolchains in use. Git and project operations provide a reliable foundation for the factory workflow. The core does not require a Studio backend, an AI subscription, or access to a paid API. [Phase 07](ROADMAP.md#product-mvp) is the primary MVP gate.
 
 A project reopened after a move retains its portable identity when its metadata moves with it. A project may have several local worktree tabs. Each tab is bound to its actual working directory. Recipes produce applications with standard source layout, toolchain commands, lockfiles, documentation, and runtime configuration. The generated application runs independently of Studio. VS Code and Codex are optional collaborators using the same directories and Git conventions. Personal local workflows such as inspection, local Git operations, and generation from installed assets remain available offline once their ordinary toolchain dependencies are present. A clone, fetch, push, or dependency download can require connectivity to its configured service.
+
+## AI-ready project context
+
+Phase 04 generates a concise, human-readable `AGENTS.md` and project documentation alongside the first scaffold. Instructions describe the actual stack, toolchain commands, source layout, custom-code ownership, and migration workflow. They work in an ordinary editor or coding agent session without Studio. The generator previews the files and protects existing instructions through the same ownership and collision rules as source code.
+
+Phase 07 adds reusable context profiles for architecture guidance, module conventions, engineering standards, and reviewed task instructions. Profiles can be pinned and shared through Git. Treat imported instructions as untrusted text. Users inspect what gets written or exported. Exclude secrets, runtime environment values, personal paths, and hidden assistant state from portable context. Agent orchestration, automatic prompt execution, and AI service integrations are optional extensions outside the MVP.
 
 ## Workspace map
 
@@ -21,7 +29,7 @@ The global scope owns reusable assets, settings, and project entry points. Proje
 | Project | Quality and Release | Testing, Project Inspector, Environment Manager, Deployment, Release Manager |
 | Project | Management | Project History, Recovery Center, Project Settings |
 
-Navigation is driven by capabilities and context. Keep Overview, Source Code, and Git Studio near the primary project navigation once delivered. Group branch tools in Git Studio, file and generation recovery in Recovery Center, and release controls in Release Manager. Surface Page Builder for supported UI stacks and API Designer for supported HTTP backends. Give unknown projects a read-only inspection path and explain why generation is unsupported when the user reaches that context. Show only usable commands in the command palette and sidebar. The roadmap defines when each destination becomes available.
+Navigation is driven by capabilities and context. Keep Overview, Project Structure, Git Studio, and generation entry points near primary project navigation. Prefer an external editor handoff for ordinary editing. Group branch tools in Git Studio, file and generation recovery in Recovery Center, and release controls in Release Manager. Retain Page Builder and API Designer as later stack-specific extensions. Full IDE parity and sophisticated visual page authoring have lower priority than templates, modules, and generation safety. Give unknown projects a read-only inspection path and explain why generation is unsupported when the user reaches that context. Show only usable commands in the command palette and sidebar. The roadmap defines when each destination becomes available.
 
 ## Project lifecycle
 
@@ -29,7 +37,7 @@ Navigation is driven by capabilities and context. Keep Overview, Source Code, an
 | --- | --- |
 | Open Folder | Use the native chooser, admit the selected directory to the session, and read a bounded snapshot. Opening an unsupported project still enables inspection when that feature is delivered. |
 | New Project | Run the wizard against one enabled stack. Choose an empty directory or a new child under a parent selected through the native dialog. Preview and approve the resolved destination and deterministic plan. |
-| Clone Repository | Ask for the remote and destination, confirm the operation, and admit the resulting directory only after clone succeeds. Use operation-specific Git policy. |
+| Clone Repository | Ask for the remote and destination, confirm the operation, and admit the resulting directory only after clone succeeds. Phase 03 supports public HTTPS and explicitly selected local bare repositories. Review the exact source and a new child folder under a natively selected parent. |
 | Reopen Recent | Reopen the actual directory by reference. If it is gone, offer Locate or Remove from Recents. An identity mismatch during Locate requires an explicit choice. |
 | Rescan | Reconcile changes from native watchers and manual refresh. Refresh the snapshot on focus or watcher loss. External changes make affected previews stale. |
 | Multiple tabs | Each tab is bound to a canonical directory. Two worktrees sharing one portable project ID retain independent tab identity, status, and pending operations. |

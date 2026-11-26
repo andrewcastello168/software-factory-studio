@@ -35,3 +35,7 @@ If apply fails or startup detects an incomplete record, mark the workspace recov
 ## Generated application boundaries
 
 Initial outputs include normal application source, build scripts, lockfiles, environment variable documentation, tests, and a PostgreSQL migration workflow. Phase 04 verifies a working PostgreSQL-backed feature using an isolated database. Phase 05 owns schema reconciliation. Phase 06 adds reviewed generation for supported migrations, models, repositories, services, controllers or handlers, API routes, validation, forms, CRUD pages, tables, tests, and docs. Templates and module dependencies expand in Phase 07. Deployment artifacts join a reviewed release workflow in Phase 11. The [SDK](STACK_PLUGIN_SDK.md) describes stack ownership and compatibility.
+
+## Phase 04 project instructions
+
+The first stack plan includes an ordinary `AGENTS.md` and README with the supported commands, layout, local configuration keys without values, ownership rules, and reviewed migration workflow. Generate them deterministically from the pinned stack profile. Preview their paths and changes and apply the same collision, stale review, and recovery rules as source files. Existing user instructions remain owned by their author unless the reviewed plan identifies an authorized edit. An AI provider, runtime agent, and executable project context are outside this scope.
