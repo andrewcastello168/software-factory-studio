@@ -223,3 +223,5 @@ Phase 09 starts on the isolated work branch at 5daa4c9, including merged PR #11 
 The Phase 09 trust boundaries and independent development database setup are documented in [Git safety](GIT_SAFETY.md) and the [parallel development guide](PARALLEL_DEVELOPMENT.md).
 
 The first Windows native merge smoke clicked Review while its explicit Git refresh was still reading the linked commit. The fixture now waits for the source selector to show the actual new commit ID. Production stale-review checks and test assertions remain in force.
+
+The subsequent Windows run exposed scheduling timeouts in two existing native filesystem and Git fixtures that use Vitest’s five-second default. Windows CI now runs those suites with two workers and a 15-second default fixture budget. The same cases, assertions and production Git process limits remain active.
