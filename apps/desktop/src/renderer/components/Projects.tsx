@@ -1,3 +1,4 @@
+import { Code2, ExternalLink } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import {
@@ -11,7 +12,7 @@ const availabilityLabel: Record<ProjectAvailability, string> = {
   ready: 'Available', missing: 'Folder not found', unavailable: 'Folder unavailable', changed: 'Folder changed',
 };
 
-export type ProjectView = 'overview' | 'structure' | 'git' | 'database' | 'generation';
+export type ProjectView = 'overview' | 'structure' | 'git' | 'database' | 'generation' | 'developer';
 
 export function WorkspaceTabs({
   projects, active, onSelect, onClose,
@@ -166,11 +167,12 @@ function buildTree(entries: ProjectEntry[]): TreeNode[] {
 }
 
 function TreeItems({
-  nodes, expanded, toggle, level = 0,
+  nodes, expanded, toggle, sourceAction, level = 0,
 }: {
   nodes: TreeNode[];
   expanded: Set<string>;
   toggle: (path: string) => void;
+  sourceAction?: ((path: string, action: 'editor' | 'reveal') => void) | undefined;
   level?: number;
 }) {
   return (
@@ -196,11 +198,15 @@ function TreeItems({
               <div className="structure-row" title={entry.path} style={{ paddingInlineStart: 32 + level * 17 }}>
                 <Icon size={15} aria-hidden="true" /><bdi>{name}</bdi>
                 {entry.kind === 'link' && <span className="structure-note">Link skipped</span>}
+                {sourceAction && entry.kind === 'file' && <>
+                  <Button className="dev-source-action" aria-label={'Open ' + entry.path + ' in VS Code'} onClick={() => sourceAction(entry.path, 'editor')}><Code2 size={14} /></Button>
+                  <Button className="dev-source-action" aria-label={'Reveal ' + entry.path} onClick={() => sourceAction(entry.path, 'reveal')}><ExternalLink size={14} /></Button>
+                </>}
                 {entry.kind === 'file' && entry.size !== null && <span className="structure-note">{entry.size.toLocaleString('en')} B</span>}
               </div>
             )}
             {entry.kind === 'directory' && isExpanded && (children.length
-              ? <TreeItems nodes={children} expanded={expanded} toggle={toggle} level={level + 1} />
+              ? <TreeItems nodes={children} expanded={expanded} toggle={toggle} sourceAction={sourceAction} level={level + 1} />
               : <p className="structure-note structure-empty" style={{ paddingInlineStart: 32 + (level + 1) * 17 }}>No listed entries</p>)}
           </li>
         );
@@ -218,11 +224,12 @@ const metadataLabel = {
 };
 
 export function ProjectPanel({
-  project, view, setView, rescan, locate, opening, gitContext,
+  project, view, setView, rescan, locate, opening, gitContext, sourceAction,
 }: {
   project: OpenProject;
   view: 'overview' | 'structure';
   setView: (view: ProjectView) => void;
+  sourceAction?: ((path: string, action: 'editor' | 'reveal') => void) | undefined;
   gitContext: string;
   rescan: () => void;
   locate: (() => void) | undefined;
@@ -300,7 +307,7 @@ export function ProjectPanel({
         </>
       ) : (
         <section className="structure" aria-label="Project files">
-          {tree.length ? <TreeItems nodes={tree} expanded={expanded} toggle={toggle} />
+          {tree.length ? <TreeItems nodes={tree} expanded={expanded} toggle={toggle} sourceAction={sourceAction} />
             : <p className="structure-empty">No entries to show in this folder.</p>}
         </section>
       ))}

@@ -247,3 +247,5 @@ const stackAdapters = {
   [NODE_STACK]: { manifest: STACKS[NODE_STACK], plan: planNode },
   [GO_STACK]: { manifest: STACKS[GO_STACK], plan: planGo },
 } satisfies Record<StarterConfig['stack'], BuiltInStackAdapter>;
+
+export { artifactLinks, composeDesign, describeDesign, readDesign } from './design';

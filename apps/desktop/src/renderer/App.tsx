@@ -1,3 +1,5 @@
+import { DeveloperWorkspace, developerBridge, developerErrors } from './components/Developer';
+import { Code2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
@@ -37,6 +39,8 @@ export function App() {
   const [cloning, setCloning] = useState(false);
   const [cloneOpen, setCloneOpen] = useState(false);
   const [generatorView, setGeneratorView] = useState<'new' | 'recovery' | null>(null);
+  const [linkedTable, setLinkedTable] = useState<{ projectId: string; name: string }>();
+  const [handoffError, setHandoffError] = useState('');
   const [cloneNotice, setCloneNotice] = useState<string | null>(null);
   const view = activeProject ? views[activeProject.id] ?? 'overview' : null;
   const database = Boolean(schemaBridge && supportsDatabaseStudio(activeProject));
@@ -76,6 +80,13 @@ export function App() {
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [mac, openPalette, restore, cloneOpen]);
+
+  function openSource(projectId: string, path: string, action: 'editor' | 'reveal') {
+    setHandoffError('');
+    void developerBridge?.handoff({ projectId, action, path, line: null, column: null }).then((result) => {
+      if (!result.ok) setHandoffError(developerErrors[result.error] ?? 'The selected source could not be opened.');
+    });
+  }
 
   function openPage(next: Page) {
     setActiveId(null);
@@ -162,6 +173,7 @@ export function App() {
       { id: 'overview', title: 'Project Overview', icon: House, run: () => openProjectView('overview') },
       { id: 'structure', title: 'Project Structure', icon: Folder, run: () => openProjectView('structure') },
       { id: 'git', title: 'Git Studio', icon: GitBranch, run: () => openProjectView('git') },
+      ...(developerBridge ? [{ id: 'developer', title: 'Developer Tools', icon: Code2, run: () => openProjectView('developer') }] : []),
       { id: 'rescan', title: 'Rescan Project', icon: RefreshCw, run: () => { void workspace.rescan(activeProject.id); void git.refresh(); } },
       { id: 'close-project', title: 'Close Project', icon: X, run: () => void closeProject(activeProject.id) },
     );
@@ -220,7 +232,7 @@ export function App() {
           <>
             <aside className="sidebar">
               <div className="sidebar-heading"><span>Explorer</span><WorkspaceMenu commands={commands} /></div>
-              <Navigation page={active ? null : page} onSelect={openPage} projectView={view} onProjectView={openProjectView} database={database} generation={generation} />
+              <Navigation page={active ? null : page} onSelect={openPage} projectView={view} onProjectView={openProjectView} database={database} generation={generation} developer={Boolean(developerBridge)} />
             </aside>
             <div
               className="separator"
@@ -270,6 +282,7 @@ export function App() {
           </>
         )}
         <div className="workspace">
+          {handoffError && <p role="alert" className="notice">{handoffError} <Button onClick={() => setHandoffError('')}>Dismiss</Button></p>}
           <WorkspaceTabs projects={workspace.catalog.projects} active={active} onSelect={setActiveId} onClose={(id) => void closeProject(id)} />
           <main className="workspace-main" id="workspace-main" tabIndex={-1}>
             {notice && (
@@ -306,12 +319,17 @@ export function App() {
                 : activeProject && view === 'generation' && generation ? <GenerationReview key={activeProject.id} project={activeProject}
                   signal={JSON.stringify([repo?.branch, repo?.head, repo?.operation, repo?.revision,
                     activeProject.entries.filter(({ path }) => path.startsWith('db/migrations/') || path.startsWith('.factory/'))])} />
-                : activeProject && view === 'database' && database ? <DatabasePanel key={activeProject.id} project={activeProject}
+                : activeProject && view === 'developer' && developerBridge ? <DeveloperWorkspace key={activeProject.id}
+                  project={activeProject} signal={JSON.stringify([repo?.branch, repo?.head, repo?.revision, activeProject.entries.length])}
+                  openTable={(name) => { setLinkedTable({ projectId: activeProject.id, name }); openProjectView('database'); }} />
+                : activeProject && view === 'database' && database ? <DatabasePanel key={activeProject.id + (linkedTable?.projectId === activeProject.id ? ':' + linkedTable.name : '')} project={activeProject}
+                  initialTable={linkedTable?.projectId === activeProject.id ? linkedTable.name : undefined}
                   sourceSignal={JSON.stringify([repo?.branch, repo?.head, repo?.operation,
                     activeProject.entries.filter(({ path }) => path.startsWith('db/migrations/'))])} />
                 : activeProject && view ? <ProjectPanel
                 key={activeProject.id}
                 project={activeProject}
+                sourceAction={developerBridge ? (path, action) => openSource(activeProject.id, path, action) : undefined}
                 view={view === 'structure' ? 'structure' : 'overview'}
                 setView={openProjectView}
                 rescan={() => { void workspace.rescan(activeProject.id); void git.refresh(); }}

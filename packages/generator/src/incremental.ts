@@ -1,3 +1,4 @@
+import { designInputs, isDesignWritePath, isPageOwnership, pageFiles } from './design';
 import {
   GENERATOR_LIMITS, GO_STACK, stackDefinition, AUTHENTICATION, IDENTITY_MODULES, MODULE_CATALOG, isLibrarySelection, moduleCompatibility, orderedModules, hasExactKeys, isGeneratorDigest, isGeneratorPath, isModuleSelection, isRecord, isSchemaName,
   isProjectId, isStarterName, isStarterPort, isStarterSlug, STARTER, WELCOME_EXAMPLE,
@@ -33,16 +34,16 @@ const identityOwner = (path: string) => {
   const suffix = /^db\/migrations\/(?:\d{4})_([a-z_]+)\.sql$/u.exec(path)?.[1];
   return suffix && identityMigration(suffix) ? suffix.replaceAll('_', '-') : undefined;
 };
-export const incrementalPaths = [descriptorPath, manifestPath, versionsPath, modulePath, libraryPath, '.env.example',
+export const incrementalPaths = [descriptorPath, manifestPath, versionsPath, modulePath, libraryPath, '.env.example', ...designInputs,
   'server/app.ts', 'go.mod', goIntegrationPath, ...goCrudPaths, ...foundationPaths, ...featurePaths, ...identityFiles];
 export const isModuleMigrationPath = (path: string) => Boolean(identityOwner(path));
 export function isIncrementalWritePath(path: string) {
-  return isModuleMigrationPath(path) || [...foundationPaths, ...featurePaths, goIntegrationPath, ...goCrudPaths, ...identityFiles, versionsPath, manifestPath, modulePath].includes(path);
+  return isDesignWritePath(path) || isModuleMigrationPath(path) || [...foundationPaths, ...featurePaths, goIntegrationPath, ...goCrudPaths, ...identityFiles, versionsPath, manifestPath, modulePath].includes(path);
 }
 
 export type LocalFile = { state: 'absent' | 'unsafe' } | { state: 'text'; sha256: string; content: string };
 interface ManifestEntry { path: string; sha256: string; owner: string; action: 'create' }
-interface VersionedProject {
+export interface VersionedProject {
   projectId: string; config: StarterConfig; files: ManifestEntry[]; versions: Record<string, unknown>;
   previous: { backend: string[]; frontend: string[]; migration: string | null; sources: { name: string; sha256: string }[] | null } | null;
 }
@@ -123,7 +124,7 @@ export function readIncrementalProject(files: ReadonlyMap<string, LocalFile>): V
     sha256: pinned.get(manifestPath)!.sha256 }]])).map(({ path, owner }) => [path, owner]));
   if (filesOwned.some(({ path, owner }) => owner === CRUD_OWNER
     ? !featuresFor(config.stack).includes(path) && path !== 'db/migrations/0002_schema.sql' && path !== 'db/migrations/0003_schema.sql'
-    : known.get(path) !== owner && (identityOwner(path) !== owner || !modules.some(({ id }) => id === owner)))) {
+    : known.get(path) !== owner && !isPageOwnership(path, owner, config.stack) && (identityOwner(path) !== owner || !modules.some(({ id }) => id === owner)))) {
     throw new IncrementalUnsupported('The manifest claims ownership of paths outside the pinned templates.');
   }
   const { schema: schemaLock, ...withoutSchema } = versions;
@@ -326,6 +327,10 @@ export function composeModuleInstall(
     }
   }
   if (issues.length || modules.length === config.modules.length) return result;
+  if (modules.some(({ id }) => id === AUTHENTICATION.id) && project.files.some(({ path }) => path === pageFiles[0])) {
+    issues.push('This project has a public standalone page. Review the page integration outside Studio before adding authentication.');
+    return result;
+  }
   modules.splice(0, modules.length, ...orderedModules(modules));
   const oldConfig: StarterConfig = {
     ...config, ...(previous ? { crud: { schema: withoutWelcome(oldSchema, project), migrations: true, backend, frontend } } : {}),

@@ -1,3 +1,7 @@
+import {
+  DEVELOPER_CHANNEL, DESIGN_CHANNEL, isDesignSnapshot, isFlag, isHandoff, isPlaygroundRequest, isPlaygroundResponse,
+  isRuntimeControl, isRuntimeCopy, isRuntimeEnvironment, isRuntimeInspection, isRuntimeLogs, isRuntimePreview, isRuntimeProcess, isRuntimeScope, isRuntimeSelection,
+} from '@factory/contracts';
 import { GIT_ADVANCED_CHANNEL, isGitAdvancedOutcome, isGitApproved, isGitReview, isGitReviewInput, isGitScope,
   isGitWorkspaceDetails } from '@factory/contracts';
 import { contextBridge, ipcRenderer } from 'electron';
@@ -35,6 +39,21 @@ function checkedInvoke<T>(
 }
 
 const studio: StudioBridge = {
+  developer: {
+    inspect: (id) => invokeProject(DEVELOPER_CHANNEL.inspect, isRuntimeInspection, id),
+    handoff: (input) => checkedInvoke(DEVELOPER_CHANNEL.handoff, input, isHandoff, isFlag),
+    preview: (input) => checkedInvoke(DEVELOPER_CHANNEL.preview, input, isRuntimeSelection, isRuntimePreview),
+    start: (scope) => checkedInvoke(DEVELOPER_CHANNEL.start, scope, isRuntimeScope, isRuntimeProcess),
+    control: (scope) => checkedInvoke(DEVELOPER_CHANNEL.control, scope, isRuntimeControl, isFlag),
+    copy: (input) => checkedInvoke(DEVELOPER_CHANNEL.copy, input, isRuntimeCopy, isFlag),
+    environment: (input) => checkedInvoke(DEVELOPER_CHANNEL.environment, input, isRuntimeEnvironment, isFlag),
+    logs: (id) => invokeProject(DEVELOPER_CHANNEL.logs, isRuntimeLogs, id),
+    request: (input) => checkedInvoke(DEVELOPER_CHANNEL.request, input, isPlaygroundRequest, isPlaygroundResponse),
+  },
+  design: {
+    inspect: (id) => invokeProject(DESIGN_CHANNEL.inspect, isDesignSnapshot, id),
+    export: (id) => invokeProject(DESIGN_CHANNEL.export, isFlag, id),
+  },
   library: {
     list: () => invoke(LIBRARY_CHANNEL.list, isLibraryAssets),
     publish: (asset) => checkedInvoke(LIBRARY_CHANNEL.publish, asset, isLibraryAsset, isLibraryAsset),

@@ -1,3 +1,5 @@
+import { isDesignMutation } from './design';
+import type { DesignMutation } from './design';
 import { isModuleSelection } from './generator-modules';
 import type { ModuleSelection } from './generator-modules';
 import type { Result } from './index';
@@ -26,7 +28,7 @@ export interface IncrementalInspection {
   recovery: IncrementalPreview | null;
 }
 export interface IncrementalSelection {
-  projectId: string; revision: string; backend: string[]; frontend: string[]; modules?: ModuleSelection[];
+  projectId: string; revision: string; backend: string[]; frontend: string[]; modules?: ModuleSelection[]; design?: DesignMutation;
 }
 export interface IncrementalApproval { projectId: string; id: string }
 export interface IncrementalChange {
@@ -53,12 +55,13 @@ function list<T>(x: unknown, max: number, check: (v: unknown) => v is T): x is T
 const issue = (x: unknown): x is string => string(x, 300);
 const nullableString = (x: unknown, max: number) => x === null || string(x, max);
 const names = (x: unknown): x is string[] => list(x, SCHEMA_LIMITS.tables, isSchemaName) && new Set(x).size === x.length;
-const choices = (x: Record<string, unknown>) => names(x.backend) && names(x.frontend)
+const choices = (x: Record<string, unknown>): x is Record<string, unknown> & { backend: string[]; frontend: string[]; modules?: ModuleSelection[] } => names(x.backend) && names(x.frontend)
   && (!Object.hasOwn(x, 'modules') || list(x.modules, 12, isModuleSelection));
 
 export function isIncrementalSelection(x: unknown): x is IncrementalSelection {
-  return isRecord(x) && hasExactKeys(x, ['projectId', 'revision', 'backend', 'frontend', ...(Object.hasOwn(x, 'modules') ? ['modules'] : [])])
-    && isProjectId(x.projectId) && isGeneratorDigest(x.revision) && choices(x);
+  return isRecord(x) && hasExactKeys(x, ['projectId', 'revision', 'backend', 'frontend', ...(Object.hasOwn(x, 'modules') ? ['modules'] : []), ...(Object.hasOwn(x, 'design') ? ['design'] : [])])
+    && isProjectId(x.projectId) && isGeneratorDigest(x.revision) && choices(x)
+    && (!Object.hasOwn(x, 'design') || (isDesignMutation(x.design) && !x.backend.length && !x.frontend.length && !x.modules?.length));
 }
 
 export function isIncrementalApproval(x: unknown): x is IncrementalApproval {

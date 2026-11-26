@@ -1,3 +1,7 @@
+import type { DesignBridge } from './design';
+export * from './design';
+import type { DeveloperBridge } from './developer';
+export * from './developer';
 export * from './stacks';
 import type { LibraryBridge } from './library';
 import { hasExactKeys, isRecord } from './validation';
@@ -78,6 +82,14 @@ const errorCodes = [
   'INCREMENTAL_UNSUPPORTED',
   'INCREMENTAL_CONFLICT',
   'LIBRARY_CONFLICT',
+  'DEVELOPER_UNSUPPORTED',
+  'DEVELOPER_STALE',
+  'DEVELOPER_TOOL',
+  'DEVELOPER_ENVIRONMENT',
+  'DEVELOPER_PORT',
+  'DEVELOPER_PROCESS',
+  'DEVELOPER_NETWORK',
+  'DESIGN_CONFLICT',
 ] as const;
 
 export type ErrorCode = typeof errorCodes[number];
@@ -85,6 +97,8 @@ export type Result<T> = { ok: true; value: T } | { ok: false; error: ErrorCode }
 export type Validator<T> = (value: unknown) => value is T;
 
 export interface StudioBridge {
+  developer: DeveloperBridge;
+  design: DesignBridge;
   projects: ProjectBridge;
   git: GitBridge;
   generator: GeneratorBridge;

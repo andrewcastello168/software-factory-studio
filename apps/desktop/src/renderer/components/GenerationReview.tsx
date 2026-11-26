@@ -20,7 +20,7 @@ const labels = { create: 'Create', modify: 'Modify', unchanged: 'Unchanged', pro
 const reviewOrder = { modify: 0, create: 0, conflict: 0, protected: 1, unchanged: 2 };
 const statuses = { generated: 'Generated', modified: 'Modified', missing: 'Missing', user: 'User-owned', discovered: 'Discovered', protected: 'Protected' };
 
-function ChangePreview({ change }: { change: IncrementalChange }) {
+export function ChangePreview({ change }: { change: IncrementalChange }) {
   const [full, setFull] = useState(false);
   const before = change.before?.split('\n') ?? [];
   const after = change.after?.split('\n') ?? [];

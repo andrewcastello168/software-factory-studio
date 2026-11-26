@@ -1,9 +1,19 @@
+import {
+  DEVELOPER_CHANNEL, DESIGN_CHANNEL, formatOpenApi, isDesignSnapshot, isFlag, isHandoff, isPlaygroundRequest, isPlaygroundResponse,
+  isRuntimeControl, isRuntimeCopy, isRuntimeEnvironment, isRuntimeInspection, isRuntimeLogs, isRuntimePreview, isRuntimeProcess, isRuntimeScope, isRuntimeSelection, isWorkspacePath,
+} from '@factory/contracts';
+import { randomUUID } from 'node:crypto';
+import { sha256 } from '@factory/generator';
+import { assertVacant, publish } from './services/generation/transaction';
+import { admitRoot } from './services/projects/filesystem';
+import { DeveloperStudio } from './services/developer/studio';
 import { GIT_ADVANCED_CHANNEL, isGitAdvancedOutcome, isGitApproved, isGitReview, isGitReviewInput, isGitScope,
   isGitWorkspaceDetails } from '@factory/contracts';
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, protocol, session, shell } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
+import { existsSync } from 'node:fs';
 import { readFile, realpath } from 'node:fs/promises';
-import { join, relative, sep } from 'node:path';
+import { basename, dirname, join, relative, sep } from 'node:path';
 import {
   LIBRARY_CHANNEL, isLibraryAsset, isLibraryAssets,
   INCREMENTAL_CHANNEL, isIncrementalApproval, isIncrementalInspection, isIncrementalPreview, isIncrementalSelection,
@@ -37,6 +47,8 @@ let gitStudio: GitStudio | undefined;
 let generatorStudio: GeneratorStudio | undefined;
 let databaseStudio: DatabaseStudio | undefined;
 let incrementalStudio: IncrementalStudio | undefined;
+let developerStudio: DeveloperStudio | undefined;
+let shutdown: Promise<void> | undefined;
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'studio', privileges: { standard: true, secure: true, supportFetchAPI: true } },
@@ -98,6 +110,51 @@ function installProjectBridge() {
   handle(PROJECT_CHANNEL.removeRecent, isProjectCatalog, forWorkspace((workspace, id) => workspace.removeRecent(id)));
   handle(PROJECT_CHANNEL.rescan, isProjectCatalog, forWorkspace((workspace, id) => workspace.rescan(id)));
   handle(PROJECT_CHANNEL.close, isProjectCatalog, forWorkspace((workspace, id) => workspace.close(id)));
+}
+
+function installDeveloperBridge() {
+  function operation<I, O>(channel: string, input: Validator<I>, output: Validator<O>, run: (studio: DeveloperStudio, value: I) => Promise<Result<O>>) {
+    handle(channel, output, (...args) => args.length === 1 && input(args[0])
+      ? developerStudio ? run(developerStudio, args[0]) : failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  }
+  operation(DEVELOPER_CHANNEL.inspect, isProjectId, isRuntimeInspection, (studio, id) => studio.inspect(id));
+  operation(DEVELOPER_CHANNEL.handoff, isHandoff, isFlag, (studio, input) => studio.handoff(input));
+  operation(DEVELOPER_CHANNEL.preview, isRuntimeSelection, isRuntimePreview, (studio, input) => studio.preview(input));
+  operation(DEVELOPER_CHANNEL.start, isRuntimeScope, isRuntimeProcess, (studio, scope) => studio.start(scope));
+  operation(DEVELOPER_CHANNEL.control, isRuntimeControl, isFlag, (studio, scope) => studio.control(scope));
+  operation(DEVELOPER_CHANNEL.copy, isRuntimeCopy, isFlag, (studio, input) => studio.copy(input));
+  operation(DEVELOPER_CHANNEL.environment, isRuntimeEnvironment, isFlag, (studio, input) => studio.environment(input));
+  operation(DEVELOPER_CHANNEL.logs, isProjectId, isRuntimeLogs, (studio, id) => studio.logs(id));
+  operation(DEVELOPER_CHANNEL.request, isPlaygroundRequest, isPlaygroundResponse, (studio, input) => studio.request(input));
+  handle(DESIGN_CHANNEL.inspect, isDesignSnapshot, (...args) => args.length === 1 && isProjectId(args[0])
+    ? incrementalStudio?.design(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(DESIGN_CHANNEL.export, isFlag, async (...args) => {
+    if (args.length !== 1 || !isProjectId(args[0])) return failure('INVALID_REQUEST');
+    const id = args[0];
+    const current = window;
+    const workspace = projects;
+    const studio = incrementalStudio;
+    const root = workspace?.root(id);
+    if (!workspace || !root || !current || !studio) return failure('ACCESS_DENIED');
+    const selected = await dialog.showSaveDialog(current, {
+      title: 'Export OpenAPI to a new file', defaultPath: 'openapi.json', filters: [{ name: 'OpenAPI JSON', extensions: ['json'] }],
+    });
+    if (selected.canceled || !selected.filePath) return success(false);
+    if (!selected.filePath.toLowerCase().endsWith('.json') || existsSync(selected.filePath)) return failure('DESIGN_CONFLICT');
+    try {
+      const destination = await admitRoot(dirname(selected.filePath));
+      const name = basename(selected.filePath);
+      if (!isWorkspacePath(name)) return failure('INVALID_REQUEST');
+      const result = await studio.design(id);
+      if (!result.ok) return result;
+      const content = formatOpenApi(result.value.entries.flatMap(({ entry }) => entry.kind === 'api' ? [entry] : []));
+      await assertVacant(destination, name);
+      await publish(destination, name, '.factory-openapi-' + randomUUID(), content, sha256(content), async () => {
+        if (workspace.root(id) !== root || current.isDestroyed()) throw new Error('Workspace grant changed.');
+      });
+      return success(true);
+    } catch { return failure('DESIGN_CONFLICT'); }
+  });
 }
 
 function installGitBridge() {
@@ -228,6 +285,7 @@ async function openWindow() {
       },
     },
     (catalog) => {
+      void developer?.reconcile();
       if (window === current && !current.isDestroyed()
         && isRendererDocument(current.webContents.getURL(), development) && isProjectCatalog(catalog)) {
         current.webContents.send(PROJECT_CHANNEL.changed, catalog);
@@ -281,6 +339,20 @@ async function openWindow() {
     refresh: (id) => workspace.rescan(id),
   }, projectDialogs);
   incrementalStudio = incremental;
+  const developer = new DeveloperStudio({
+    root: (id) => workspace.root(id), allows: (path) => workspace.allowsAuxiliaryPath(path), git: (id) => git.status(id),
+  }, {
+    confirm: projectDialogs.confirm,
+    async chooseEditor() {
+      if (current.isDestroyed()) return null;
+      const selected = await dialog.showOpenDialog(current, { title: 'Select VS Code executable', properties: ['openFile'] });
+      return selected.canceled ? null : selected.filePaths[0] ?? null;
+    },
+    reveal: (path) => shell.showItemInFolder(path),
+    openURL: (url) => shell.openExternal(url),
+    copy: (text) => clipboard.writeText(text),
+  });
+  developerStudio = developer;
   current.on('focus', () => { void workspace.reconcile(); });
   current.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   current.webContents.on('will-frame-navigate', (event) => event.preventDefault());
@@ -300,6 +372,7 @@ async function openWindow() {
   });
   current.once('ready-to-show', () => current.show());
   current.on('closed', () => {
+    shutdown = developer?.dispose();
     workspace.dispose();
     generator.dispose();
     database.dispose();
@@ -311,6 +384,7 @@ async function openWindow() {
       generatorStudio = undefined;
       databaseStudio = undefined;
       incrementalStudio = undefined;
+      developerStudio = undefined;
       window = undefined;
     }
   });
@@ -329,7 +403,16 @@ if (!app.requestSingleInstanceLock()) {
     if (window?.isMinimized()) window.restore();
     window?.focus();
   });
-  app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') void Promise.resolve(shutdown).finally(() => app.quit());
+  });
+  app.on('before-quit', (event) => {
+    if (!developerStudio) return;
+    event.preventDefault();
+    const running = developerStudio;
+    developerStudio = undefined;
+    void running.dispose().finally(() => app.quit());
+  });
   app.whenReady().then(async () => {
     const rendererSession = session.defaultSession;
     rendererSession.setPermissionCheckHandler(() => false);
@@ -348,6 +431,7 @@ if (!app.requestSingleInstanceLock()) {
     installGeneratorBridge();
     installSchemaBridge();
     installIncrementalBridge();
+    installDeveloperBridge();
     installBridge(new PreferenceStore(join(app.getPath('userData'), 'preferences.json')));
     await openWindow();
     app.on('activate', () => { if (!window) void openWindow().catch(reportStartupError); });

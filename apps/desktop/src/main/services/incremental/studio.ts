@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { isAbsolute, join, relative, sep } from 'node:path';
-import { GO_STACK, failure, INCREMENTAL_LIMITS, success } from '@factory/contracts';
+import { DESIGN_PATH, GO_STACK, failure, INCREMENTAL_LIMITS, success } from '@factory/contracts';
 import type {
-  ErrorCode, GitState, IncrementalApproval, IncrementalInspection, IncrementalPreview, IncrementalSelection, OpenProject, Result,
+  DesignEntry, DesignSnapshot, ErrorCode, GitState, IncrementalApproval, IncrementalInspection, IncrementalPreview, IncrementalSelection, OpenProject, Result,
 } from '@factory/contracts';
 import {
-  classifyOwned, composeIncremental, composeModuleInstall, eligibility, incrementalPaths, IncrementalUnsupported, manifestEntries,
+  artifactLinks, composeDesign, describeDesign, readDesign, classifyOwned, composeIncremental, composeModuleInstall, eligibility, incrementalPaths, IncrementalUnsupported, manifestEntries,
   previousSources, readIncrementalProject, sha256,
 } from '@factory/generator';
 import type { LocalFile } from '@factory/generator';
@@ -149,12 +149,33 @@ export class IncrementalStudio {
 
   inspect(id: string) { return this.#run(async () => success(await this.#inspect(id))); }
 
+  async #loadDesignReferences(captured: Awaited<ReturnType<IncrementalStudio['captureDesign']>>, addition?: DesignEntry) {
+    const document = readDesign(captured.files.get(DESIGN_PATH));
+    const entries = document.records.map(({ entry }) => entry);
+    if (addition) entries.push(addition);
+    const paths = new Set(entries.flatMap(artifactLinks).filter(({ kind }) => kind === 'source').map(({ target }) => target));
+    for (const path of paths) if (!captured.files.has(path)) captured.files.set(path, await inspectFile(captured.root, path));
+  }
+
+  private captureDesign(id: string) { return this.#capture(id); }
+
+  design(id: string): Promise<Result<DesignSnapshot>> {
+    return this.#run(async () => {
+      const captured = await this.captureDesign(id);
+      await this.#loadDesignReferences(captured);
+      if (this.#root(id) !== captured.root) return failure('INCREMENTAL_STALE');
+      return success(describeDesign(captured.project, captured.files, captured.schema));
+    });
+  }
+
   async #plan(input: IncrementalSelection) {
     const captured = await this.#capture(input.projectId, true);
     if (captured.revision !== input.revision) throw new Rejected('INCREMENTAL_STALE');
     const id = randomUUID();
+    if (input.design) await this.#loadDesignReferences(captured, input.design.entry);
     const result = captured.issues.length ? { changes: [], issues: captured.issues, backend: [], frontend: [] }
-      : input.modules?.length ? composeModuleInstall(captured.project, captured.files, captured.oldSchema, captured.source.migrations, input.modules)
+      : input.design ? composeDesign(captured.project, captured.files, captured.schema, input.design)
+        : input.modules?.length ? composeModuleInstall(captured.project, captured.files, captured.oldSchema, captured.source.migrations, input.modules)
         : composeIncremental(captured.project, captured.files, captured.schema, captured.oldSchema, captured.source.migrations, input);
     if (input.modules?.length && (input.backend.length || input.frontend.length)) result.issues.push('Review module installation and new CRUD layers separately.');
     const plannedSql = result.changes.filter(isWrite).filter(({ path }) => path.startsWith('db/'));
