@@ -2,12 +2,22 @@ import { ArrowUpRight, Command, FolderOpen, Monitor, Moon, PanelLeft, Search, Se
 import type { Theme } from '@factory/contracts';
 import { Button } from './Controls';
 
-export function Home({ openSettings, openPalette }: { openSettings: () => void; openPalette: () => void }) {
+export function Home({
+  openSettings, openPalette, openFolder, openProjects, native, opening, projectCount,
+}: {
+  openSettings: () => void;
+  openPalette: () => void;
+  openFolder: () => void;
+  openProjects: () => void;
+  native: boolean;
+  opening: boolean;
+  projectCount: number;
+}) {
   return (
     <div className="page">
       <header className="page-header">
         <h1>Home</h1>
-        <p>Manage your Studio preferences and see what’s available in the workspace.</p>
+        <p>Open a local project or configure your Studio workspace.</p>
       </header>
       <div className="home-grid">
         <section aria-labelledby="projects-title" className="projects">
@@ -15,8 +25,12 @@ export function Home({ openSettings, openPalette }: { openSettings: () => void; 
           <div className="project-empty">
             <span className="empty-icon"><FolderOpen size={20} aria-hidden="true" /></span>
             <div>
-              <h3>No project open</h3>
-              <p>Opening local folders and recent projects is planned.</p>
+              <h3>{projectCount ? `${projectCount} open ${projectCount === 1 ? 'project' : 'projects'}` : 'No project open'}</h3>
+              <p>{native ? 'Browse local project files in a read-only workspace.' : 'Local folders are available in the desktop app.'}</p>
+              {native && <div className="home-project-actions">
+                <Button variant="primary" onClick={openFolder} disabled={opening}>Open Folder</Button>
+                <Button onClick={openProjects}>Recent Projects<ArrowUpRight size={14} aria-hidden="true" /></Button>
+              </div>}
             </div>
           </div>
         </section>

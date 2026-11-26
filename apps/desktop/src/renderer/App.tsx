@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  AlertCircle, AppWindow, CircleCheck, Folder, GitBranch, House, LoaderCircle, PanelLeft,
+  AlertCircle, AppWindow, CircleCheck, Clock3, Folder, FolderOpen, GitBranch, House, LoaderCircle, PanelLeft, RefreshCw, X,
   PanelLeftClose, PanelLeftOpen, Settings2,
 } from 'lucide-react';
 import { SIDEBAR } from '@factory/contracts';
@@ -9,6 +9,9 @@ import { browserPreview, usePreferences } from './usePreferences';
 import { Button, Dialog, IconButton } from './components/Controls';
 import { CommandPalette, WorkspaceMenu } from './components/Commands';
 import type { Command } from './components/Commands';
+import { useProjects } from './useProjects';
+import { ProjectList, ProjectPanel, WorkspaceTabs } from './components/Projects';
+import type { ProjectView } from './components/Projects';
 import { Navigation } from './components/Navigation';
 import type { Page } from './components/Navigation';
 import { Home, OpenCommandButton, Settings } from './components/Pages';
@@ -17,6 +20,12 @@ const clamp = (value: number) => Math.round(Math.max(SIDEBAR.minimum, Math.min(S
 
 export function App() {
   const state = usePreferences();
+  const workspace = useProjects();
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [views, setViews] = useState<Record<string, ProjectView>>({});
+  const activeProject = workspace.catalog.projects.find((project) => project.id === activeId);
+  const active = activeProject?.id ?? null;
+  const view = activeProject ? views[activeProject.id] ?? 'overview' : null;
   const [page, setPage] = useState<Page>('home');
   const [collapsed, setCollapsed] = useState(false);
   const [palette, setPalette] = useState(false);
@@ -53,11 +62,59 @@ export function App() {
     return () => document.removeEventListener('keydown', handleKey);
   }, [mac, openPalette, restore]);
 
+  function openPage(next: Page) {
+    setActiveId(null);
+    setPage(next);
+  }
+
+  async function selectProject(result: Promise<string | null> | undefined) {
+    const id = await result;
+    if (id) setActiveId(id);
+  }
+
+  function openFolder() {
+    void selectProject(workspace.openFolder());
+  }
+
+  function openProjectView(next: ProjectView) {
+    if (active) setViews((current) => ({ ...current, [active]: next }));
+  }
+
+  async function closeProject(id: string) {
+    const index = workspace.catalog.projects.findIndex((project) => project.id === id);
+    const catalog = await workspace.close(id);
+    if (!catalog) return;
+    setViews((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+    if (active === id) {
+      const next = catalog.projects[index]?.id ?? catalog.projects[index - 1]?.id ?? null;
+      setActiveId(next);
+      document.getElementById(`workspace-tab-${next ?? 'global'}`)?.focus();
+    }
+  }
+
   const commands: Command[] = [
-    { id: 'home', title: 'Home', icon: House, run: () => setPage('home') },
-    { id: 'settings', title: 'Settings', icon: Settings2, run: () => setPage('settings') },
+    { id: 'home', title: 'Home', icon: House, run: () => openPage('home') },
+    { id: 'settings', title: 'Settings', icon: Settings2, run: () => openPage('settings') },
+    { id: 'projects', title: 'Projects', icon: Folder, run: () => openPage('projects') },
+    { id: 'recents', title: 'Recent Projects', icon: Clock3, run: () => openPage('recents') },
     { id: 'sidebar', title: 'Toggle Sidebar', icon: PanelLeft, run: toggleSidebar },
   ];
+
+  if (workspace.native && !workspace.opening) {
+    commands.splice(1, 0, { id: 'open-folder', title: 'Open Folder', icon: FolderOpen, run: openFolder });
+  }
+  if (activeProject) {
+    commands.push(
+      { id: 'overview', title: 'Project Overview', icon: House, run: () => openProjectView('overview') },
+      { id: 'structure', title: 'Project Structure', icon: Folder, run: () => openProjectView('structure') },
+      { id: 'rescan', title: 'Rescan Project', icon: RefreshCw, run: () => void workspace.rescan(activeProject.id) },
+      { id: 'close-project', title: 'Close Project', icon: X, run: () => void closeProject(activeProject.id) },
+    );
+  }
 
   const notice = state.error ?? (state.storage === 'corrupt'
     ? 'Stored preferences are unreadable. Studio is using defaults.'
@@ -89,10 +146,11 @@ export function App() {
           <span className="brand-name">Factory Studio</span>
         </div>
         <div className="context-bar" role="group" aria-label="Project context">
-          <span className="project-context"><Folder size={15} aria-hidden="true" />No project open</span>
-          <span className="context-detail" title="Working directory: None"><span>Directory</span><span aria-label="Working directory: None">—</span></span>
-          <span className="context-detail" title="Git branch: None"><GitBranch size={14} aria-hidden="true" /><span aria-label="Git branch: None">—</span></span>
-          <span className="context-detail" title="Working tree: Unavailable"><span>Working tree</span><span aria-label="Working tree: Unavailable">—</span></span>
+          <span className="project-context"><Folder size={15} aria-hidden="true" /><bdi>{activeProject?.name ?? 'No project open'}</bdi></span>
+          <span className="context-detail context-directory" title={`Working directory: ${activeProject?.directory ?? 'None'}`}>
+            <span>Directory</span><bdi>{activeProject?.directory ?? '—'}</bdi>
+          </span>
+          <span className="context-detail" title="Git details unavailable"><GitBranch size={14} aria-hidden="true" /><span>Git unavailable</span></span>
         </div>
         <OpenCommandButton open={openPalette} shortcut={shortcut} />
       </header>
@@ -102,7 +160,7 @@ export function App() {
           <>
             <aside className="sidebar">
               <div className="sidebar-heading"><span>Explorer</span><WorkspaceMenu commands={commands} /></div>
-              <Navigation page={page} onSelect={setPage} />
+              <Navigation page={active ? null : page} onSelect={openPage} projectView={view} onProjectView={openProjectView} />
             </aside>
             <div
               className="separator"
@@ -152,10 +210,7 @@ export function App() {
           </>
         )}
         <div className="workspace">
-          <div className="workspace-tabs" aria-label="Workspace tabs">
-            <div className="workspace-tab" aria-current="true"><AppWindow size={15} aria-hidden="true" />Workspace</div>
-            <span className="workspace-scope">Global workspace</span>
-          </div>
+          <WorkspaceTabs projects={workspace.catalog.projects} active={active} onSelect={setActiveId} onClose={(id) => void closeProject(id)} />
           <main className="workspace-main" id="workspace-main" tabIndex={-1}>
             {notice && (
               <div className="notice-wrap">
@@ -168,23 +223,75 @@ export function App() {
                 </div>
               </div>
             )}
-            {page === 'home'
-              ? <Home openSettings={() => setPage('settings')} openPalette={openPalette} />
-              : <Settings
-                  theme={state.preferences.theme}
-                  onTheme={(theme) => void state.write({ action: 'update', changes: { theme } })}
-                  disabled={!state.editable}
-                  loading={state.loading}
-                  browser={browserPreview}
-                  sidebarWidth={selectedWidth}
-                  sidebarOpen={!collapsed}
-                  toggleSidebar={toggleSidebar}
-                />}
+            {workspace.error && <div className="notice-wrap"><div className="notice" role="alert">
+              <AlertCircle size={16} aria-hidden="true" /><span>{workspace.error}</span>
+              <IconButton label="Dismiss project error" onClick={workspace.dismiss}><X size={15} aria-hidden="true" /></IconButton>
+            </div></div>}
+            {workspace.catalog.recentsStatus !== 'ready' && (
+              <div className="notice-wrap"><div className="notice" role="status">
+                {workspace.catalog.recentsStatus === 'unreadable'
+                  ? 'Recent Projects could not be read. The stored list was preserved.'
+                  : 'Recent Projects could not be saved. Changes apply to this session.'}
+              </div></div>
+            )}
+            <section role="tabpanel" id="workspace-panel" aria-labelledby={`workspace-tab-${active ?? 'global'}`}>
+              {activeProject && view ? <ProjectPanel
+                key={activeProject.id}
+                project={activeProject}
+                view={view}
+                setView={openProjectView}
+                rescan={() => void workspace.rescan(activeProject.id)}
+                locate={workspace.catalog.recents.some((recent) => recent.id === activeProject.recentId)
+                  ? () => void selectProject(workspace.locate(activeProject.recentId)) : undefined}
+                opening={workspace.opening}
+              /> : page === 'home'
+                ? <Home
+                    openSettings={() => openPage('settings')}
+                    openPalette={openPalette}
+                    openFolder={openFolder}
+                    openProjects={() => openPage('recents')}
+                    native={workspace.native}
+                    opening={workspace.opening}
+                    projectCount={workspace.catalog.projects.length}
+                  />
+                : page === 'settings' ? <Settings
+                    theme={state.preferences.theme}
+                    onTheme={(theme) => void state.write({ action: 'update', changes: { theme } })}
+                    disabled={!state.editable}
+                    loading={state.loading}
+                    browser={browserPreview}
+                    sidebarWidth={selectedWidth}
+                    sidebarOpen={!collapsed}
+                    toggleSidebar={toggleSidebar}
+                  />
+                : page === 'projects' ? <ProjectList
+                    title="Projects"
+                    rows={workspace.catalog.projects}
+                    native={workspace.native}
+                    opening={workspace.opening}
+                    openFolder={openFolder}
+                    open={setActiveId}
+                  />
+                : <ProjectList
+                    title="Recent Projects"
+                    rows={workspace.catalog.recents}
+                    native={workspace.native}
+                    opening={workspace.opening}
+                    openFolder={openFolder}
+                    open={(id) => void selectProject(workspace.openRecent(id))}
+                    locate={(id) => void selectProject(workspace.locate(id))}
+                    remove={(id) => void workspace.remove(id)}
+                  />}
+            </section>
           </main>
         </div>
       </div>
       <footer className="statusbar">
-        <span><AppWindow size={13} aria-hidden="true" />{browserPreview ? 'Browser development' : 'Desktop workspace'}</span>
+        <span><AppWindow size={13} aria-hidden="true" />{
+          browserPreview ? 'Browser development' : workspace.opening ? 'Opening folder…'
+            : activeProject?.refreshing ? 'Scanning project…'
+              : activeProject?.availability === 'ready' ? 'Read-only project' : activeProject ? 'Project unavailable' : 'Desktop workspace'
+        }</span>
         <div>
           <span role="status" className={notice ? 'status-warning' : undefined}><StatusIcon size={13} aria-hidden="true" />{status}</span>
           {state.appInfo && <span aria-label={`Studio version ${state.appInfo.version}`}>v{state.appInfo.version}</span>}

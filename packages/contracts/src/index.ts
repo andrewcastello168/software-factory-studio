@@ -1,3 +1,9 @@
+import { hasExactKeys, isRecord } from './validation';
+import type { ProjectBridge } from './projects';
+
+export { hasControlCharacters, hasExactKeys, isRecord } from './validation';
+export * from './projects';
+
 export const CHANNEL = {
   appInfo: 'factory:app-info',
   readPreferences: 'factory:read-preferences',
@@ -39,6 +45,10 @@ const errorCodes = [
   'PREFERENCES_READ_FAILED',
   'PREFERENCES_WRITE_FAILED',
   'PREFERENCES_REVIEW_REQUIRED',
+  'PROJECT_UNAVAILABLE',
+  'PROJECT_LIMIT',
+  'PROJECT_BUSY',
+  'RECENT_NOT_FOUND',
 ] as const;
 
 export type ErrorCode = typeof errorCodes[number];
@@ -46,6 +56,7 @@ export type Result<T> = { ok: true; value: T } | { ok: false; error: ErrorCode }
 export type Validator<T> = (value: unknown) => value is T;
 
 export interface StudioBridge {
+  projects: ProjectBridge;
   getAppInfo(): Promise<Result<AppInfo>>;
   readPreferences(): Promise<Result<PreferenceSnapshot>>;
   writePreferences(request: PreferenceWrite): Promise<Result<Preferences>>;
@@ -63,14 +74,6 @@ export function success<T>(value: T): Result<T> {
 
 export function failure(error: ErrorCode): Result<never> {
   return { ok: false, error };
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-export function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
-  return Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 }
 
 export function isSystemTheme(value: unknown): value is SystemTheme {

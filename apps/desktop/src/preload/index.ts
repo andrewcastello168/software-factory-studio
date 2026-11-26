@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   CHANNEL, failure, isAppInfo, isPreferences, isPreferenceSnapshot, isPreferenceWrite,
-  isSystemTheme, validateReply,
+  isSystemTheme, validateReply, PROJECT_CHANNEL, isProjectCatalog, isProjectId, isProjectSelection,
 } from '@factory/contracts';
 import type { Result, StudioBridge, Validator } from '@factory/contracts';
 
@@ -14,7 +14,28 @@ async function invoke<T>(channel: string, validate: Validator<T>, ...args: unkno
   }
 }
 
+function invokeProject<T>(channel: string, validate: Validator<T>, id: unknown): Promise<Result<T>> {
+  return isProjectId(id) ? invoke(channel, validate, id) : Promise.resolve(failure('INVALID_REQUEST'));
+}
+
 const studio: StudioBridge = {
+  projects: {
+    list: () => invoke(PROJECT_CHANNEL.list, isProjectCatalog),
+    openFolder: () => invoke(PROJECT_CHANNEL.openFolder, isProjectSelection),
+    openRecent: (id) => invokeProject(PROJECT_CHANNEL.openRecent, isProjectSelection, id),
+    locateRecent: (id) => invokeProject(PROJECT_CHANNEL.locateRecent, isProjectSelection, id),
+    removeRecent: (id) => invokeProject(PROJECT_CHANNEL.removeRecent, isProjectCatalog, id),
+    rescan: (id) => invokeProject(PROJECT_CHANNEL.rescan, isProjectCatalog, id),
+    close: (id) => invokeProject(PROJECT_CHANNEL.close, isProjectCatalog, id),
+    onChange(listener) {
+      if (typeof listener !== 'function') return () => undefined;
+      const receive = (_event: unknown, value: unknown) => {
+        if (isProjectCatalog(value)) listener(value);
+      };
+      ipcRenderer.on(PROJECT_CHANNEL.changed, receive);
+      return () => ipcRenderer.removeListener(PROJECT_CHANNEL.changed, receive);
+    },
+  },
   getAppInfo: () => invoke(CHANNEL.appInfo, isAppInfo),
   readPreferences: () => invoke(CHANNEL.readPreferences, isPreferenceSnapshot),
   writePreferences: (request) => isPreferenceWrite(request)

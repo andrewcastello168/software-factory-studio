@@ -3,15 +3,16 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from './Controls';
+import type { ProjectView } from './Projects';
 
-export type Page = 'home' | 'settings';
+export type Page = 'home' | 'projects' | 'recents' | 'settings';
 const groups: { title: string; entries: { title: string; icon: LucideIcon; page?: Page }[] }[] = [
   {
     title: 'Workspace',
     entries: [
       { title: 'Home', icon: House, page: 'home' },
-      { title: 'Projects', icon: Folder },
-      { title: 'Recent Projects', icon: Clock3 },
+      { title: 'Projects', icon: Folder, page: 'projects' },
+      { title: 'Recent Projects', icon: Clock3, page: 'recents' },
     ],
   },
   {
@@ -35,9 +36,29 @@ const groups: { title: string; entries: { title: string; icon: LucideIcon; page?
   },
 ];
 
-export function Navigation({ page, onSelect }: { page: Page; onSelect: (page: Page) => void }) {
+export function Navigation({
+  page, onSelect, projectView, onProjectView,
+}: {
+  page: Page | null;
+  onSelect: (page: Page) => void;
+  projectView: ProjectView | null;
+  onProjectView: (view: ProjectView) => void;
+}) {
   return (
     <nav id="workspace-navigation" className="navigation" aria-label="Global navigation">
+      {projectView && (
+        <section className="nav-group" aria-label="Active project">
+          <h2>Project</h2>
+          <ul>
+            <li><Button aria-current={projectView === 'overview' ? 'page' : undefined} onClick={() => onProjectView('overview')}>
+              <House size={16} aria-hidden="true" />Overview
+            </Button></li>
+            <li><Button aria-current={projectView === 'structure' ? 'page' : undefined} onClick={() => onProjectView('structure')}>
+              <Folder size={16} aria-hidden="true" />Project Structure
+            </Button></li>
+          </ul>
+        </section>
+      )}
       {groups.map((group) => (
         <section key={group.title} className="nav-group" aria-label={group.title} data-planned={group.entries.every((entry) => !entry.page)}>
           <h2>{group.title}{group.entries.every((entry) => !entry.page) && <small>Planned</small>}</h2>
