@@ -37,7 +37,7 @@ Use `pnpm dev:web` for a separate Vite renderer preview at `http://127.0.0.1:448
 | `pnpm test:renderer` | Playwright tests against the built renderer with a test-only bridge and the browser development mode |
 | `pnpm test:electron` | Playwright smoke test of the built app with sandboxing and a disposable profile |
 
-For both end-to-end suites and a manual production smoke test on Windows x64:
+The [Windows verification workflow](.github/workflows/windows.yml) runs automatically on pull requests to `main`. It builds the application on Windows x64 and runs the renderer and native Electron suites. To reproduce those checks locally and open the built app on Windows x64:
 
 ```powershell
 pnpm --filter @factory/desktop exec playwright install chromium
