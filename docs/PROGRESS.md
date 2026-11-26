@@ -137,3 +137,17 @@ Phase 04 started from main at ab724b71fcb2fccaa866c87e725fa3b6c518535e, which co
 Studio authorizes file creation in a new directory. It does not run install, startup or migration commands. The destination must support hard links. Windows uses canonical-path and identity checks around native operations. Simultaneous changes by an adversarial process running under the same local account are outside that protection boundary. An ambiguous partial folder is handed off without deleting files. Detailed verification instructions and manual native-dialog limits are in the [README](../README.md) and [testing strategy](TESTING_STRATEGY.md). Phase 05 has not started.
 
 The initial [Linux x64 run](https://github.com/andrewcastello168/software-factory-studio/actions/runs/45751738063) and [Windows Server 2025 x64 run](https://github.com/andrewcastello168/software-factory-studio/actions/runs/45751737977) passed at 93af92e. Both verified the generated app with isolated PostgreSQL. Windows additionally verified the running React frontend in Chromium and exercised the native New Project flow. The latest PR checks cover the subsequent manual recovery handoff and preview readability changes.
+
+## Phase 04 · Modular generator follow-up
+
+PR #6 was already merged. The isolated Cloud work branch advanced to main at 9468cc6ed8553b8766adba412579dbba6a67f98f before implementation. The follow-up is [PR #7](https://github.com/andrewcastello168/software-factory-studio/pull/7).
+
+| Gate | Evidence |
+| --- | --- |
+| P04-01, P04-06 | The sandboxed desktop verified a default 34-file foundation preview, a canceled confirmation, and opening the 41-file Welcome-enabled project. Captured the feature selector and both Light and Dark previews. |
+| P04-02, P04-08 | Identical inputs produce identical plans. The optional example adds seven owned files and only its required registrations, test command and documentation. Unsupported application types, database choices, module IDs and versions, duplicate modules, and missing prerequisites are covered. |
+| P04-03 | The previously released v1 digest was reproduced byte for byte. An interrupted v1 record resumed with its original layout. The suite also exercised the existing conflict, stale plan, link or junction, and manual handoff cases. |
+| P04-04, P04-05 | Both generated configurations passed frozen installation, lint, typecheck, tests, development proxy and production build. Isolated PostgreSQL 17 schemas verified readiness and checksum rejection. The foundation schema contained only the migration ledger and its welcome route returned 404. The selected example's migration added its seeded table and sandboxed Chromium displayed the persisted value. |
+| P04-07 | Cloud Linux passed 62 unit and integration tests, 10 Chromium renderer tests, four Electron tests, and the production build. The optional public Git HTTPS regression runs on Windows. [PR checks](https://github.com/andrewcastello168/software-factory-studio/pull/7/checks) cover both platform workflows. |
+
+No application dependencies changed. Foundation and example share the frozen dependency graph. Startup, credential handling, filesystem authority, and recovery remain within the Phase 04 boundaries. The reusable module installer and Database Studio are later milestones.

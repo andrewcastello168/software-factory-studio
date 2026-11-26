@@ -21,7 +21,7 @@ Adapter interfaces consume typed values and bounded source content. They cannot 
 
 ## Reference stack structure
 
-The first stack uses an Express/TypeScript backend and an independent React/Vite frontend. PostgreSQL migrations and a standard development workflow ship with the generated application. The second uses a Go module, a `cmd/` entry point, idiomatic `internal/` packages for HTTP and persistence, and a React/Vite frontend. Migrations, Go toolchain commands, and build conventions follow that Go adapter. Shared interfaces describe capabilities and ownership rather than requiring identical directory structures.
+The first stack uses an Express/TypeScript backend and an independent React/Vite frontend. It always supplies PostgreSQL readiness and migration tooling. An optional example composes versioned routes, UI, migration, tests and documentation without adding dependencies. The catalog and contribution model are internal until Phase 08. The second uses a Go module, a `cmd/` entry point, idiomatic `internal/` packages for HTTP and persistence, and a React/Vite frontend. Migrations, Go toolchain commands, and build conventions follow that Go adapter. Shared interfaces describe capabilities and ownership rather than requiring identical directory structures.
 
 ## Enablement gate
 

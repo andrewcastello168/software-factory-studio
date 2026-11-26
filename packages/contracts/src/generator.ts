@@ -1,6 +1,8 @@
 import type { ProjectSelection, Result } from './index';
 import { isProjectId, isProjectSegment, isProjectSelection, PROJECT_LIMITS } from './projects';
 import { hasControlCharacters, hasExactKeys, isRecord } from './validation';
+import { isModuleSelection, moduleCompatibility, MODULE_CATALOG } from './generator-modules';
+import type { ApplicationType, DatabaseChoice, ModuleSelection } from './generator-modules';
 
 export const GENERATOR_CHANNEL = {
   choose: 'factory:generator-choose-parent',
@@ -14,10 +16,11 @@ export const GENERATOR_CHANNEL = {
 export const STARTER = {
   appType: 'full-stack',
   stack: 'node-express-react-postgres',
+  database: 'postgresql',
   architecture: 'layered-web',
   engineering: 'standard-engineering',
-  engineVersion: '1.0.0',
-  templateVersion: '1.0.0',
+  engineVersion: '2.0.0',
+  templateVersion: '2.0.0',
   architectureVersion: '1.0.0',
   engineeringVersion: '1.0.0',
   stackLabel: 'Node.js · TypeScript · Express · React · Vite · PostgreSQL',
@@ -25,7 +28,7 @@ export const STARTER = {
 
 export const GENERATOR_LIMITS = { files: 64, fileBytes: 180_000, pending: 32 } as const;
 
-export interface StarterConfig {
+export interface LegacyStarterConfig {
   name: string;
   slug: string;
   port: number;
@@ -33,6 +36,12 @@ export interface StarterConfig {
   stack: typeof STARTER.stack;
   architecture: typeof STARTER.architecture;
   engineering: typeof STARTER.engineering;
+}
+
+export interface StarterConfig extends Omit<LegacyStarterConfig, 'appType'> {
+  appType: ApplicationType;
+  database: DatabaseChoice;
+  modules: ModuleSelection[];
 }
 
 export interface GeneratorParent {
@@ -95,11 +104,23 @@ export function isStarterPort(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1024 && value <= 65535;
 }
 
-export function isStarterConfig(value: unknown): value is StarterConfig {
-  return isRecord(value) && hasExactKeys(value, ['name', 'slug', 'port', 'appType', 'stack', 'architecture', 'engineering'])
-    && isStarterName(value.name) && isStarterSlug(value.slug) && isStarterPort(value.port)
+const coreKeys = ['name', 'slug', 'port', 'appType', 'stack', 'architecture', 'engineering'];
+
+function hasSupportedCore(value: Record<string, unknown>) {
+  return isStarterName(value.name) && isStarterSlug(value.slug) && isStarterPort(value.port)
     && value.appType === STARTER.appType && value.stack === STARTER.stack
     && value.architecture === STARTER.architecture && value.engineering === STARTER.engineering;
+}
+
+export function isLegacyStarterConfig(value: unknown): value is LegacyStarterConfig {
+  return isRecord(value) && hasExactKeys(value, coreKeys) && hasSupportedCore(value);
+}
+
+export function isStarterConfig(value: unknown): value is StarterConfig {
+  return isRecord(value) && hasExactKeys(value, [...coreKeys, 'database', 'modules']) && hasSupportedCore(value)
+    && value.database === STARTER.database && Array.isArray(value.modules)
+    && value.modules.length <= MODULE_CATALOG.length && value.modules.every(isModuleSelection)
+    && moduleCompatibility(STARTER.appType, STARTER.database, value.modules).length === 0;
 }
 
 export function isGeneratorRequest(value: unknown): value is GeneratorRequest {

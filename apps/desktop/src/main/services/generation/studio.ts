@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
-import { failure, GENERATOR_LIMITS, PROJECT_LIMITS, success } from '@factory/contracts';
+import { failure, GENERATOR_LIMITS, isStarterConfig, PROJECT_LIMITS, success } from '@factory/contracts';
 import type {
   ErrorCode, GeneratorParent, GeneratorPending, GeneratorPreview, GeneratorReceipt, GeneratorRequest, ProjectSelection, Result,
 } from '@factory/contracts';
-import { planProject } from '@factory/generator';
+import { planLegacyProject, planProject } from '@factory/generator';
 import type { StarterPlan } from '@factory/generator';
 import { admitRoot, checkedDirectory, pathKey, sameDirectory } from '../projects/filesystem';
 import type { ProjectRoot } from '../projects/filesystem';
@@ -52,7 +52,7 @@ async function inspectParent(parent: ProjectRoot) {
 
 export class GeneratorStudio {
   #parent: { id: string; root: ProjectRoot } | undefined;
-  #plan: { id: string; plan: StarterPlan; parent: ProjectRoot } | undefined;
+  #plan: { id: string; plan: StarterPlan<GeneratorRequest['config']>; parent: ProjectRoot } | undefined;
   #closed = false;
   #busy = false;
   #writing: string | undefined;
@@ -186,7 +186,7 @@ export class GeneratorStudio {
     return this.#exclusive(async () => {
       const record = (await this.#records()).find((entry) => entry.id === id);
       if (!record) return failure('GENERATOR_STALE');
-      const plan = planProject(record.config, record.projectId);
+      const plan = isStarterConfig(record.config) ? planProject(record.config, record.projectId) : planLegacyProject(record.config, record.projectId);
       if (plan.digest !== record.digest) return failure('GENERATOR_CONFLICT');
       const selected = await this.dialogs.choose('Reauthorize the Project Parent Folder', record.parent.path);
       if (!selected) return success(null);

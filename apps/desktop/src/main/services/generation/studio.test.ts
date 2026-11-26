@@ -4,14 +4,16 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { STARTER, success } from '@factory/contracts';
 import type { GeneratorParent, Result, StarterConfig } from '@factory/contracts';
-import { sha256 } from '@factory/generator';
+import { planLegacyProject, sha256 } from '@factory/generator';
+import { admitRoot } from '../projects/filesystem';
+import { runGeneration } from './transaction';
 import { GenerationJournal } from './journal';
 import type { GenerationRecord } from './journal';
 import { GeneratorStudio } from './studio';
 
 const config: StarterConfig = {
   name: 'Client café', slug: 'client-cafe', port: 4150,
-  appType: STARTER.appType, stack: STARTER.stack, architecture: STARTER.architecture, engineering: STARTER.engineering,
+  appType: STARTER.appType, stack: STARTER.stack, database: STARTER.database, modules: [], architecture: STARTER.architecture, engineering: STARTER.engineering,
 };
 
 class InterruptedJournal extends GenerationJournal {
@@ -159,4 +161,25 @@ it('rejects a native parent that resides inside an existing Git working tree', a
   await mkdir(chosen);
   expect(await service().chooseParent()).toEqual({ ok: false, error: 'GENERATOR_DESTINATION' });
   expect(await readdir(chosen)).toEqual([]);
+});
+
+it('resumes a persisted v1 plan using the released template layout', async () => {
+  const journal = new InterruptedJournal(data);
+  const legacy = {
+    name: config.name, slug: config.slug, port: config.port, appType: STARTER.appType,
+    stack: STARTER.stack, architecture: STARTER.architecture, engineering: STARTER.engineering,
+  };
+  const projectId = '92500fcd-63be-4e81-b0dd-918e935ab0d3';
+  const plan = planLegacyProject(legacy, projectId);
+  const record: GenerationRecord = {
+    version: 1, id: 'e6449158-0bea-4f36-89e9-0a28c7570848', projectId,
+    digest: plan.digest, config: legacy, parent: await admitRoot(parent), directories: {}, createdFiles: 0,
+  };
+  await journal.save(record, true);
+  await expect(runGeneration(plan, record, (next) => journal.save(next), () => undefined)).rejects.toThrow('interruption');
+  const restarted = service();
+  const receipt = unwrap(await restarted.resume(record.id));
+  expect(receipt?.fileCount).toBe(plan.files.length);
+  expect(await readFile(join(parent, legacy.slug, 'db/migrations/0001_welcome.sql'), 'utf8')).toContain('welcome_messages');
+  expect(unwrap(await restarted.pending())).toEqual([]);
 });
