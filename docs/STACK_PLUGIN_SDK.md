@@ -65,3 +65,7 @@ Both adapters use the versioned PostgreSQL v1 model, ordered `db/migrations/NNNN
 5. Verify replay, CLI commands, bad paths and cross-stack requests against disposable projects. Build real applications and exercise PostgreSQL, HTTP, and browser flows on Linux and Windows before release.
 
 Stack conversion, external executable loading, cross-stack identity module installation, and runtime upgrades are outside this SDK. Sharing the advisory profile or Business Workspace definition creates independent version-pinned snapshots in both project types.
+
+## Development execution profiles
+
+The reviewed `STACKS[id].execution` descriptor pins the supported Node.js and Go versions and supplies a built-in backend argv. Electron main composes the corresponding Vite, TypeScript and Go verification steps, resolves executables outside admitted workspaces and mediates approval. Project manifests are inspected as data. Their scripts cannot extend this contract. The current page publisher enables one Node.js Business Workspace page. Go projects can author design metadata, inspect generated endpoints and use the same local API and traceability tools.

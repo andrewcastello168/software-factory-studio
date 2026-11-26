@@ -113,6 +113,7 @@ jobs:
             apps/desktop/test-results/**/new-project-*.png
             apps/desktop/test-results/**/database-studio-*.png
             apps/desktop/test-results/**/generation-review-*.png
+            apps/desktop/test-results/**/developer-*.png
             apps/desktop/test-results/**/engineering-library-*.png
             apps/desktop/test-results/**/technology-catalog-*.png
           retention-days: 7

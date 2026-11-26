@@ -59,3 +59,9 @@ The same CI workflows run six standalone configurations including the full authe
 ## Phase 09 Git worktrees
 
 Run native integration fixtures against disposable repositories and worktrees with spaces and Unicode in path names. Verify scoped grants, dirty and stale plans, linked directory rejection, stash preservation, native conflict stages, durable recovery and published-ref protection. Sandbox Electron drives linked checkout and merge review screens. Run generated Node and Go applications against disposable PostgreSQL after exercising both stack adapters in linked worktrees.
+
+## Phase 10 verification
+
+Run the existing Linux and Windows x64 workflows. The disposable developer-service integration exercises stale plans, occupied ports, invalid workspace grants, directory links/junctions, credential redaction, redirects and response size bounds against real Node.js and HTTP subprocesses. The sandboxed Electron flow generates a project, previews a command, saves a design, reviews and publishes React page source, and detects an external edit to a linked requirement. The standalone verifier builds and opens the generated inventory page in Chromium, and runs real Node.js and Go backend and Vite processes through the desktop service with a disposable PostgreSQL schema.
+
+Verify actual VS Code installations, visual native terminal behavior and user file-manager handoff separately on a Windows desktop with those tools installed. CI assertions for command review and runtime process-tree handling do not cover all desktop application installations.

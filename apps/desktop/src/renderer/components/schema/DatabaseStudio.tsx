@@ -128,13 +128,13 @@ function Connection({ snapshot, project, physical, busy, error, run, onResult }:
   </div>;
 }
 
-export function DatabasePanel({ project, sourceSignal }: { project: OpenProject; sourceSignal: string }) {
+export function DatabasePanel({ project, sourceSignal, initialTable }: { project: OpenProject; sourceSignal: string; initialTable?: string | undefined }) {
   const bridge = schemaBridge;
   const [view, setView] = useState<View>('schema');
   const [snapshot, setSnapshot] = useState<SchemaSnapshot>();
   const [draft, setDraft] = useState<{ value: DatabaseSchema; revision: string }>();
   const [points, setPoints] = useState<SchemaPoint[]>();
-  const [selected, select] = useState('');
+  const [selected, select] = useState(initialTable ?? '');
   const [migration, setMigration] = useState('');
   const [preview, setPreview] = useState<MigrationPreview>();
   const [physical, setPhysical] = useState<SchemaPhysical>();
