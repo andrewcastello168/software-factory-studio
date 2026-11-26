@@ -4,7 +4,7 @@ Software Factory Studio is a local-first, Git-native, AI-ready desktop engineeri
 
 ## Repository status
 
-The desktop provides local project workspaces, Git Studio, and one independently runnable full-stack generator. The primary factory MVP is Phase 07, after independent application generation, database-driven changes, and incremental code protection. Windows x64 is the first desktop target. See [Progress](docs/PROGRESS.md) for platform-specific evidence.
+The desktop provides local project workspaces, Git Studio, and independently runnable Node.js and Go full-stack generators. The primary factory MVP is Phase 07, after independent application generation, database-driven changes, and incremental code protection. Windows x64 is the first desktop target. See [Progress](docs/PROGRESS.md) for platform-specific evidence.
 
 ## Open a local project
 
@@ -14,9 +14,11 @@ Use **Open Folder** in the desktop app to select a local directory. The project 
 
 ## Use Git Studio
 
-Install native Git 2.39 or newer in a system location. On Windows use the standard Git for Windows installation under Program Files. Open a standalone repository root, then select **Git Studio** in the project sidebar or click the Git context in the top bar. The panel shows local and remote branches, HEAD, upstream divergence and real working or staged patches. Select a file to inspect a hunk and use its adjacent Stage or Unstage control. Set repository-local `user.name` and `user.email` using `git config --local` before committing. This phase isolates global and system config to keep imported repositories from activating host tools.
+Install native Git 2.39 or newer in a system location. On Windows use the standard Git for Windows installation under Program Files. Open a repository or registered local worktree folder, then select **Git Studio** in the project sidebar or click the Git context in the top bar. The panel shows local and remote branches, HEAD, upstream divergence and real working or staged patches. Select a file to inspect a hunk and use its adjacent Stage or Unstage control. Set repository-local `user.name` and `user.email` using `git config --local` before committing. This phase isolates global and system config to keep imported repositories from activating host tools.
 
-Use **Clone Repository** on Home or from the command palette. Select a public HTTPS URL or a local bare Git repository and choose the native destination parent. Studio creates a new child folder after confirmation. Fetch, fast-forward pull and ordinary push use existing upstream and remote configuration. Local transfer requires separate selection of the bare remote. Private authentication, SSH, tracked submodules, and linked worktrees are outside the supported Phase 03 Git boundary. Use the existing Git client for unsupported configurations. See [Git safety](docs/GIT_SAFETY.md).
+Use **Clone Repository** on Home or from the command palette. Select a public HTTPS URL or a local bare Git repository and choose the native destination parent. Studio creates a new child folder after confirmation. Fetch, fast-forward pull and ordinary push use existing upstream and remote configuration. Local transfer requires separate selection of the bare remote. Private authentication, SSH and tracked submodules remain outside the transfer policy. Use the existing Git client for unsupported configurations. See [Git safety](docs/GIT_SAFETY.md).
+
+Use **Worktrees**, **Stashes**, **Integrate**, and **Conflicts** for reviewed local multi-workspace operations. See [Parallel development](docs/PARALLEL_DEVELOPMENT.md) for separate VS Code or Codex sessions, recovery, and development database setup.
 
 ## Generate a standalone project
 

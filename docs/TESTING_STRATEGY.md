@@ -55,3 +55,7 @@ The same CI workflows run six standalone configurations including the full authe
 ## Phase 08 generated Go checks
 
 `pnpm verify:starter` verifies the six Node MVP cases and the Go foundation and inventory cases. Supply the exact Go toolchain on PATH and select `FACTORY_STARTER_VARIANT=go-foundation` or `go-inventory` for a targeted check. The verifier checks Go hashes, formatting, vet, tests and build, frozen frontend dependencies and production assets, starts the generated binary, and exercises a disposable PostgreSQL namespace. It compares stack-specific locks with the same profile, checks migration rejection and rollback, and adds reviewed supplier CRUD without modifying custom service bytes. Use `FACTORY_STARTER_BROWSER=1` for the sandboxed generated web checks and `FACTORY_GO_SECURITY=1` with a pinned govulncheck binary for the Go scan. The Windows native suite captures the Technology Catalog and New Project Wizard.
+
+## Phase 09 Git worktrees
+
+Run native integration fixtures against disposable repositories and worktrees with spaces and Unicode in path names. Verify scoped grants, dirty and stale plans, linked directory rejection, stash preservation, native conflict stages, durable recovery and published-ref protection. Sandbox Electron drives linked checkout and merge review screens. Run generated Node and Go applications against disposable PostgreSQL after exercising both stack adapters in linked worktrees.

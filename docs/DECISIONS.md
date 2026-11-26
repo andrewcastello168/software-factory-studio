@@ -139,3 +139,9 @@ Use same-directory backups with an app-data journal for verified replacements. T
 - Keep the reviewed adapter interface inside the generator package and the manifest registry in contracts. This gives the renderer safe capability discovery and preserves pre-Phase 08 Node plan bytes, without a separate runtime loader.
 - Use Go 1.26.11, Gin 1.12.0 and pgx 5.13.0. Pin backend modules with go.mod/go.sum and the existing React toolchain with a separate frontend lock that has no Express or pg runtime dependency. Serve compiled assets from Go. The project environment supplies configuration without a dotenv dependency.
 - Share PostgreSQL source interpretation, migrations, React record components, and the existing ownership-aware incremental planner. A Go project adds compiled record descriptors and a small HTTP route slot. Exact trusted integration bytes take precedence over editing customized route entry points. Node executable modules remain specific to Node; advisory profiles and declarative branding are reusable across both stacks.
+
+## Phase 09 decisions
+
+- Support conventional absolute reciprocal worktree registrations. Keep checkout and repository identities separate. Use a conservative shared Studio writer lock and existing workspace admission rather than inventing Git lockfiles.
+- Compose read-only previews and require explicit plans for stashes, local integration, guarded branch and file changes, and conflict staging. Use native conflict handling and editor-based resolution. Bound rebase to a linear, locally unpublished range and cherry-pick to one non-merge commit.
+- Store reviewed recovery receipts in user data and revalidate native markers and an allowlisted rebase sequence. Keep external Git operations, generator recovery and PostgreSQL recovery separate.

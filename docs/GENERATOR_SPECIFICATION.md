@@ -96,3 +96,7 @@ Incremental module installation adds only eligible bundled identity revisions. I
 The closed catalog resolves exact stack and architecture identifiers before rendering. Its Go Service v1 adapter emits Go commands and internal packages, dependency checksums, React/Vite, and stack-specific instructions. Legacy Node plans retain their existing configuration and byte layout. PostgreSQL migration composition, renderer contracts, file fingerprints, approval and journaling are shared. Verify generated files in Studio and run project tools separately. Studio never invokes either stack's runtime from preparation, preview, recovery or project inspection.
 
 Incremental Go CRUD reconstructs the pinned Go baseline and schema history, uses the same supported file ownership transitions as Node, and stages changes after native consent. Go module, HTTP integration, and active frontend integration must match the prior generator baseline. Independent customized services can remain unchanged when a change needs no edits to them. Existing SQL stays in place.
+
+## Linked worktree context
+
+Linked previews bind the common and checkout metadata identities, branch, HEAD, and the existing workspace grant. File ownership, portable locks and receipt state come from the selected checkout. Changing branches or reviewed source files invalidates the approval. A Git transition affects source files and leaves database application to its own reviewed workflow.

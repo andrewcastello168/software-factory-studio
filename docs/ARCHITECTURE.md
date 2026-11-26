@@ -73,3 +73,7 @@ Main stores personal engineering assets in an application-data catalog. The rend
 ## Multiple built-in stacks
 
 The Phase 08 SDK is an interface and registration table inside the generator package with read-only discovery in contracts. It needs no extra workspace package or runtime loading boundary. Studio dispatches a validated stack and architecture pair through the same workspace preview, approval, publication and recovery services. Stack-specific planners only contribute deterministic source bytes. The Go adapter keeps `cmd/` executable entry points, `internal/` packages and a frontend Vite build. Node keeps Layered Web and its existing optional modules. Both consume the shared PostgreSQL schema and portable locks.
+
+## Linked Git checkout identity
+
+Workspace authorization and watchers remain tied to a canonical checkout. Git additionally verifies the shared common-directory identity and the per-checkout metadata identity. The existing workspace service admits linked checkouts as separate tabs. A shared Git writer lock coordinates local Studio ref mutations. Incremental generation and Database Studio bind linked-worktree identity into their review revisions. Existing standalone journal identity fields retain compatibility.

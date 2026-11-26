@@ -206,3 +206,18 @@ Phase 08 starts at `9e8bb22` on the isolated `work` branch. The second parent ma
 The Go vulnerability check uses upstream advisory data. The initial scan reported reachable transitive dependency advisories. The resulting lock pins golang.org/x/net v0.63.0 and quic-go v0.59.1. The Linux workflow scans generated source with govulncheck v1.10.0 and the upstream advisory snapshot recorded in the workflow. See the [stack matrix](STACK_PLUGIN_SDK.md#built-in-sdk-v1) for boundaries and exact versions.
 
 The initial Windows run exceeded Vitest’s default five-second budget in the existing Git initialization and staging fixture. Its test budget now matches the other multistep Git integration cases. The Git execution limits and assertions are unchanged.
+
+## Phase 09 · Advanced Git and worktree isolation
+
+Phase 09 starts on the isolated work branch at 5daa4c9, including merged PR #11 and the Phase 08 stack adapters.
+
+| Gate | Evidence |
+| --- | --- |
+| P09-01 | Native Git fixtures exercise two linked feature checkouts, separate root grants, shared metadata identities, locks, missing worktrees, path aliases, reciprocal markers and clean removal. Sandbox Electron creates and opens a worktree in a separate tab. |
+| P09-02 | Real staged, unstaged and untracked files are reviewed before a branch switch. Tests exercise exact stash entries, credential-path guards, restored staged state, and retention after a conflicted pop. |
+| P09-03 | Native commands verify fast-forward and divergent merges, one-commit cherry-pick, linear unpublished rebase, published-range rejection, guarded branch changes and a selected-file replacement. |
+| P09-04 | Conflict tests verify available index stages, abort and staged resolution, recovery after a new Git service instance, stale confirmation and overlapping writes. |
+| P09-05 | Node and Go incremental plans are exercised in linked checkouts of the same portable project. Tests cover distinct source and lock files, wrong grants, and branch drift during confirmation. A separate PostgreSQL fixture verifies checkout changes source schema without applying SQL or changing the ledger. |
+| P09-06 | Local end-to-end verification covers all eight generated Node and Go reference cases using PostgreSQL. The delivery pull request records Linux and Windows x64 CI, renderer and Electron results, dependency scan evidence, and screenshots. |
+
+The Phase 09 trust boundaries and independent development database setup are documented in [Git safety](GIT_SAFETY.md) and the [parallel development guide](PARALLEL_DEVELOPMENT.md).
