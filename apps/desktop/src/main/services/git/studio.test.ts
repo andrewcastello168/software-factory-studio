@@ -272,12 +272,13 @@ describe('native Git workspace', () => {
     expect(push.level, push.message).toBe('success');
     expect(git(remote, 'rev-parse', 'main')).toBe(git(work, 'rev-parse', 'main'));
     expect(push.status).toMatchObject({ ahead: 0, behind: 0 });
+    git(other, 'pull', '--ff-only', 'origin', 'main');
 
     await writeFile(join(work, 'local.txt'), 'work diverged\n');
     git(work, 'commit', '-am', 'work diverged');
     await writeFile(join(other, 'external.txt'), 'remote diverged\n');
     git(other, 'commit', '-am', 'remote diverged');
-    git(other, 'push', '--force', 'origin', 'main');
+    git(other, 'push', 'origin', 'main');
     const head = git(work, 'rev-parse', 'HEAD');
     choices = [remote];
     const divergence = await act({ operation: 'pull' });

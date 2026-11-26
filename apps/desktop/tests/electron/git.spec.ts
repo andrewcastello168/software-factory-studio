@@ -79,6 +79,7 @@ test('Git Studio clones, commits and switches real native workspaces with read-o
     expect(await readFile(join(clone, 'service.txt'), 'utf8')).toBe('export mode=standard\n');
     git(clone, 'config', 'user.name', 'Test User');
     git(clone, 'config', 'user.email', 'test@example.test');
+    git(clone, 'branch', '--no-track', 'topic', 'refs/remotes/origin/topic');
     await writeFile(join(clone, 'service.txt'), 'export mode=reviewed\n');
     const file = page.getByRole('button', { name: /service.txt/ }).filter({ hasText: 'service.txt' });
     await expect(file).toBeVisible({ timeout: 12_000 });
@@ -106,17 +107,21 @@ test('Git Studio clones, commits and switches real native workspaces with read-o
     await instance.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'dark'; });
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.screenshot({ path: test.info().outputPath('git-studio-dark.png') });
-    await chooser.selectOption('refs/heads/review');
+    await chooser.selectOption('refs/heads/topic');
     await page.getByRole('button', { name: 'Switch', exact: true }).click();
     await expect(page.getByText('Branch switched and project refreshed.')).toBeVisible();
-    expect(git(clone, 'branch', '--show-current')).toBe('review');
+    expect(git(clone, 'branch', '--show-current')).toBe('topic');
+    expect(git(clone, 'show', 'review:service.txt')).toBe('export mode=reviewed');
+    await page.getByRole('button', { name: 'Project Structure', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Project Structure' })).toBeVisible();
+    await expect(page.getByText('topic.txt', { exact: true })).toBeVisible();
 
     await page.getByRole('tab', { name: 'Workspace', exact: true }).click();
     await page.getByRole('button', { name: 'Open Folder', exact: true }).click();
     await expect(page.getByRole('tab', { name: 'Unrelated folder' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('group', { name: 'Project context' })).toContainText('No repository');
     await studio.click();
-    await expect(page.getByRole('group', { name: 'Project context' })).toContainText('review');
+    await expect(page.getByRole('group', { name: 'Project context' })).toContainText('topic');
     await studio.press('Delete');
     await expect(studio).toBeHidden();
     expect(await page.evaluate((closedId) => window.studio!.git.status(closedId), id))
