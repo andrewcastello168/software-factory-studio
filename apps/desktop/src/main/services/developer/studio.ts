@@ -157,9 +157,10 @@ export class DeveloperStudio {
       if (action === 'choose-editor') {
         const chosen = await this.dialogs.chooseEditor();
         if (!chosen) return false;
-        if (!/^(?:code(?:-insiders)?(?:\.exe)?)$/iu.test(basename(chosen))) throw new Blocked('DEVELOPER_TOOL');
+        if (!/^(?:code(?:-insiders)?(?:\.exe)?)$/iu.test(basename(chosen))) throw new Blocked('DEVELOPER_EDITOR');
         const editor = await openTool('code', this.grant.allows, chosen);
-        if (!editor || !await this.dialogs.confirm('Approve VS Code executable?', editor.target, 'Approve Editor')) return false;
+        if (!editor) throw new Blocked('DEVELOPER_EDITOR');
+        if (!await this.dialogs.confirm('Approve VS Code executable?', editor.target, 'Approve Editor')) return false;
         await this.#guard(projectId, root);
         this.#editor = chosen;
         return true;
@@ -176,20 +177,27 @@ export class DeveloperStudio {
         await checkedDirectory(parent.path, parent.identity);
         return { path, file: stat.isFile() };
       };
-      const target = await resolveTarget();
+      const checkedTarget = async () => {
+        try { return await resolveTarget(); }
+        catch (error) {
+          if (error instanceof Blocked) throw error;
+          throw new Blocked('DEVELOPER_PATH');
+        }
+      };
+      const target = await checkedTarget();
       if ((line !== null && !target.file) || (action === 'terminal' && target.file)) throw new Blocked('INVALID_REQUEST');
       if (action === 'reveal') {
         this.dialogs.reveal(target.path);
         return true;
       }
       const tool = await openTool(action === 'editor' ? 'code' : 'terminal', this.grant.allows, this.#editor);
-      if (!tool) throw new Blocked('DEVELOPER_TOOL');
+      if (!tool) throw new Blocked(action === 'editor' ? 'DEVELOPER_EDITOR' : 'DEVELOPER_TERMINAL');
       const args = action === 'editor'
         ? ['--new-window', ...(line !== null ? ['--goto', target.path + ':' + line + ':' + (column ?? 1)] : [target.path])]
         : windows ? ['/D'] : [];
       if (!await this.dialogs.confirm(action === 'editor' ? 'Open in VS Code?' : 'Open a native terminal?',
         tool.target + '\n\n' + target.path + (line === null ? '' : ':' + line + ':' + (column ?? 1)), 'Open')) return false;
-      await resolveTarget();
+      await checkedTarget();
       await this.#guard(projectId, root);
       const dir = target.file ? dirname(target.path) : target.path;
       await new Promise<void>((resolve, reject) => {
