@@ -10,6 +10,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as wait } from 'node:timers/promises';
 import { createServer } from 'vite';
+import { verifyDeveloper } from './verify-developer.mjs';
 import { fixtureIdentity, identityBrowser, verifyIdentity, verifySecureCookie } from './verify-identity.mjs';
 
 const { fetch, AbortSignal, URL } = globalThis;
@@ -221,7 +222,7 @@ async function installIdentity(fixture, authentication) {
   } finally { studio.dispose(); await rm(profile, { recursive: true, force: true, maxRetries: 5 }); }
 }
 
-async function verify(plan, demo, inventory, incremental, identity, authentication, go) {
+async function verify(plan, demo, inventory, incremental, identity, authentication, go, design) {
   const fixture = await mkdtemp(join(tmpdir(), 'studio-generated-app-'));
   const port = plan.config.port;
   const url = 'http://127.0.0.1:' + port;
@@ -379,6 +380,11 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
         assert.equal((await (await patch({ external_id: null })).json()).data.external_id, null);
       }
     }
+    if (design) {
+      const page = await fetch(url + '/studio-page.html');
+      assert.equal(page.status, 200);
+      assert((await page.text()).includes('<title>Studio page</title>'));
+    }
     const frontend = await (await fetch(url)).text();
     assert(frontend.includes('<title>Inventory Portal</title>'));
     const bundle = /<script[^>]+src="([^"]+)"/u.exec(frontend)?.[1];
@@ -402,6 +408,16 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
           else assert.equal(await page.getByRole('heading', { name: 'Welcome example' }).count(), 0);
           if (go) await page.getByText('GO', { exact: true }).waitFor();
           if (inventory && database) await inventoryBrowser(page, incremental);
+          if (design) {
+            await page.goto(url + '/studio-page.html');
+            await page.getByRole('heading', { name: 'Inventory review' }).waitFor();
+            await page.getByText('DP', { exact: true }).waitFor();
+            if (database) {
+              await page.getByRole('table').getByRole('cell', { name: 'Workshop Hammer' }).waitFor();
+            } else {
+              await page.getByRole('alert').getByText('The data request failed.').waitFor();
+            }
+          }
         }
       } finally {
         await browser.close();
@@ -414,13 +430,18 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
       await ready(server, url + '/api/health');
       await verifySecureCookie(url, origin);
     }
+    if (design || (go && incremental)) {
+      await stop(server);
+      server = undefined;
+      await verifyDeveloper(vite, fixture, env, developmentPort);
+    }
     const instructions = await readFile(join(fixture, 'AGENTS.md'), 'utf8');
     if (go) {
       assert(instructions.includes('Go 1.26.11'));
       assert(instructions.includes('Client delivery v2'));
       assert(!instructions.includes('Express') && !instructions.includes('pnpm db:migrate'));
       assert((await readFile(join(fixture, 'docs/ENGINEERING_PROFILE.md'), 'utf8')).includes('Go Service conventions'));
-      assert.equal((await fetch(url + '/api/auth/session')).status, 404);
+      if (server) assert.equal((await fetch(url + '/api/auth/session')).status, 404);
     } else assert(instructions.includes('Standard Engineering profile v1'));
     assert.equal(instructions.includes('Welcome example'), demo);
     if (identity) {
@@ -454,7 +475,7 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
 }
 
 try {
-  const { planProject } = await vite.ssrLoadModule('/packages/generator/src/index.ts');
+  const { planProject, readIncrementalProject, composeDesign, sha256 } = await vite.ssrLoadModule('/packages/generator/src/index.ts');
   const { AUTHENTICATION, GO_STACK, IDENTITY_MODULES, BUSINESS_TEMPLATE, STARTER, STACKS, WELCOME_EXAMPLE } = await vite.ssrLoadModule('/packages/contracts/src/index.ts');
   const { parseSql } = await vite.ssrLoadModule('/packages/schema/src/index.ts');
   const { schema: inventory, diagnostics } = parseSql(await readFile(resolve(root, 'tests/fixtures/inventory.sql'), 'utf8'));
@@ -465,7 +486,8 @@ try {
   for (const variant of variants) {
     const go = variant.startsWith('go-');
     const identity = variant === 'identity' ? 'full' : variant === 'installed' ? 'installed' : undefined;
-    const records = Boolean(identity || variant === 'inventory' || variant === 'incremental' || variant === 'go-inventory');
+    const design = variant === 'inventory';
+    const records = Boolean(identity || design || variant === 'incremental' || variant === 'go-inventory');
     const demo = variant === 'welcome';
     const incremental = variant === 'incremental' || variant === 'go-inventory';
     const selectedSchema = identity === 'installed'
@@ -483,8 +505,8 @@ try {
       appType: STARTER.appType, stack: stack.id, database: STARTER.database,
       architecture: stack.architecture, engineering: STARTER.engineering, modules: identity === 'full' ? [...IDENTITY_MODULES] : demo ? [WELCOME_EXAMPLE] : [],
       ...(records ? { crud: { schema, migrations: true, backend: tables, frontend: tables } } : {}),
-      ...(identity || go ? { library: { profile, template: BUSINESS_TEMPLATE,
-        branding: { color: identity === 'full' ? '#2458a4' : '#594688', theme: 'dark', mark: go ? 'GO' : identity === 'full' ? 'IN' : 'CL' } } } : {}),
+      ...(identity || go || design ? { library: { profile, template: BUSINESS_TEMPLATE,
+        branding: { color: identity === 'full' ? '#2458a4' : '#594688', theme: 'dark', mark: go ? 'GO' : design ? 'DP' : identity === 'full' ? 'IN' : 'CL' } } } : {}),
     }, randomUUID());
     if (go) {
       const node = planProject({ ...plan.config, stack: STARTER.stack, architecture: STARTER.architecture }, randomUUID());
@@ -496,7 +518,25 @@ try {
       assert.throws(() => planProject({ ...plan.config, modules: [AUTHENTICATION] }, randomUUID()));
       assert.deepEqual(planProject(plan.config, plan.projectId), plan);
     }
-    await verify(plan, demo, records, incremental, identity, AUTHENTICATION, go);
+    if (design) {
+      const files = new Map(plan.files.map((file) => [file.path, { state: 'text', ...file }]));
+      const unchanged = files.get('web/main.tsx');
+      const path = 'web/features/StudioPage.tsx';
+      for (const missing of [path, 'docs/STUDIO_PAGE.md', 'web/studio-page.html']) files.set(missing, { state: 'absent' });
+      const project = readIncrementalProject(files);
+      const reviewed = composeDesign(project, files, schema, { generate: true,
+        entry: { kind: 'page', id: 'inventory-review', title: 'Inventory review', description: 'Current stock records.', layout: 'table', api: 'list-products', columns: ['id', 'name'] } });
+      assert.deepEqual(reviewed.issues, []);
+      assert(reviewed.changes.some((entry) => entry.path === path && entry.action === 'create'));
+      for (const change of reviewed.changes) {
+        assert(change.after !== null);
+        files.set(change.path, { path: change.path, content: change.after, sha256: sha256(change.after), state: 'text' });
+      }
+      assert.equal(files.get('web/main.tsx'), unchanged);
+      readIncrementalProject(files);
+      plan.files = [...files.values()].filter((file) => file.state === 'text');
+    }
+    await verify(plan, demo, records, incremental, identity, AUTHENTICATION, go, design);
   }
 } finally {
   await vite.close();

@@ -100,3 +100,7 @@ Incremental Go CRUD reconstructs the pinned Go baseline and schema history, uses
 ## Linked worktree context
 
 Linked previews bind the common and checkout metadata identities, branch, HEAD, and the existing workspace grant. File ownership, portable locks and receipt state come from the selected checkout. Changing branches or reviewed source files invalidates the approval. A Git transition affects source files and leaves database application to its own reviewed workflow.
+
+## Phase 10 design publication
+
+The incremental planner accepts a closed developer-design selection in place of CRUD or module inputs. It records artifact references in a versioned portable document. Page publication has fixed built-in paths and verifies the exact pinned Vite preimage, absent outputs, compatible template, reviewed endpoint provenance and existing project ownership. The plan lists all generated and modified bytes. It adds output fingerprints to the same manifest and uses the existing exclusive transaction, journal and recovery UI. This release creates one unauthenticated Node.js page entry. Arbitrary layout and integration rewriting are outside its capability.

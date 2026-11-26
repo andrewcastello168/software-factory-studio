@@ -77,3 +77,9 @@ The Phase 08 SDK is an interface and registration table inside the generator pac
 ## Linked Git checkout identity
 
 Workspace authorization and watchers remain tied to a canonical checkout. Git additionally verifies the shared common-directory identity and the per-checkout metadata identity. The existing workspace service admits linked checkouts as separate tabs. A shared Git writer lock coordinates local Studio ref mutations. Incremental generation and Database Studio bind linked-worktree identity into their review revisions. Existing standalone journal identity fields retain compatibility.
+
+## Developer workbench
+
+The per-window developer service owns native editor and terminal handoff, toolchain probes, reviewed runtime plans, process groups and the bounded loopback HTTP client. It consumes the existing workspace grant and native Git context without exposing generic process, filesystem, shell or network primitives through preload. The runtime catalog is declared with the built-in stack descriptors.
+
+Portable developer design uses a versioned data document. The generator derives API and page observations from current local artifacts. Design and page mutations use the incremental planner and its durable journal. The first page extension uses a second Vite HTML entry so it can preserve the existing React root, CRUD workspace and custom application components. Project source and portable design data remain usable in external tools. See [Developer workspace](DEVELOPER_WORKSPACE.md).

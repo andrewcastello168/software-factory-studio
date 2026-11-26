@@ -145,3 +145,13 @@ Use same-directory backups with an app-data journal for verified replacements. T
 - Support conventional absolute reciprocal worktree registrations. Keep checkout and repository identities separate. Use a conservative shared Studio writer lock and existing workspace admission rather than inventing Git lockfiles.
 - Compose read-only previews and require explicit plans for stashes, local integration, guarded branch and file changes, and conflict staging. Use native conflict handling and editor-based resolution. Bound rebase to a linear, locally unpublished range and cherry-pick to one non-merge commit.
 - Store reviewed recovery receipts in user data and revalidate native markers and an allowlisted rebase sequence. Keep external Git operations, generator recovery and PostgreSQL recovery separate.
+
+## Phase 10 · Local developer workspace
+
+### Reviewed subprocesses and local requests
+
+Use the pinned adapter's development commands and direct argv with session-scoped native approval. Runtime variables come from a bounded local configuration. This preserves native tools and user-owned source while excluding generic execution adapters and remote URL input. Runtime execution is a trust decision at operating system account scope. An HTTP request is allowed only on the worktree's active numerical loopback backend with an explicitly approved method and path. History retains only status metadata. VS Code and native terminals remain external applications.
+
+### Data-only design and one owned page entry
+
+Store API, page, requirements and workflow designs in a versioned worktree document. Derive implementation signals from the pinned generation manifest and actual source files. Scope the first reviewed React extension to an unauthenticated Node Business Workspace with a second Vite entry and reusable branded layout. This keeps its integration independent of existing React routing and avoids replacing custom pages or controller code. Later extensions can introduce versioned authenticated routes and reviewed component composition.

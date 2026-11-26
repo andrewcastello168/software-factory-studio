@@ -12,6 +12,10 @@ Use **Open Folder** in the desktop app to select a local directory. The project 
 
 **Recent Projects** stores folder references in Studio application data. Use **Locate** when a folder has moved, or remove its recent entry. If Studio cannot match the selected directory to the saved project, the native dialog asks which folder to use. An existing `.factory/project.json` with `version: 1` and a UUID `id` supplies portable identity. The optional `name`, `type`, `stackId`, and `profileId` fields provide display metadata. Studio reads this descriptor directly and leaves the project contents intact.
 
+## Use Developer Tools
+
+Open a project or worktree and select **Developer Tools**. Use Runtime to inspect tools, hand off to VS Code or a native terminal, and review the supported Node.js or Go commands before execution. Test this worktree’s local backend with API Playground. Save API contracts, generate a supported Node.js Business Workspace page, and link requirements to source and designs. See [Developer workspace](docs/DEVELOPER_WORKSPACE.md) for commands, local trust controls, and limitations.
+
 ## Use Git Studio
 
 Install native Git 2.39 or newer in a system location. On Windows use the standard Git for Windows installation under Program Files. Open a repository or registered local worktree folder, then select **Git Studio** in the project sidebar or click the Git context in the top bar. The panel shows local and remote branches, HEAD, upstream divergence and real working or staged patches. Select a file to inspect a hunk and use its adjacent Stage or Unstage control. Set repository-local `user.name` and `user.email` using `git config --local` before committing. This phase isolates global and system config to keep imported repositories from activating host tools.

@@ -16,7 +16,7 @@ Each phase delivers a demonstrable slice. Alongside the feature gate below, comp
 | 07 · Engineering Library and AI Context Studio | 06 | Versioned built-in, personal and Git-shared libraries of architecture, UI, module, component, and deployment templates. Install a supported audited module after project creation, preview dependency changes, lock digests, reject cycles and conflicts, and verify repeatable generation with a reusable appearance customization. Apply a reviewed, version-pinned reusable AI context profile without secrets or a provider integration. This is the primary MVP gate. |
 | 08 · Multi-stack support and SDK validation | 05, 06, 07 | Generate an idiomatic Go/Gin + React/Vite + PostgreSQL app using the versioned SDK. Pass P08-01 through P08-05 below. Preserve Phase 07 reference behavior and record migrations and tooling per stack. |
 | 09 · Advanced Git and worktrees | 03, 06 | Deliver reviewed dirty-switch choices, linked checkout isolation, shared stashes, directional integration, guarded branch and file actions, and recovery. Pass P09-01 through P09-06. Full history graph, interactive rebase, tags and provider integration require separate verification. |
-| 10 · Editor integrations and design extensions | 05, 06, 08 | Prioritize VS Code handoff and context-aware links to source. Keep embedded source editing, controlled run/debug, logs, terminal, and advanced designers as gated extensions with local trust controls. Verify an API design-to-request path, a saved page design that builds through an enabled stack, and a saved requirements-to-workflow link that points to real project artifacts. |
+| 10 · Editor integrations and design extensions | 05, 06, 08 | Deliver VS Code handoff, controlled local runtime and diagnostics, built-in API and page designs, and artifact traceability. Pass P10-01 through P10-06. Embedded editors, embedded terminals, debugger attachment and general-purpose builders remain extensions. |
 | 11 · Engineering standards, collaboration and release | 07, 09, 10 | Verify an engineering standard and shared template through Git and CI. Build and package a generated app using reviewed environment and deployment configuration. Show test, inspection, and release results, permission errors, and project history and recovery. Prove the core flow works without a mandatory Studio service. |
 | 12 · Windows distribution and verification | 11 and Windows native evidence for relevant earlier phases | Produce a Windows x64 installer via Electron Builder and verify clean install, launch, upgrade with data preservation, uninstall, and documented signing and SmartScreen behavior on actual Windows. Record exact artifact and platform versions. |
 
@@ -121,3 +121,15 @@ Phases 08–12 retain the approved multi-stack, advanced Git, design, developmen
 Introduce native dialog, recents and watchers with actual project admission in Phase 02. Add Git remotes and indexing when their safety checks are implemented. Introduce PostgreSQL access, React Flow, a migration parser, or SQLite only when the corresponding feature needs it. Gate generation on published stack-specific evidence. A phase can land incrementally with explicit pending evidence. Mark a phase verified only when its applicable gates pass.
 
 Add `factory-generator` in Phase 04, `factory-schema` in Phase 05, and `factory-stack-plugin` in Phase 08 when the corresponding engines or SDK have working execution paths and fixtures.
+
+
+## Phase 10 acceptance
+
+| Gate | Observable check |
+| --- | --- |
+| P10-01 Editor and terminal | Hand off the active, canonical worktree or selected source location, reject stale and escaping paths, and explain missing tools. A native terminal receives only the explicit working directory. |
+| P10-02 Runtime | Discover actual tools and local configuration. Review and run real Node.js and Go development, build and test steps with exact native approval. Recover from a failed launch and stop only Studio-managed processes. Verify independent worktree attribution, bounded logs, and secret masking. |
+| P10-03 APIs | Save a design linked to a generated route, show its source evidence, export usable OpenAPI JSON, and issue authorized requests to that worktree's running backend. Reject unsafe URL and header input, redirects and oversized responses. |
+| P10-04 Page source | Publish a reviewed branded React page from a saved design, build and render it against a real inventory fixture, and block unowned or customized inputs. |
+| P10-05 Traceability | Save a requirement and workflow with links to database, API, page and source artifacts. Open valid links and report missing or changed references. |
+| P10-06 Platforms and regression | Pass applicable Studio and generated stack checks on Linux and Windows x64. Record actual platform results and separate native desktop tool checks. |
