@@ -50,3 +50,8 @@ Clone uses an exclusive new child folder, no checkout during transfer, and tree 
 Dirty checkout allows review and cancellation. Clean checkout requests native confirmation and keeps Git's ignored-file collision protection. Pull fetches an explicitly scoped tracking ref and applies only a verified fast-forward. Divergence leaves the checked-out branch untouched and can be inspected by comparing its upstream ref. Ordinary push uses the reviewed commit ID and destination branch, with no force or hook execution. A successful push followed by a failed tracking refresh is reported as partial success.
 
 A Studio lock serializes its own writes. External editors and Git clients can still act in the interval between the last review and a native Git call. Git's native locks and overwrite checks remain active. Save editor buffers before checkout, and avoid modifying the same Git configuration or files concurrently. On failure, refresh and review the actual worktree and refs before retrying. Phase 03 has no authority over physical databases.
+
+
+## Phase 06 generation coordination
+
+Incremental generation binds review to the admitted worktree, repository directory identity, ref and HEAD, and rejects staged affected paths and in-progress Git operations. It permits unrelated dirty files. A pending transaction blocks Studio Git mutations and source migration publication on that workspace. Resume rechecks the exact Git and schema context and the observed before/after bytes. Handoff preserves workspace and backup files for independent recovery.

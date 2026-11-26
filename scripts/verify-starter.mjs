@@ -92,7 +92,23 @@ async function inventoryRequests(url) {
   await call('products/record?id=4', 404);
 }
 
-async function inventoryBrowser(page) {
+async function inventoryBrowser(page, incremental) {
+  if (incremental) {
+    await page.getByRole('combobox', { name: 'Table' }).selectOption('suppliers');
+    await page.getByRole('button', { name: 'New Record' }).click();
+    const supplier = page.getByRole('form', { name: 'Create record' });
+    await supplier.getByRole('spinbutton', { name: 'Id', exact: true }).fill('8');
+    await supplier.getByRole('textbox', { name: 'Name', exact: true }).fill('Browser Supplier');
+    await supplier.getByRole('button', { name: 'Save Record' }).click();
+    const row = page.getByRole('row', { name: /Browser Supplier/u });
+    await row.getByRole('button', { name: 'Edit' }).click();
+    await page.getByRole('form', { name: 'Edit record' }).getByRole('textbox', { name: 'Name', exact: true }).fill('Updated Supplier');
+    await page.getByRole('button', { name: 'Save Record' }).click();
+    const updated = page.getByRole('row', { name: /Updated Supplier/u });
+    await updated.getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('button', { name: 'Delete Record' }).click();
+    await updated.waitFor({ state: 'hidden' });
+  }
   await page.getByRole('combobox', { name: 'Table' }).selectOption('products');
   await page.getByRole('cell', { name: 'Workshop Hammer' }).waitFor();
   await page.getByRole('button', { name: 'New Record' }).click();
@@ -114,7 +130,51 @@ async function inventoryBrowser(page) {
   await updated.waitFor({ state: 'hidden' });
 }
 
-async function verify(plan, demo, inventory) {
+async function addSuppliers(fixture) {
+  const { IncrementalStudio } = await vite.ssrLoadModule('/apps/desktop/src/main/services/incremental/studio.ts');
+  const { IncrementalStore } = await vite.ssrLoadModule('/apps/desktop/src/main/services/incremental/storage.ts');
+  const { admitRoot } = await vite.ssrLoadModule('/apps/desktop/src/main/services/projects/filesystem.ts');
+  const { success } = await vite.ssrLoadModule('/packages/contracts/src/index.ts');
+  const rootGrant = await admitRoot(fixture);
+  const userData = await mkdtemp(join(tmpdir(), 'studio-incremental-profile-'));
+  const projectId = randomUUID();
+  const migration = await readFile(resolve(root, 'tests/fixtures/suppliers.sql'), 'utf8');
+  const migrationPath = join(fixture, 'db/migrations/0003_suppliers.sql');
+  const servicePath = join(fixture, 'server/features/crud/service.ts');
+  const custom = (await readFile(servicePath, 'utf8')) + '\nexport const clientBusinessRule = "Existing inventory approval policy";\n';
+  const studio = new IncrementalStudio(new IncrementalStore(userData), {
+    root: (id) => id === projectId ? rootGrant : undefined,
+    project: async () => undefined, git: async () => success({ state: 'not-repository', detail: 'Standalone fixture' }),
+    gitWriting: () => false, schemaPending: async () => false, refresh: async () => undefined,
+  }, { confirm: async (_title, detail) => detail.includes('Plan SHA-256') });
+  const verified = (result) => {
+    assert(result.ok, result.error);
+    return result.value;
+  };
+  try {
+    await writeFile(servicePath, custom);
+    await writeFile(migrationPath, migration, { flag: 'wx' });
+    const inspected = verified(await studio.inspect(projectId));
+    const select = { projectId, revision: inspected.revision, backend: ['suppliers'], frontend: ['suppliers'] };
+    assert(inspected.sources.some(({ name, external }) => name === '0003_suppliers.sql' && external));
+    const review = verified(await studio.preview(select));
+    assert.deepEqual(review.issues, []);
+    assert(review.changes.some(({ path, action }) => path === 'server/features/crud/service.ts' && action === 'protected'));
+    assert(!review.changes.some(({ path }) => path.startsWith('db/')));
+    const applied = verified(await studio.action({ projectId, id: review.id }, 'apply'));
+    assert.deepEqual(applied.issues, []);
+    assert.equal(await readFile(servicePath, 'utf8'), custom);
+    assert.equal(await readFile(migrationPath, 'utf8'), migration);
+    const repeat = verified(await studio.preview({ ...select, revision: applied.revision }));
+    assert.deepEqual(repeat.issues, []);
+    assert(!repeat.changes.some(({ action }) => action === 'create' || action === 'modify'));
+  } finally {
+    studio.dispose();
+    await rm(userData, { recursive: true, force: true, maxRetries: 5 });
+  }
+}
+
+async function verify(plan, demo, inventory, incremental) {
   const fixture = await mkdtemp(join(tmpdir(), 'studio-generated-app-'));
   const port = plan.config.port;
   const url = 'http://127.0.0.1:' + port;
@@ -154,6 +214,16 @@ async function verify(plan, demo, inventory) {
       env.TEST_DATABASE_URL = connection.href;
     }
 
+    if (incremental) {
+      if (database) run('db:migrate');
+      server = spawn(process.execPath, ['--experimental-strip-types', 'server/server.ts'], { cwd: fixture, env, stdio: 'inherit' });
+      await ready(server, url + '/api/health');
+      assert.equal((await fetch(url + '/api/crud/products')).status, database ? 200 : 503);
+      assert.equal((await fetch(url + '/api/crud/suppliers')).status, 404);
+      await stop(server);
+      server = undefined;
+      await addSuppliers(fixture);
+    }
     run('lint');
     run('typecheck');
     run('test');
@@ -198,7 +268,7 @@ async function verify(plan, demo, inventory) {
         await page.getByText(database ? 'PostgreSQL ready.' : 'PostgreSQL unavailable.', { exact: true }).waitFor();
         if (demo) await page.getByText(database ? 'Welcome from PostgreSQL.' : /The welcome example is unavailable/u).waitFor();
         else assert.equal(await page.getByRole('heading', { name: 'Welcome example' }).count(), 0);
-        if (inventory && database) await inventoryBrowser(page);
+        if (inventory && database) await inventoryBrowser(page, incremental);
       } finally {
         await browser.close();
       }
@@ -208,10 +278,10 @@ async function verify(plan, demo, inventory) {
     assert.equal(instructions.includes('Welcome example'), demo);
     if (client) {
       const { rows } = await client.query('SELECT table_name FROM information_schema.tables WHERE table_schema = $1 ORDER BY table_name', [schema]);
-      const expected = ['schema_migrations', ...(demo ? ['welcome_messages'] : []), ...(inventory ? plan.config.crud.schema.tables.map(({ name }) => name) : [])];
+      const expected = ['schema_migrations', ...(demo ? ['welcome_messages'] : []), ...(inventory ? plan.config.crud.schema.tables.map(({ name }) => name) : []), ...(incremental ? ['suppliers'] : [])];
       assert.deepEqual(rows.map(({ table_name }) => table_name), expected.sort());
     }
-    console.log('Standalone ' + (inventory ? 'inventory CRUD' : demo ? 'Welcome example' : 'foundation') + ' verified with' + (database ? ' PostgreSQL.' : 'out a database connection.'));
+    console.log('Standalone ' + (incremental ? 'incremental inventory CRUD' : inventory ? 'inventory CRUD' : demo ? 'Welcome example' : 'foundation') + ' verified with' + (database ? ' PostgreSQL.' : 'out a database connection.'));
   } finally {
     try {
       await stop(development);
@@ -230,16 +300,20 @@ try {
   const { parseSql } = await vite.ssrLoadModule('/packages/schema/src/index.ts');
   const { schema: inventory, diagnostics } = parseSql(await readFile(resolve(root, 'tests/fixtures/inventory.sql'), 'utf8'));
   assert.deepEqual(diagnostics, []);
-  for (const variant of ['foundation', 'welcome', 'inventory']) {
+  for (const variant of ['foundation', 'welcome', 'inventory', 'incremental']) {
     const demo = variant === 'welcome';
-    const tables = inventory.tables.map(({ name }) => name);
+    const incremental = variant === 'incremental';
+    const selectedSchema = incremental ? { ...inventory, tables: inventory.tables.filter(({ name }) => name !== 'suppliers')
+      .map((table) => table.name !== 'products' ? table : { ...table, columns: table.columns.filter(({ name }) => name !== 'supplier_id'),
+        constraints: table.constraints.filter(({ name }) => name !== 'products_supplier_id_fkey') }) } : inventory;
+    const tables = selectedSchema.tables.map(({ name }) => name);
     const plan = planProject({
       name: 'Inventory Portal', slug: 'inventory-portal', port: await freePort(),
       appType: STARTER.appType, stack: STARTER.stack, database: STARTER.database,
       architecture: STARTER.architecture, engineering: STARTER.engineering, modules: demo ? [WELCOME_EXAMPLE] : [],
-      ...(variant === 'inventory' ? { crud: { schema: inventory, migrations: true, backend: tables, frontend: tables } } : {}),
+      ...(variant === 'inventory' || incremental ? { crud: { schema: selectedSchema, migrations: true, backend: tables, frontend: tables } } : {}),
     }, randomUUID());
-    await verify(plan, demo, variant === 'inventory');
+    await verify(plan, demo, variant === 'inventory' || incremental, incremental);
   }
 } finally {
   await vite.close();

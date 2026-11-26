@@ -1,6 +1,7 @@
 import { hasExactKeys, isRecord } from './validation';
 import type { ProjectBridge } from './projects';
 import type { GitBridge } from './git';
+import type { IncrementalBridge } from './incremental';
 import type { SchemaBridge } from './schema';
 import type { GeneratorBridge } from './generator';
 
@@ -10,6 +11,7 @@ export * from './git';
 export * from './generator';
 export * from './generator-modules';
 export * from './schema';
+export * from './incremental';
 
 export const CHANNEL = {
   appInfo: 'factory:app-info',
@@ -68,6 +70,9 @@ const errorCodes = [
   'SCHEMA_CONFLICT',
   'SCHEMA_DATABASE',
   'SCHEMA_STORAGE',
+  'INCREMENTAL_STALE',
+  'INCREMENTAL_UNSUPPORTED',
+  'INCREMENTAL_CONFLICT',
 ] as const;
 
 export type ErrorCode = typeof errorCodes[number];
@@ -79,6 +84,7 @@ export interface StudioBridge {
   git: GitBridge;
   generator: GeneratorBridge;
   schema: SchemaBridge;
+  incremental: IncrementalBridge;
   getAppInfo(): Promise<Result<AppInfo>>;
   readPreferences(): Promise<Result<PreferenceSnapshot>>;
   writePreferences(request: PreferenceWrite): Promise<Result<Preferences>>;

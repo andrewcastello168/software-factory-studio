@@ -30,3 +30,6 @@ Test toolchain detection, incompatible OS or versions, deterministic generation,
 ## PostgreSQL contract exercised in Phase 05
 
 The built-in Node adapter consumes the version 1 model from the Schema package. It advertises its canonical SQL dialect subset, fixed migration directory and ledger convention. It validates backend and frontend table eligibility before emitting a new-project plan. Phase 05 does not yet require other adapters to share the Node runtime layout or migrations.
+
+
+Phase 06 exercises the incremental planning boundary using the built-in Node adapter. The planner needs the pinned manifest, checked-out source schema and prior feature selections. It returns exact before/after artifacts and conflict reasons. Filesystem approval, staged publication and recovery stay in the desktop service. Third-party executable adapters remain outside the current release.

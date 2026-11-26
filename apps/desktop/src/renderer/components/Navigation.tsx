@@ -1,4 +1,4 @@
-import { Database } from 'lucide-react';
+import { Database, ListChecks } from 'lucide-react';
 import {
   Blocks, BookOpen, Box, Clock3, Folder, GitBranch, House, Layers3, Library, Package, Settings2, Users, Waypoints,
 } from 'lucide-react';
@@ -38,12 +38,13 @@ const groups: { title: string; entries: { title: string; icon: LucideIcon; page?
 ];
 
 export function Navigation({
-  page, onSelect, projectView, onProjectView, database,
+  page, onSelect, projectView, onProjectView, database, generation,
 }: {
   page: Page | null;
   onSelect: (page: Page) => void;
   projectView: ProjectView | null;
   database: boolean;
+  generation: boolean;
   onProjectView: (view: ProjectView) => void;
 }) {
   return (
@@ -63,6 +64,9 @@ export function Navigation({
             </Button></li>
             {database && <li><Button aria-current={projectView === 'database' ? 'page' : undefined} onClick={() => onProjectView('database')}>
               <Database size={16} aria-hidden="true" />Database Studio
+            </Button></li>}
+            {generation && <li><Button aria-current={projectView === 'generation' ? 'page' : undefined} onClick={() => onProjectView('generation')}>
+              <ListChecks size={16} aria-hidden="true" />Generation Review
             </Button></li>}
           </ul>
         </section>

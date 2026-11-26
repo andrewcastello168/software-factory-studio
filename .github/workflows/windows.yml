@@ -106,4 +106,5 @@ jobs:
             apps/desktop/test-results/**/git-studio-*.png
             apps/desktop/test-results/**/new-project-*.png
             apps/desktop/test-results/**/database-studio-*.png
+            apps/desktop/test-results/**/generation-review-*.png
           retention-days: 7

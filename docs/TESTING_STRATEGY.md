@@ -41,3 +41,8 @@ Journal tests use disposable directories and inject an interruption into the jou
 ## Phase 05 verification
 
 Use the pinned PostgreSQL 17 fixture database at loopback. Set FACTORY_TEST_DATABASE_URL to the dedicated factory_check endpoint to run the Database Studio integration in Vitest. It uses a unique temporary namespace and verifies read-only inspection, an approved transaction, ledger and source checksums, constraint failure rollback, and edited-history detection. The same inventory SQL drives the standalone verifier, which exercises all record operations, foreign-key actions, checks, invalid input, and pagination. FACTORY_STARTER_BROWSER=1 also verifies the generated React record editor against the production Express server. The Electron suite exercises the actual wizard and Database Studio, using controlled native consent responses to test the workspace paths and capture light and dark screenshots without automating the operating system dialog.
+
+
+## Phase 06 verification
+
+The incremental Vitest fixtures cover native Git staleness, external SQL, customized and missing files, junctions, and restart from a failed publication checkpoint. The standalone verifier starts an initial inventory app on a disposable PostgreSQL namespace before adding the supplier migration, preserves a client service edit, runs production builds and verifies the expanded API and React flow. The built Electron test performs wizard creation, plan navigation, cancelled consent, reviewed apply, and a zero-write repeat in a temporary workspace. The Windows workflow uploads the captured dark and light plans.

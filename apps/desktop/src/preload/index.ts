@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import {
+  INCREMENTAL_CHANNEL, isIncrementalApproval, isIncrementalInspection, isIncrementalPreview, isIncrementalSelection,
+  isNullableIncrementalInspection,
   SCHEMA_CHANNEL, isMigrationPreview, isNullableSchemaSnapshot, isSchemaConnection, isSchemaEdit,
   isSchemaLayout, isSchemaPhysical, isSchemaPoints, isSchemaProposal, isSchemaPublish, isSchemaSnapshot, isSqlImport,
   CHANNEL, failure, isAppInfo, isPreferences, isPreferenceSnapshot, isPreferenceWrite,
@@ -30,6 +32,13 @@ function checkedInvoke<T>(
 }
 
 const studio: StudioBridge = {
+  incremental: {
+    inspect: (id) => invokeProject(INCREMENTAL_CHANNEL.inspect, isIncrementalInspection, id),
+    preview: (input) => checkedInvoke(INCREMENTAL_CHANNEL.preview, input, isIncrementalSelection, isIncrementalPreview),
+    apply: (input) => checkedInvoke(INCREMENTAL_CHANNEL.apply, input, isIncrementalApproval, isNullableIncrementalInspection),
+    resume: (input) => checkedInvoke(INCREMENTAL_CHANNEL.resume, input, isIncrementalApproval, isNullableIncrementalInspection),
+    handoff: (input) => checkedInvoke(INCREMENTAL_CHANNEL.handoff, input, isIncrementalApproval, isNullableIncrementalInspection),
+  },
   schema: {
     inspect: (id) => invokeProject(SCHEMA_CHANNEL.inspect, isSchemaSnapshot, id),
     parse: (input) => checkedInvoke(SCHEMA_CHANNEL.parse, input, isSqlImport, isSchemaProposal),
