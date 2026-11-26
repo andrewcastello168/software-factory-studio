@@ -297,7 +297,7 @@ export class DeveloperStudio {
     }
     if (input.task === 'audit') {
       if (!snapshot.pnpm || tool('pnpm') !== stack.execution.pnpm) throw new Blocked('DEVELOPER_TOOL');
-      add(node?.target, snapshot.pnpm, 'audit', '--prod', '--audit-level', 'high', '--registry=https://registry.npmjs.org', '--fetch-retries=0', '--fetch-timeout=15000');
+      add(node?.target, snapshot.pnpm, 'audit', '--prod', '--audit-level', 'high', '--registry=https://registry.npmjs.org');
     }
     if (input.task === 'vet') add(go?.target, 'vet', '-mod=readonly', './...');
     if (input.task === 'format' || input.task === 'vulnerability') {
@@ -336,10 +336,12 @@ export class DeveloperStudio {
     const env = {
       ...baseEnvironment([node?.target, go?.target].flatMap((path) => path ? [dirname(path)] : [])),
       ...(needGo ? { ...goCache, GOTOOLCHAIN: 'local', GOENV: 'off', GOWORK: 'off', GOFLAGS: '', CGO_ENABLED: '0' } : {}),
+      ...(input.task === 'audit' ? { npm_config_fetch_retries: '0', npm_config_fetch_timeout: '15000' } : {}),
       ...selected, HOST: '127.0.0.1', PORT: String(info.backendPort),
     };
     const preview: RuntimePreview = { id, cwd: root.path, steps, port,
-      environment: ['HOST=127.0.0.1', 'PORT=' + info.backendPort, ...Object.keys(selected).filter((key) => !['HOST', 'PORT'].includes(key))
+      environment: ['HOST=127.0.0.1', 'PORT=' + info.backendPort,
+        ...(input.task === 'audit' ? ['npm_config_fetch_retries=0', 'npm_config_fetch_timeout=15000'] : []), ...Object.keys(selected).filter((key) => !['HOST', 'PORT'].includes(key))
         .map((key) => key + ' (configured in .env)'), ...(needGo ? ['GOTOOLCHAIN=local', 'GOWORK=off', 'CGO_ENABLED=0', ...Object.keys(goCache).map((key) => key + ' (host cache)')] : [])] };
     const binaries = await Promise.all([...new Set(steps.flatMap(({ executable, args }) =>
       [executable, ...args.slice(0, 1).filter(isAbsolute)]))]
