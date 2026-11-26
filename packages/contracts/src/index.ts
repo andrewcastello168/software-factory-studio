@@ -1,8 +1,10 @@
 import { hasExactKeys, isRecord } from './validation';
 import type { ProjectBridge } from './projects';
+import type { GitBridge } from './git';
 
 export { hasControlCharacters, hasExactKeys, isRecord } from './validation';
 export * from './projects';
+export * from './git';
 
 export const CHANNEL = {
   appInfo: 'factory:app-info',
@@ -49,6 +51,8 @@ const errorCodes = [
   'PROJECT_LIMIT',
   'PROJECT_BUSY',
   'RECENT_NOT_FOUND',
+  'GIT_STALE',
+  'GIT_DIFF_UNAVAILABLE',
 ] as const;
 
 export type ErrorCode = typeof errorCodes[number];
@@ -57,6 +61,7 @@ export type Validator<T> = (value: unknown) => value is T;
 
 export interface StudioBridge {
   projects: ProjectBridge;
+  git: GitBridge;
   getAppInfo(): Promise<Result<AppInfo>>;
   readPreferences(): Promise<Result<PreferenceSnapshot>>;
   writePreferences(request: PreferenceWrite): Promise<Result<Preferences>>;

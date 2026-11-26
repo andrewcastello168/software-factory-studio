@@ -5,16 +5,20 @@ import { join, relative, sep } from 'node:path';
 import {
   CHANNEL, failure, isAppInfo, isPreferences, isPreferenceSnapshot, isPreferenceWrite, success,
   validateReply, PROJECT_CHANNEL, isProjectCatalog, isProjectId, isProjectSelection,
+  GIT_CHANNEL, isGitAction, isGitCloneRequest, isGitCloneResult, isGitCompareRequest, isGitDiff, isGitDiffRequest,
+  isGitOutcome, isGitState,
 } from '@factory/contracts';
 import type { Result, SystemTheme, Validator } from '@factory/contracts';
 import { APP_URL, DEV_URL, PRODUCTION_CSP, isAuthorizedFrame, isRendererDocument, rendererRestrictions, resolveBundledRoute } from './security';
 import { PreferenceStore } from './services/preferences';
 import { RecentStore } from './services/projects/recents';
 import { ProjectWorkspace } from './services/projects/workspace';
+import { GitStudio } from './services/git/studio';
 
 const development = !app.isPackaged && process.env.FACTORY_DESKTOP_DEV === '1';
 let window: BrowserWindow | undefined;
 let projects: ProjectWorkspace | undefined;
+let gitStudio: GitStudio | undefined;
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'studio', privileges: { standard: true, secure: true, supportFetchAPI: true } },
@@ -72,6 +76,19 @@ function installProjectBridge() {
   handle(PROJECT_CHANNEL.removeRecent, isProjectCatalog, forWorkspace((workspace, id) => workspace.removeRecent(id)));
   handle(PROJECT_CHANNEL.rescan, isProjectCatalog, forWorkspace((workspace, id) => workspace.rescan(id)));
   handle(PROJECT_CHANNEL.close, isProjectCatalog, forWorkspace((workspace, id) => workspace.close(id)));
+}
+
+function installGitBridge() {
+  handle(GIT_CHANNEL.status, isGitState, (...args) => args.length === 1 && isProjectId(args[0])
+    ? gitStudio?.status(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(GIT_CHANNEL.diff, isGitDiff, (...args) => args.length === 1 && isGitDiffRequest(args[0])
+    ? gitStudio?.diff(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(GIT_CHANNEL.compare, isGitDiff, (...args) => args.length === 1 && isGitCompareRequest(args[0])
+    ? gitStudio?.compare(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(GIT_CHANNEL.action, isGitOutcome, (...args) => args.length === 1 && isGitAction(args[0])
+    ? gitStudio?.action(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(GIT_CHANNEL.clone, isGitCloneResult, (...args) => args.length === 1 && isGitCloneRequest(args[0])
+    ? gitStudio?.clone(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
 }
 
 async function installProtocol() {
@@ -145,6 +162,30 @@ async function openWindow() {
     },
   );
   projects = workspace;
+  const git = new GitStudio({
+    root: (id) => workspace.root(id),
+    canOpen: () => workspace.canOpen(),
+    allowsAuxiliaryPath: (path) => workspace.allowsAuxiliaryPath(path),
+    adopt: (root) => workspace.adoptCloned(root),
+    refresh: (id) => workspace.rescan(id),
+  }, {
+    async chooseDirectory(title, defaultPath) {
+      if (current.isDestroyed()) return null;
+      const selected = await dialog.showOpenDialog(current, {
+        title, properties: ['openDirectory'], ...(defaultPath ? { defaultPath } : {}),
+      });
+      return selected.canceled ? null : selected.filePaths[0] ?? null;
+    },
+    async confirm(title, detail, action) {
+      if (current.isDestroyed()) return false;
+      const decision = await dialog.showMessageBox(current, {
+        title, message: title, detail, type: 'warning',
+        buttons: ['Cancel', action], defaultId: 0, cancelId: 0,
+      });
+      return decision.response === 1;
+    },
+  });
+  gitStudio = git;
   current.on('focus', () => { void workspace.reconcile(); });
   current.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   current.webContents.on('will-frame-navigate', (event) => event.preventDefault());
@@ -165,8 +206,10 @@ async function openWindow() {
   current.once('ready-to-show', () => current.show());
   current.on('closed', () => {
     workspace.dispose();
+    void git.dispose().catch(() => undefined);
     if (window === current) {
       projects = undefined;
+      gitStudio = undefined;
       window = undefined;
     }
   });
@@ -200,6 +243,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     if (!development) await installProtocol();
     installProjectBridge();
+    installGitBridge();
     installBridge(new PreferenceStore(join(app.getPath('userData'), 'preferences.json')));
     await openWindow();
     app.on('activate', () => { if (!window) void openWindow().catch(reportStartupError); });

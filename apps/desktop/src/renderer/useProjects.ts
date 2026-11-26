@@ -63,6 +63,7 @@ export function useProjects() {
 
   return {
     catalog,
+    applySelection: (selection: ProjectSelection) => update(selection.catalog),
     error,
     opening,
     native: Boolean(bridge),

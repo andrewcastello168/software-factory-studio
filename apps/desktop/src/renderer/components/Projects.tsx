@@ -11,7 +11,7 @@ const availabilityLabel: Record<ProjectAvailability, string> = {
   ready: 'Available', missing: 'Folder not found', unavailable: 'Folder unavailable', changed: 'Folder changed',
 };
 
-export type ProjectView = 'overview' | 'structure';
+export type ProjectView = 'overview' | 'structure' | 'git';
 
 export function WorkspaceTabs({
   projects, active, onSelect, onClose,
@@ -218,11 +218,12 @@ const metadataLabel = {
 };
 
 export function ProjectPanel({
-  project, view, setView, rescan, locate, opening,
+  project, view, setView, rescan, locate, opening, gitContext,
 }: {
   project: OpenProject;
-  view: ProjectView;
+  view: Exclude<ProjectView, 'git'>;
   setView: (view: ProjectView) => void;
+  gitContext: string;
   rescan: () => void;
   locate: (() => void) | undefined;
   opening: boolean;
@@ -279,7 +280,7 @@ export function ProjectPanel({
               <div><dt>Folder access</dt><dd>Read-only</dd></div>
               <div><dt>Listed files</dt><dd>{counts.files}</dd></div>
               <div><dt>Listed folders</dt><dd>{counts.folders}</dd></div>
-              <div><dt>Git branch and status</dt><dd>Unavailable</dd></div>
+              <div><dt>Git branch and status</dt><dd><bdi>{gitContext}</bdi></dd></div>
             </dl>
           </section>
           <section className="project-section" aria-labelledby="metadata-title">

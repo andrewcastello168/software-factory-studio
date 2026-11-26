@@ -1,13 +1,14 @@
-import { ArrowUpRight, Command, FolderOpen, Monitor, Moon, PanelLeft, Search, Settings2, Sun } from 'lucide-react';
+import { ArrowUpRight, Command, FolderOpen, GitFork, Monitor, Moon, PanelLeft, Search, Settings2, Sun } from 'lucide-react';
 import type { Theme } from '@factory/contracts';
 import { Button } from './Controls';
 
 export function Home({
-  openSettings, openPalette, openFolder, openProjects, native, opening, projectCount,
+  openSettings, openPalette, openFolder, openProjects, native, opening, projectCount, cloneRepository,
 }: {
   openSettings: () => void;
   openPalette: () => void;
   openFolder: () => void;
+  cloneRepository?: (() => void) | undefined;
   openProjects: () => void;
   native: boolean;
   opening: boolean;
@@ -26,7 +27,7 @@ export function Home({
             <span className="empty-icon"><FolderOpen size={20} aria-hidden="true" /></span>
             <div>
               <h3>{projectCount ? `${projectCount} open ${projectCount === 1 ? 'project' : 'projects'}` : 'No project open'}</h3>
-              <p>{native ? 'Browse local project files in a read-only workspace.' : 'Local folders are available in the desktop app.'}</p>
+              <p>{native ? 'Open an existing folder or clone a Git repository.' : 'Local folders are available in the desktop app.'}</p>
               {native && <div className="home-project-actions">
                 <Button variant="primary" onClick={openFolder} disabled={opening}>Open Folder</Button>
                 <Button onClick={openProjects}>Recent Projects<ArrowUpRight size={14} aria-hidden="true" /></Button>
@@ -39,6 +40,9 @@ export function Home({
           <Button onClick={openSettings}>
             <Settings2 size={16} aria-hidden="true" /><span>Open Settings</span><ArrowUpRight size={14} aria-hidden="true" />
           </Button>
+          {cloneRepository && <Button onClick={cloneRepository} disabled={opening}>
+            <GitFork size={16} aria-hidden="true" /><span>Clone Repository</span><ArrowUpRight size={14} aria-hidden="true" />
+          </Button>}
           <Button onClick={openPalette}>
             <Command size={16} aria-hidden="true" /><span>Command palette</span><ArrowUpRight size={14} aria-hidden="true" />
           </Button>

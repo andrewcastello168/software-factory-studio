@@ -1,5 +1,5 @@
 import {
-  Blocks, BookOpen, Box, Clock3, Folder, House, Layers3, Library, Package, Settings2, Users, Waypoints,
+  Blocks, BookOpen, Box, Clock3, Folder, GitBranch, House, Layers3, Library, Package, Settings2, Users, Waypoints,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from './Controls';
@@ -55,6 +55,9 @@ export function Navigation({
             </Button></li>
             <li><Button aria-current={projectView === 'structure' ? 'page' : undefined} onClick={() => onProjectView('structure')}>
               <Folder size={16} aria-hidden="true" />Project Structure
+            </Button></li>
+            <li><Button aria-current={projectView === 'git' ? 'page' : undefined} onClick={() => onProjectView('git')}>
+              <GitBranch size={16} aria-hidden="true" />Git Studio
             </Button></li>
           </ul>
         </section>

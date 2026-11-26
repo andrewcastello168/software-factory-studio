@@ -49,8 +49,10 @@ jobs:
       - name: Type check
         run: pnpm typecheck
 
-      - name: Unit and filesystem integration tests
-        run: pnpm test
+      - name: Unit, filesystem, and Git integration tests
+        run: |
+          git --version
+          pnpm test
 
       - name: Build desktop application
         run: pnpm build
@@ -65,11 +67,15 @@ jobs:
         run: pnpm --filter @factory/desktop exec install-electron
 
       - name: Test native Electron
+        env:
+          FACTORY_TEST_PUBLIC_HTTPS: '1'
         run: pnpm test:electron
 
-      - name: Upload project workspace screenshots
+      - name: Upload desktop workspace screenshots
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: windows-project-workspace
-          path: apps/desktop/test-results/**/project-*.png
+          name: windows-desktop-workspaces
+          path: |
+            apps/desktop/test-results/**/project-*.png
+            apps/desktop/test-results/**/git-studio-*.png
           retention-days: 7
