@@ -118,6 +118,10 @@ createServer((request, response) => {
     await expect(page.locator('.incremental-preview')).toContainText('BusinessShell');
     await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'dark'; });
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    const workspace = page.locator('#workspace-main');
+    expect(await workspace.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    await page.getByRole('heading', { name: 'Generation review', exact: true })
+      .evaluate((element) => element.scrollIntoView({ block: 'start' }));
     await page.screenshot({ path: test.info().outputPath('developer-page-review-dark.png') });
     await page.getByRole('button', { name: 'Approve and Apply' }).click();
     await expect(page.getByText('Reviewed design saved.')).toBeVisible();

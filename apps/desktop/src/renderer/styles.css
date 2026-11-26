@@ -992,3 +992,4 @@ kbd {
 .developer-page .incremental-preview > header bdi { overflow-wrap: anywhere; }
 .developer-page .incremental-preview strong[data-action="create"] { color: var(--success); }
 .developer-page .incremental-preview strong[data-action="modify"] { color: var(--accent); }
+.developer-page .structure-note { white-space: normal; overflow-wrap: anywhere; }
