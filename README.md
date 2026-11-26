@@ -62,6 +62,8 @@ pnpm test:electron
 pnpm start
 ```
 
+The Windows workflow sets `FACTORY_TEST_PUBLIC_HTTPS=1` for the anonymous GitHub clone smoke. Set the same variable before `pnpm test:electron` when testing on a machine with direct HTTPS access. The disposable local repository suite runs without that network dependency.
+
 Close other Studio instances before the manual smoke test. In the built app, switch among System, Dark, and Light in Settings. With System selected, change the Windows appearance setting and confirm Studio follows it. Check both 1280×800 and 1024×768 workbench sizes, keyboard and pointer resize, `Ctrl+K`, Escape focus restoration, and the 200% zoom layout. Restart and verify the saved theme and expanded sidebar width. Record Windows version, architecture, display scaling, and results in [Progress](docs/PROGRESS.md). Manually check native chooser and confirmation dialogs on a Windows desktop when validating a release. CI supplies controlled chooser results so the tests exercise real Git and filesystem operations without automating the OS dialog. Installer creation is scheduled for Phase 12.
 
 ## Working on this repository
