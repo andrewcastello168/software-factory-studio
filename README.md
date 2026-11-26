@@ -36,6 +36,12 @@ pnpm dev:api
 
 In a second terminal run pnpm dev:web. For production run pnpm build and pnpm start from the generated root. On PowerShell use Copy-Item .env.example .env. Neither project runtime nor development commands depend on Studio.
 
+## Database Studio
+
+Open a managed Node/PostgreSQL project and select **Database Studio**. Use **Schema** to add tables and relationships, **ERD** to inspect and position them, and **Migrations** to review the source sequence and checksums. **Physical database** inspects a separately authorized PostgreSQL target and shows differences and its migration ledger. Publish an additive source migration before reviewing any separate local development apply. See [Database engine](docs/DATABASE_ENGINE.md) for supported PostgreSQL syntax, targets and recovery.
+
+In **New Project**, enable **Define a database schema** to import DDL or design tables before generation. Enable Backend API and optional React page per compatible table. The generated data routes have no built-in authentication and require appropriate deployment access controls. Existing application files are preserved when Database Studio publishes a migration.
+
 ## Development setup
 
 Use Node.js **22.16.0** and pnpm **10.13.1**. The application has no service or credential setup. Install Git for the project workflows and integration tests. Install the binary explicitly before running the desktop app. These commands work from PowerShell after installing the pinned Windows x64 Node release.
@@ -66,7 +72,7 @@ Use `pnpm dev:web` for a separate Vite renderer preview at `http://127.0.0.1:448
 | `pnpm start` | Run the built desktop app through its production renderer origin |
 | `pnpm test:renderer` | Playwright tests against the built renderer with a test-only bridge and the browser development mode |
 | `pnpm test:electron` | Playwright flows through sandboxed Electron with disposable profiles, projects, and Git repositories |
-| `pnpm verify:starter` | Generate both starter configurations, install each frozen graph, and verify development and production startup |
+| `pnpm verify:starter` | Generate foundation, Welcome and inventory configurations, then verify standalone startup, migration and CRUD |
 
 The [Windows verification workflow](.github/workflows/windows.yml) runs automatically on pull requests to `main`. It builds the application on Windows x64 and runs the renderer and native Electron suites. To reproduce those checks locally and open the built app on Windows x64:
 

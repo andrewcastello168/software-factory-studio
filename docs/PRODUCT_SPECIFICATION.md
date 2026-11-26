@@ -76,3 +76,7 @@ Use explicit availability when describing a capability. **Planned** means schedu
 Architecture, UI, module, component, and deployment templates are distinct versioned library assets. The resolution order is explicit per project and pinned in portable locks. Users can customize branding, logos, typography, colors, themes, layout, navigation, login screens, forms, tables, and components and save reusable versions in personal or team libraries. Imported assets remain untrusted. The [SDK](STACK_PLUGIN_SDK.md) defines compatibility and activation.
 
 The module roadmap starts with authentication, user management, RBAC, audit logging, Excel and CSV, file management, notifications, reporting, scheduler, payment adapters, and deployment configuration. Modules declare compatible stacks, dependencies, versions, migration ownership, and reviewable file changes. Installation after project creation uses the same planner and recovery path as other incremental changes. Team libraries, standards, and policy can live in Git and be checked in CI, with access enforced by the host and Git provider.
+
+## Verified database-driven path
+
+Phase 05 connects the managed PostgreSQL workbench to optional schema and CRUD selection in a new Node starter. Database Studio inspects and edits supported declared schema, previews additive migrations, and separately reviews local development apply. CRUD selection is independent per table and layer within the supported configuration. Phase 06 extends the same engineering practices to projects with existing application code.

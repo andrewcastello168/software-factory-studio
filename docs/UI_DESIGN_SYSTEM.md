@@ -47,3 +47,8 @@ The command palette opens with Ctrl+K on Windows and Linux and Cmd+K on macOS. I
 ## Phase 01 layout bounds
 
 Start expanded at 240 px and use a 180–320 px resize range. Arrow keys adjust by 8 px within the range. Verify the workbench at 1280×800 and 1024×768 CSS pixels, plus a 200% zoom check in a platform capable of running the UI. Settings offers System, Dark, and Light. System follows native color-scheme changes. Persist the theme and last expanded width in local app settings. [Roadmap](ROADMAP.md) defines the exact phase gate.
+
+
+## Database Studio
+
+Keep source editing, ERD, migration review, and physical observations in separate workbench views. Use the same surface, border, muted text, accent and focus tokens as the project explorer. The tree selects the table inspector. The ERD draws foreign-key links from the model, provides keyboard controls, and indicates draft selection without changing source. Use clear labels for draft, source, pending, applied, unknown and stale states. Native confirmation follows the renderer review for file publication, connection inspection and development apply.

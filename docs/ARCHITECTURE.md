@@ -29,7 +29,7 @@ Use TypeScript in strict mode and pin Node and pnpm for a reproducible frozen-lo
 | `.factory/project.json` | Versioned portable descriptor with stable UUID, project type, and stack/profile identifiers. A path grant remains separate from portable identity. |
 | `.factory/versions.lock.json` and `.factory/modules.json` | Exact stack, template and generator versions and digests, resolved modules and dependencies. Values describe reproducible inputs. |
 | `.factory/generation-manifest.json` | Relative project paths, content fingerprints, template ownership, and generation provenance. |
-| `.factory/schema.json` | Studio diagram layout and supported schema configuration. Migration authority is defined in [Database engine](DATABASE_ENGINE.md). |
+| `db/migrations/` | Portable, ordered source schema. Diagram coordinates use versioned workbench preferences; see [Database engine](DATABASE_ENGINE.md). |
 | Main-owned recovery storage | Worktree-local operation records keyed by canonical path and operation ID, with narrowly scoped backups and content digests. Keep outside the source tree. The recovery design records the staging paths needed for same-filesystem operations. |
 | OS-protected credential store | Database and service credentials. Store only opaque references in app data. See [Security](SECURITY.md). |
 
@@ -54,3 +54,8 @@ The Contracts package describes validated wizard input, preview files, receipts 
 ## Platform risks
 
 Windows path handling requires native tests for Unicode, spaces, drive and UNC roots, case-insensitive collisions, reserved device names, alternate streams, and junctions. Git for Windows executable discovery, shell-free argument passing, CRLF policy, and watcher behavior require Windows fixtures. File replacement can fail while an editor or antivirus holds a handle. Treat failures as recoverable operations with cleanup and meaningful errors. Electron packaging introduces separate icon, installer, upgrade, signing, and SmartScreen gates. Linux success does not establish the Windows results. Evidence belongs in [Progress](PROGRESS.md).
+
+
+## Phase 05 database boundaries
+
+The pure Schema package validates the bounded PostgreSQL model, interprets SQL, compares snapshots, and plans deterministic additive changes. Shared contracts validate the narrow schema IPC. The desktop main service owns scope checks, source files, recovery storage, Git rechecks and the pinned JavaScript PostgreSQL client. The renderer owns drafts and ERD interaction. The generator consumes the schema and explicit table selections for independent new applications. Opening folders and switching branches do not connect to a database.
