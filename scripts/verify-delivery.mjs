@@ -118,6 +118,9 @@ export async function verifySharedAssets(vite) {
     assert.deepEqual(await reader.delivery.import({ projectId: second, digest: secondBundle.value.digest }), { ok: true, value: 1 });
     assert(get(projects[0], 'docs/ENGINEERING_PROFILE.md').includes(profile.advice.Testing));
     const sharedPath = join(consumer, 'factory-library', shared.value.digest + '.json');
+    const canonical = await readFile(sharedPath, 'utf8');
+    await writeFile(sharedPath, canonical.replace(/\r?\n/gu, '\r\n'));
+    assert.deepEqual(await reader.delivery.import({ projectId: second, digest: shared.value.digest }), { ok: true, value: 0 });
     await writeFile(sharedPath, '{}\n');
     assert.equal((await reader.delivery.import({ projectId: second, digest: shared.value.digest })).ok, false);
     console.log('Shared profile and template passed across two native Git worktrees, with version locks and corruption rejection.');
@@ -154,7 +157,7 @@ export async function applyDeliveryFixture(vite, directory) {
   assert(!workflow.includes('pull_request_target'));
 }
 
-async function verifyDocker(directory, go, env) {
+export async function verifyDocker(directory, go, env) {
   const prefix = ['compose', '-p', 'factory-' + randomUUID().slice(0, 8), '-f', 'compose.factory.yaml'];
   const dockerEnv = { ...env, DATABASE_URL: 'postgresql://factory_dev:disposable-delivery-fixture@database:5432/factory_dev',
     POSTGRES_PASSWORD: 'disposable-delivery-fixture' };
@@ -215,12 +218,16 @@ export async function verifyDelivery(vite, directory, env, go, packageManager, p
     assert(inspection.ok);
     assert.deepEqual(new Set(inspection.value.quality.filter((row) => row.outcome === 'passed').map(({ task }) => task)), new Set(taskList));
     const input = { projectId: id, version: '1.0.0', notes: 'First client handoff.', source };
+    const inside = services.create(profile, root.path);
+    try { assert.deepEqual(await inside.delivery.package(input), { ok: false, error: 'ACCESS_DENIED' }); }
+    finally { await inside.developer.dispose(); }
     const result = await delivery.package(input);
     assert(result.ok && result.value, JSON.stringify(result));
     const artifact = result.value.file;
     assert.equal(createHash('sha256').update(await readFile(artifact)).digest('hex'), result.value.sha256);
     const live = await delivery.inspect(id);
     assert(live.ok && live.value.releases[0]?.artifact === 'available');
+    assert.deepEqual(await delivery.package(input), { ok: false, error: 'DELIVERY_CONFLICT' });
     exec('tar', ['-xf', artifact], install, process.env);
     const evidence = JSON.parse(await readFile(join(install, 'release-evidence.json'), 'utf8'));
     assert.equal(evidence.revision, result.value.head);

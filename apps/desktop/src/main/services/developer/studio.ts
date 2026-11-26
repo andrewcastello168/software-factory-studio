@@ -297,7 +297,7 @@ export class DeveloperStudio {
     }
     if (input.task === 'audit') {
       if (!snapshot.pnpm || tool('pnpm') !== stack.execution.pnpm) throw new Blocked('DEVELOPER_TOOL');
-      add(node?.target, snapshot.pnpm, 'audit', '--prod', '--audit-level', 'high', '--registry=https://registry.npmjs.org');
+      add(node?.target, snapshot.pnpm, 'audit', '--prod', '--audit-level', 'high', '--registry=https://registry.npmjs.org', '--fetch-retries=0', '--fetch-timeout=15000');
     }
     if (input.task === 'vet') add(go?.target, 'vet', '-mod=readonly', './...');
     if (input.task === 'format' || input.task === 'vulnerability') {

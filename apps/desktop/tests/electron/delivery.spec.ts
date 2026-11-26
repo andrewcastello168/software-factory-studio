@@ -43,6 +43,7 @@ test('inspects owned source, applies reviewed deployment files, and runs real qu
     await page.getByRole('button', { name: 'Client Delivery', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Source and standards' })).toBeVisible();
     await expect(page.getByText('Pinned stack and engine locks are recognized.')).toBeVisible();
+    await expect(page.getByText('No missing or modified owned files were found.')).toBeVisible();
     await page.screenshot({ path: test.info().outputPath('delivery-inspector-dark.png') });
 
     await page.getByRole('button', { name: 'Deployment', exact: true }).click();

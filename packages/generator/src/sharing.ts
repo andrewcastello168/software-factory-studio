@@ -41,6 +41,6 @@ export function readSharedBundle(content: string) {
     value && typeof value === 'object' && 'asset' in value ? value.asset : null);
   if (!isLibraryAssets(assets)) throw new Error('Invalid shared definitions.');
   const rebuilt = sharedBundle(assets);
-  if (rebuilt.content !== content) throw new Error('Bundle digests, dependencies, or compatibility differ from the supported envelope.');
+  if (rebuilt.content !== content.replaceAll('\r\n', '\n')) throw new Error('Bundle digests, dependencies, or compatibility differ from the supported envelope.');
   return rebuilt;
 }

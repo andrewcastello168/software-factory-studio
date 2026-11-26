@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Download, FileCheck2, RefreshCw } from 'lucide-react';
-import { GO_STACK, isPackageRequest, isProjectId, qualityTasks, requiredQuality } from '@factory/contracts';
+import { GO_STACK, STACKS, isPackageRequest, isProjectId, qualityTasks, requiredQuality } from '@factory/contracts';
 import type {
   AssetPin, DeliveryInspection, DeliveryOption, DeveloperBridge, ErrorCode, IncrementalInspection, IncrementalPreview,
   LibraryAsset, OpenProject, QualityTask, Result, RuntimeInspection, RuntimePreview, SharedLibrary,
@@ -31,7 +31,8 @@ const slug = (asset: Pick<LibraryAsset, 'id' | 'version'>) => asset.id + ':' + a
 function Inspector({ inspection, generated, runtime, openSource }: {
   inspection: DeliveryInspection; generated: IncrementalInspection | undefined; runtime: RuntimeInspection | undefined; openSource(path: string): void;
 }) {
-  const supportedStack = inspection.stack !== null;
+  const stack = inspection.stack && STACKS[inspection.stack];
+  const supportedStack = Boolean(stack);
   const changed = generated?.files.filter(({ owner, state }) => owner && state !== 'generated') ?? [];
   return <div className="dev-grid">
     <section className="project-section">
@@ -41,8 +42,8 @@ function Inspector({ inspection, generated, runtime, openSource }: {
         <div><dt>Worktree</dt><dd title={inspection.worktree}><code>{inspection.worktree.slice(0, 24)}</code></dd></div>
         <div><dt>Source revision</dt><dd><code>{inspection.head?.slice(0, 12) ?? 'Uncommitted project'}</code></dd></div>
         <div><dt>Git state</dt><dd>{inspection.branch ?? 'No named branch'} · {inspection.clean ? 'Clean' : 'Requires review'}</dd></div>
-        <div><dt>Stack and architecture</dt><dd>{generated?.profile?.stack ?? 'Unsupported'} · {generated?.profile?.architecture ?? 'Unknown'}</dd></div>
-        <div><dt>Engineering profile</dt><dd>{generated?.profile?.engineering ?? 'Unavailable'}</dd></div>
+        <div><dt>Stack and architecture</dt><dd>{generated?.profile?.stack ?? (stack ? stack.label : 'Unsupported')} · {generated?.profile?.architecture ?? (stack ? stack.architectureLabel : 'Unknown')}</dd></div>
+        <div><dt>Engineering profile</dt><dd>{generated?.profile?.engineering ?? (stack && !generated ? 'Reading profile…' : 'Unavailable')}</dd></div>
         <div><dt>Interface template</dt><dd>{inspection.template ?? 'Standard layout'}</dd></div>
         <div><dt>Installed modules</dt><dd>{generated?.profile?.modules.join(', ') || 'None recorded'}</dd></div>
       </dl>
@@ -70,7 +71,7 @@ function Inspector({ inspection, generated, runtime, openSource }: {
       {changed.length ? <ul className="dev-artifact-list">{changed.map(({ path, state }) =>
         <li key={path}><div><span>{path}</span><small>{state === 'missing' || state === 'protected' ? 'Error' : 'Warning'} · {state}</small></div>
           {!path.startsWith('.factory/') && state === 'modified' && <Button className="outlined-button" onClick={() => openSource(path)}>Open Source</Button>}</li>)}</ul>
-        : <p className="structure-note">{supportedStack && generated ? 'No missing or modified owned files were found.' : 'Ownership evidence is unavailable.'}</p>}
+        : <p className="structure-note">{supportedStack && generated?.profile ? 'No missing or modified owned files were found.' : supportedStack && !generated ? 'Reading ownership evidence…' : 'Ownership evidence is unavailable.'}</p>}
     </section>
   </div>;
 }
