@@ -4,7 +4,7 @@ Software Factory Studio is a local-first, Git-native, AI-ready desktop engineeri
 
 ## Repository status
 
-The desktop provides real local project workspaces and Git Studio. The primary factory MVP is Phase 07, after independent application generation, database-driven changes, and incremental code protection. Windows x64 is the first desktop target. See [Progress](docs/PROGRESS.md) for platform-specific evidence.
+The desktop provides local project workspaces, Git Studio, and one independently runnable full-stack generator. The primary factory MVP is Phase 07, after independent application generation, database-driven changes, and incremental code protection. Windows x64 is the first desktop target. See [Progress](docs/PROGRESS.md) for platform-specific evidence.
 
 ## Open a local project
 
@@ -17,6 +17,24 @@ Use **Open Folder** in the desktop app to select a local directory. The project 
 Install native Git 2.39 or newer in a system location. On Windows use the standard Git for Windows installation under Program Files. Open a standalone repository root, then select **Git Studio** in the project sidebar or click the Git context in the top bar. The panel shows local and remote branches, HEAD, upstream divergence and real working or staged patches. Select a file to inspect a hunk and use its adjacent Stage or Unstage control. Set repository-local `user.name` and `user.email` using `git config --local` before committing. This phase isolates global and system config to keep imported repositories from activating host tools.
 
 Use **Clone Repository** on Home or from the command palette. Select a public HTTPS URL or a local bare Git repository and choose the native destination parent. Studio creates a new child folder after confirmation. Fetch, fast-forward pull and ordinary push use existing upstream and remote configuration. Local transfer requires separate selection of the bare remote. Private authentication, SSH, tracked submodules, and linked worktrees are outside the supported Phase 03 Git boundary. Use the existing Git client for unsupported configurations. See [Git safety](docs/GIT_SAFETY.md).
+
+## Generate a standalone project
+
+Open **New Project** from Home or the command palette. Enter a project name and API port and choose a parent folder outside an existing Git working tree. The wizard creates a new child and offers the full-stack Node.js, TypeScript, Express, React, Vite and PostgreSQL combination with Layered Web v1 and Standard Engineering v1. Review the exact files, confirm in the native dialog, and open the verified managed project.
+
+The output includes independent backend and frontend source, a PostgreSQL migration, a frozen dependency graph, portable fingerprints, and project-specific instructions for people and coding assistants. Use **Generation Recovery** in the command palette to reauthorize and resume an interrupted operation. The [generator specification](docs/GENERATOR_SPECIFICATION.md) describes destination, file integrity, and recovery limits.
+
+Use the generated README to configure a disposable local PostgreSQL database and run the app with Node.js 22.16.0 and pnpm 10.13.1. From the project root:
+
+~~~sh
+pnpm install --frozen-lockfile
+cp .env.example .env
+# Set DATABASE_URL in .env to the reviewed local database.
+pnpm db:migrate
+pnpm dev:api
+~~~
+
+In a second terminal run pnpm dev:web. For production run pnpm build and pnpm start from the generated root. On PowerShell use Copy-Item .env.example .env. Neither project runtime nor development commands depend on Studio.
 
 ## Development setup
 
@@ -48,6 +66,7 @@ Use `pnpm dev:web` for a separate Vite renderer preview at `http://127.0.0.1:448
 | `pnpm start` | Run the built desktop app through its production renderer origin |
 | `pnpm test:renderer` | Playwright tests against the built renderer with a test-only bridge and the browser development mode |
 | `pnpm test:electron` | Playwright flows through sandboxed Electron with disposable profiles, projects, and Git repositories |
+| `pnpm verify:starter` | Generate a disposable app, install the frozen graph, run checks and serve the production build |
 
 The [Windows verification workflow](.github/workflows/windows.yml) runs automatically on pull requests to `main`. It builds the application on Windows x64 and runs the renderer and native Electron suites. To reproduce those checks locally and open the built app on Windows x64:
 

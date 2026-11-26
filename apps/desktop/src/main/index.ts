@@ -7,6 +7,7 @@ import {
   validateReply, PROJECT_CHANNEL, isProjectCatalog, isProjectId, isProjectSelection,
   GIT_CHANNEL, isGitAction, isGitCloneRequest, isGitCloneResult, isGitCompareRequest, isGitDiff, isGitDiffRequest,
   isGitOutcome, isGitState,
+  GENERATOR_CHANNEL, isGeneratorParent, isGeneratorPending, isGeneratorPreview, isGeneratorReceipt, isGeneratorRequest,
 } from '@factory/contracts';
 import type { Result, SystemTheme, Validator } from '@factory/contracts';
 import { APP_URL, DEV_URL, PRODUCTION_CSP, isAuthorizedFrame, isRendererDocument, rendererRestrictions, resolveBundledRoute } from './security';
@@ -14,11 +15,14 @@ import { PreferenceStore } from './services/preferences';
 import { RecentStore } from './services/projects/recents';
 import { ProjectWorkspace } from './services/projects/workspace';
 import { GitStudio } from './services/git/studio';
+import { GenerationJournal } from './services/generation/journal';
+import { GeneratorStudio } from './services/generation/studio';
 
 const development = !app.isPackaged && process.env.FACTORY_DESKTOP_DEV === '1';
 let window: BrowserWindow | undefined;
 let projects: ProjectWorkspace | undefined;
 let gitStudio: GitStudio | undefined;
+let generatorStudio: GeneratorStudio | undefined;
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'studio', privileges: { standard: true, secure: true, supportFetchAPI: true } },
@@ -89,6 +93,21 @@ function installGitBridge() {
     ? gitStudio?.action(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
   handle(GIT_CHANNEL.clone, isGitCloneResult, (...args) => args.length === 1 && isGitCloneRequest(args[0])
     ? gitStudio?.clone(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+}
+
+function installGeneratorBridge() {
+  handle(GENERATOR_CHANNEL.choose, isGeneratorParent, (...args) => !args.length
+    ? generatorStudio?.chooseParent() ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(GENERATOR_CHANNEL.pending, isGeneratorPending, (...args) => !args.length
+    ? generatorStudio?.pending() ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(GENERATOR_CHANNEL.preview, isGeneratorPreview, (...args) => args.length === 1 && isGeneratorRequest(args[0])
+    ? generatorStudio?.preview(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(GENERATOR_CHANNEL.apply, isGeneratorReceipt, (...args) => args.length === 1 && isProjectId(args[0])
+    ? generatorStudio?.apply(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(GENERATOR_CHANNEL.resume, isGeneratorReceipt, (...args) => args.length === 1 && isProjectId(args[0])
+    ? generatorStudio?.resume(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(GENERATOR_CHANNEL.release, isGeneratorPending, (...args) => args.length === 1 && isProjectId(args[0])
+    ? generatorStudio?.release(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
 }
 
 async function installProtocol() {
@@ -162,21 +181,15 @@ async function openWindow() {
     },
   );
   projects = workspace;
-  const git = new GitStudio({
-    root: (id) => workspace.root(id),
-    canOpen: () => workspace.canOpen(),
-    allowsAuxiliaryPath: (path) => workspace.allowsAuxiliaryPath(path),
-    adopt: (root) => workspace.adoptCloned(root),
-    refresh: (id) => workspace.rescan(id),
-  }, {
-    async chooseDirectory(title, defaultPath) {
+  const projectDialogs = {
+    async chooseDirectory(title: string, defaultPath?: string) {
       if (current.isDestroyed()) return null;
       const selected = await dialog.showOpenDialog(current, {
         title, properties: ['openDirectory'], ...(defaultPath ? { defaultPath } : {}),
       });
       return selected.canceled ? null : selected.filePaths[0] ?? null;
     },
-    async confirm(title, detail, action) {
+    async confirm(title: string, detail: string, action: string) {
       if (current.isDestroyed()) return false;
       const decision = await dialog.showMessageBox(current, {
         title, message: title, detail, type: 'warning',
@@ -184,7 +197,20 @@ async function openWindow() {
       });
       return decision.response === 1;
     },
-  });
+  };
+  const generator = new GeneratorStudio(new GenerationJournal(app.getPath('userData')), {
+    canOpen: () => workspace.canOpen(),
+    adopt: (root) => workspace.adoptCreated(root),
+  }, { choose: projectDialogs.chooseDirectory, confirm: projectDialogs.confirm });
+  generatorStudio = generator;
+  const git = new GitStudio({
+    root: (id) => workspace.root(id),
+    canOpen: () => workspace.canOpen(),
+    allowsAuxiliaryPath: (path) => workspace.allowsAuxiliaryPath(path),
+    adopt: (root) => workspace.adoptCreated(root),
+    generationPending: async (path) => Boolean(await generator.protectsGit(path)),
+    refresh: (id) => workspace.rescan(id),
+  }, projectDialogs);
   gitStudio = git;
   current.on('focus', () => { void workspace.reconcile(); });
   current.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -206,10 +232,12 @@ async function openWindow() {
   current.once('ready-to-show', () => current.show());
   current.on('closed', () => {
     workspace.dispose();
+    generator.dispose();
     void git.dispose().catch(() => undefined);
     if (window === current) {
       projects = undefined;
       gitStudio = undefined;
+      generatorStudio = undefined;
       window = undefined;
     }
   });
@@ -244,6 +272,7 @@ if (!app.requestSingleInstanceLock()) {
     if (!development) await installProtocol();
     installProjectBridge();
     installGitBridge();
+    installGeneratorBridge();
     installBridge(new PreferenceStore(join(app.getPath('userData'), 'preferences.json')));
     await openWindow();
     app.on('activate', () => { if (!window) void openWindow().catch(reportStartupError); });

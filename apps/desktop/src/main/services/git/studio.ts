@@ -27,6 +27,7 @@ interface GitWorkspace {
   allowsAuxiliaryPath(path: string): boolean;
   adopt(root: ProjectRoot): Promise<Result<ProjectSelection>>;
   refresh(id: string): Promise<unknown>;
+  generationPending?(directory: string): Promise<boolean>;
 }
 
 type Inspected = RepositorySnapshot | Exclude<GitState, { state: 'repository' }>;
@@ -168,6 +169,12 @@ export class GitStudio {
     if (this.#disposed || this.workspace.root(id) !== root) throw new StaleRepository();
   }
 
+  async #assertNoGeneration(directory: string) {
+    if (await this.workspace.generationPending?.(directory)) {
+      throw new GitFailure('Resume or review the interrupted generation before changing this repository.');
+    }
+  }
+
   #write<T>(operation: () => Promise<Result<T>>): Promise<Result<T>> {
     if (this.#disposed) return Promise.resolve(failure('ACCESS_DENIED'));
     if (this.#writeLocked) return Promise.resolve(failure('PROJECT_BUSY'));
@@ -185,6 +192,8 @@ export class GitStudio {
       let message: string;
       try {
         git = await this.#git();
+        const root = this.workspace.root(request.id);
+        if (root) await this.#assertNoGeneration(root.path);
         if (!git) throw new GitFailure('Install native Git in a supported system location and restart Studio.');
         const result = request.operation === 'init'
           ? await this.#init(git, request.id)
@@ -208,6 +217,7 @@ export class GitStudio {
     if (stateOf(await this.#inspect(git, id)).state !== 'not-repository') throw new StaleRepository();
     this.#assertGrant(id, root);
     const metadata = join(root.path, '.git');
+    await this.#assertNoGeneration(root.path);
     await checkedDirectory(root.path, root.identity);
     await mkdir(metadata, { mode: 0o700 });
     await checkedDirectory(metadata);
@@ -414,10 +424,12 @@ export class GitStudio {
         if (!selected) return cancelled;
         const parent = await admitRoot(selected);
         const destination = join(parent.path, request.name);
+        await this.#assertNoGeneration(destination);
         if (!await this.dialogs.confirm('Clone repository into a new folder?',
           `Source: ${approved.root?.path ?? approved.address}\nDestination: ${destination}\nProject scripts and submodules stay inactive.`, 'Clone')) return cancelled;
         if (this.#disposed || !this.workspace.canOpen()) return cancelled;
         await this.#verifyRemote(git, approved);
+        await this.#assertNoGeneration(destination);
         await checkedDirectory(parent.path, parent.identity);
         await mkdir(destination, { mode: 0o700 });
         created = true;

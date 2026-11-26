@@ -199,7 +199,7 @@ export class ProjectWorkspace {
     return !this.#closed && this.#tabs.size < PROJECT_LIMITS.tabs;
   }
 
-  adoptCloned(root: ProjectRoot): Promise<Result<ProjectSelection>> {
+  adoptCreated(root: ProjectRoot): Promise<Result<ProjectSelection>> {
     return this.#mutate(async () => {
       try {
         return await this.#adopt(root, await scanProject(root));

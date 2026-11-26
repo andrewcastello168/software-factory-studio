@@ -31,3 +31,9 @@ Record `passed`, `failed`, `blocked`, or `not applicable` per check and describe
 ## Git Studio fixtures
 
 Use standard Git for Windows and a system Git on Linux. Generate separate ordinary repositories, project directories and bare remotes in the test process. Integration tests verify stored refs, index state and preserved files through Git and the filesystem. Electron tests drive the built app with native sandboxing and controlled chooser and confirmation outcomes. Renderer tests cover keyboard decisions and theme rendering through a test-only bridge. Keep screenshots and temporary credentials outside the repository. HTTPS transport policy is checked locally. Record any independent public HTTPS smoke with its actual host and platform.
+
+## Generator verification
+
+Run pnpm verify:starter through the pinned package manager. The harness renders a new directory, uses the included frozen lockfile, runs the starter lint, typecheck and tests, and serves the production result over loopback. FACTORY_REQUIRE_DATABASE=1 requires a disposable PostgreSQL connection in FACTORY_TEST_DATABASE_URL for the dedicated factory_check database. FACTORY_STARTER_BROWSER=1 runs a sandboxed Chromium assertion against the generated frontend. Studio workflows use a pinned Linux PostgreSQL service and the Windows runner's PostgreSQL service with a new test database. The native Electron test separately exercises the reviewed workspace flow and captures the Light and Dark previews.
+
+Journal tests use disposable directories and inject an interruption into the journal update. Verify that a restarted service requires the original parent, safely resumes verified output, detects edits and symlink or junction replacements, and leaves protected content intact.

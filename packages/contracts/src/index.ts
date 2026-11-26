@@ -1,10 +1,12 @@
 import { hasExactKeys, isRecord } from './validation';
 import type { ProjectBridge } from './projects';
 import type { GitBridge } from './git';
+import type { GeneratorBridge } from './generator';
 
 export { hasControlCharacters, hasExactKeys, isRecord } from './validation';
 export * from './projects';
 export * from './git';
+export * from './generator';
 
 export const CHANNEL = {
   appInfo: 'factory:app-info',
@@ -53,6 +55,11 @@ const errorCodes = [
   'RECENT_NOT_FOUND',
   'GIT_STALE',
   'GIT_DIFF_UNAVAILABLE',
+  'GENERATOR_DESTINATION',
+  'GENERATOR_STALE',
+  'GENERATOR_STORAGE',
+  'GENERATOR_RECOVERY',
+  'GENERATOR_CONFLICT',
 ] as const;
 
 export type ErrorCode = typeof errorCodes[number];
@@ -62,6 +69,7 @@ export type Validator<T> = (value: unknown) => value is T;
 export interface StudioBridge {
   projects: ProjectBridge;
   git: GitBridge;
+  generator: GeneratorBridge;
   getAppInfo(): Promise<Result<AppInfo>>;
   readPreferences(): Promise<Result<PreferenceSnapshot>>;
   writePreferences(request: PreferenceWrite): Promise<Result<Preferences>>;

@@ -1,0 +1,7 @@
+:root { font: 16px/1.6 system-ui, sans-serif; color: #182438; background: #f4f7fb; }
+body { margin: 0; }
+main { max-width: 42rem; margin: 12vh auto; padding: 0 1.5rem; }
+h1 { margin: 0; font-size: 2rem; line-height: 1.2; }
+section { margin-top: 2rem; padding: .9rem 1rem; border-inline-start: 3px solid #255f9f; background: #fff; }
+h2 { margin: 0; font-size: 1rem; }
+section p { margin: .35rem 0 0; }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  AlertCircle, AppWindow, CircleCheck, Clock3, Folder, FolderOpen, GitBranch, GitFork, House, LoaderCircle, PanelLeft, RefreshCw, X,
+  AlertCircle, AppWindow, CircleCheck, Clock3, Folder, FolderOpen, FolderPlus, GitBranch, GitFork, House, LoaderCircle, PanelLeft, RefreshCw, X,
   PanelLeftClose, PanelLeftOpen, Settings2,
 } from 'lucide-react';
 import { SIDEBAR } from '@factory/contracts';
@@ -13,6 +13,7 @@ import type { Command } from './components/Commands';
 import { useProjects } from './useProjects';
 import { gitBridge, gitLabel, useGit } from './useGit';
 import { CloneDialog, GitPanel } from './components/Git';
+import { GeneratorDialog, generatorBridge } from './components/Generator';
 import { ProjectList, ProjectPanel, WorkspaceTabs } from './components/Projects';
 import type { ProjectView } from './components/Projects';
 import { Navigation } from './components/Navigation';
@@ -32,6 +33,7 @@ export function App() {
   const repo = git.status?.state === 'repository' ? git.status : null;
   const [cloning, setCloning] = useState(false);
   const [cloneOpen, setCloneOpen] = useState(false);
+  const [generatorView, setGeneratorView] = useState<'new' | 'recovery' | null>(null);
   const [cloneNotice, setCloneNotice] = useState<string | null>(null);
   const view = activeProject ? views[activeProject.id] ?? 'overview' : null;
   const [page, setPage] = useState<Page>('home');
@@ -145,6 +147,10 @@ export function App() {
   }
   if (gitBridge && !cloning && !workspace.opening) {
     commands.splice(2, 0, { id: 'clone', title: 'Clone Repository', icon: GitFork, run: () => setCloneOpen(true) });
+  }
+  if (generatorBridge && !workspace.opening) {
+    commands.splice(1, 0, { id: 'new-project', title: 'New Project', icon: FolderPlus, run: () => setGeneratorView('new') });
+    commands.push({ id: 'generation-recovery', title: 'Generation Recovery', icon: RefreshCw, run: () => setGeneratorView('recovery') });
   }
   if (activeProject) {
     commands.push(
@@ -299,6 +305,7 @@ export function App() {
                     openSettings={() => openPage('settings')}
                     openPalette={openPalette}
                     openFolder={openFolder}
+                    newProject={generatorBridge ? () => setGeneratorView('new') : undefined}
                     cloneRepository={gitBridge ? () => setCloneOpen(true) : undefined}
                     openProjects={() => openPage('recents')}
                     native={workspace.native}
@@ -348,6 +355,14 @@ export function App() {
           {state.appInfo && <span aria-label={`Studio version ${state.appInfo.version}`}>v{state.appInfo.version}</span>}
         </div>
       </footer>
+      {generatorView && <GeneratorDialog
+        recovery={generatorView === 'recovery'}
+        close={() => setGeneratorView(null)}
+        opened={(selection) => {
+          workspace.applySelection(selection);
+          setActiveId(selection.projectId);
+        }}
+      />}
       {cloneOpen && <CloneDialog close={() => setCloneOpen(false)} clone={(input) => void clone(input)} busy={cloning} />}
       {palette && <CommandPalette commands={commands} close={() => setPalette(false)} />}
       {restore && (

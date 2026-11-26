@@ -2,7 +2,7 @@
 
 ## Authority for PostgreSQL stacks
 
-The committed, ordered PostgreSQL migration files plus supported working-tree migration changes are the declared source schema for both planned PostgreSQL stacks. The PostgreSQL dialect and migration convention are pinned by stack version. The Node stack uses `db/migrations/` as its planned convention. The Go adapter declares and verifies its own relative migration location in Phase 08. Studio reconstructs the supported schema from the ordered SQL. Portable `.factory/schema.json` stores diagram layout, stable metadata and supported modeling settings. It does not authorize DDL execution or override migration SQL.
+The committed, ordered PostgreSQL migration files plus supported working-tree migration changes are the declared source schema for both planned PostgreSQL stacks. The PostgreSQL dialect and migration convention are pinned by stack version. The Phase 04 Node starter uses `db/migrations/` and the `schema_migrations` checksum ledger. The Go adapter declares and verifies its own relative migration location in Phase 08. Studio reconstructs the supported schema from the ordered SQL. Portable `.factory/schema.json` stores diagram layout, stable metadata and supported modeling settings. It does not authorize DDL execution or override migration SQL.
 
 | View | Derivation | User-facing meaning |
 | --- | --- | --- |

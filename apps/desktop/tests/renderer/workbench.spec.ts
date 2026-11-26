@@ -43,6 +43,17 @@ test.beforeEach(async ({ page }) => {
       remotes: [{ name: 'origin', kind: 'https' }],
     };
     const studio: StudioBridge = {
+      generator: {
+        chooseParent: async () => ({ ok: true, value: { id: project.id, directory: '/fixture' } }),
+        preview: async ({ config }) => ({ ok: true, value: {
+          id: project.id, directory: '/fixture/' + config.slug, config, digest: 'e'.repeat(64),
+          files: [{ path: 'AGENTS.md', content: '# ' + config.name, sha256: 'f'.repeat(64) }],
+        } }),
+        apply: async () => ({ ok: false, error: 'GENERATOR_STALE' }),
+        pending: async () => ({ ok: true, value: [] }),
+        resume: async () => ({ ok: false, error: 'GENERATOR_STALE' }),
+        release: async () => ({ ok: true, value: [] }),
+      },
       git: {
         status: async () => ({ ok: true, value: repo }),
         diff: async () => ({ ok: true, value: { text: '@@ -1 +1 @@\n-return 1\n+return 2', truncated: false } }),
@@ -225,4 +236,26 @@ test('Git Studio supports keyboard diff inspection and cancel-only dirty checkou
       && workbench.scrollHeight > workbench.clientHeight
       && document.documentElement.scrollWidth === 660;
   })).toBe(true);
+});
+
+test('New Project keeps the preview reviewed and explains stale plans in a compact window', async ({ page }) => {
+  await page.setViewportSize({ width: 680, height: 520 });
+  await page.goto('/');
+  const trigger = page.getByRole('button', { name: 'New Project', exact: true });
+  await trigger.press('Enter');
+  const wizard = page.getByRole('dialog', { name: 'New Project' });
+  const name = wizard.getByRole('textbox', { name: 'Project name', exact: true });
+  await expect(name).toBeFocused();
+  await name.fill('Client Demo');
+  await expect(wizard.getByRole('textbox', { name: 'Folder and package name' })).toHaveValue('client-demo');
+  await wizard.getByRole('button', { name: 'Choose Folder' }).press('Enter');
+  await wizard.getByRole('button', { name: 'Continue' }).press('Enter');
+  await wizard.getByRole('button', { name: 'Review Files' }).press('Enter');
+  await expect(wizard.getByRole('heading', { name: 'Review generation plan' })).toBeFocused();
+  await expect(wizard.getByRole('region', { name: 'File preview' })).toContainText('# Client Demo');
+  await wizard.getByRole('button', { name: 'Generate Project', exact: true }).press('Enter');
+  await expect(wizard.getByRole('alert')).toContainText('fresh preview');
+  await expect(wizard.getByRole('button', { name: 'Generate Project', exact: true })).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
 });

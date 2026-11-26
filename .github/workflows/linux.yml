@@ -16,7 +16,19 @@ jobs:
   linux-x64:
     name: Linux x64
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:f9cf3e1f0066f0eb0c48707d864f0ac5941e9ff454a072077d97a4d278d07d73
+        env:
+          POSTGRES_DB: factory_check
+          POSTGRES_USER: factory_test
+          POSTGRES_PASSWORD: local-ci-fixture-only
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U factory_test -d factory_check"
+          --health-interval 5s --health-timeout 3s --health-retries 12
 
     steps:
       - name: Check out repository
@@ -41,3 +53,9 @@ jobs:
           pnpm typecheck
           pnpm test
           pnpm build
+
+      - name: Verify standalone generated application
+        env:
+          FACTORY_REQUIRE_DATABASE: '1'
+          FACTORY_TEST_DATABASE_URL: postgresql://factory_test:local-ci-fixture-only@127.0.0.1:${{ job.services.postgres.ports[5432] }}/factory_check
+        run: pnpm verify:starter

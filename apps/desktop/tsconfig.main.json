@@ -1,6 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "types": ["node"], "rootDir": "../.." },
-  "include": ["src/main/**/*.ts"],
+  "include": ["src/main/**/*.ts", "../../packages/generator/src/raw.d.ts"],
   "exclude": ["**/*.test.ts"]
 }

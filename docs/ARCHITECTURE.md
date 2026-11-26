@@ -16,7 +16,7 @@ Keep the main process responsive. Move expensive parsing and planning to a worke
 
 Phase 01 starts with `apps/desktop` for main, preload, and renderer entry points, and `packages/contracts` for shared schemas and cross-boundary types used immediately. Keep main services in `apps/desktop/src/main/services` while only the desktop consumes them. Main and preload have separate build entry points, privileges, and compilation contexts. Renderer and contracts cannot import main code. Use import restrictions and TypeScript configuration to enforce the direction.
 
-Introduce `packages/generator` when Phase 04 delivers working plans and `packages/schema` once Phase 05 has a consumer and fixtures. Introduce a separate stack adapter package and public SDK boundary when the Go implementation exercises it in Phase 08. Phase 04 can organize its built-in Node adapter inside the generation package. The future CLI can reuse pure planning and approved platform adapters. Keep workspace package names stable and avoid directories for unused layers.
+Phase 04 adds `packages/generator` for versioned built-in templates and deterministic plans. Introduce `packages/schema` once Phase 05 has a consumer and fixtures. Introduce a separate stack adapter package and public SDK boundary when the Go implementation exercises it in Phase 08. Phase 04 can organize its built-in Node adapter inside the generation package. The future CLI can reuse pure planning and approved platform adapters. Keep workspace package names stable and avoid directories for unused layers.
 
 Use TypeScript in strict mode and pin Node and pnpm for a reproducible frozen-lockfile install. Use Electron, React, Vite, and Tailwind in Phase 01. Select build and test integration after checking Electron's embedded Node/Chromium, host Node, pnpm and native binary support, and the bundler and test matrices. Bundle a sandbox-compatible preload entry and smoke-test it in real Electron. See [Testing strategy](TESTING_STRATEGY.md) for dependency validation.
 
@@ -46,6 +46,10 @@ Snapshots hold scan revision, access state, Git identity, and relevant file fing
 ## Git Studio integration
 
 The main-owned Git service consumes an active project root and directory identity from the workspace manager. It exposes named status, diff, comparison, action, and clone IPC methods. A renderer request cannot supply a filesystem path, arbitrary refspec, Git arguments, or command. Revision binds ref, index, configuration, status, and affected path identities. Native confirmation precedes sensitive actions. Phase 03 serializes writes in the Studio window and refreshes the Phase 02 project snapshot after actions. The active renderer refreshes Git context on focus, manual refresh, and a periodic reconciliation. See [Git safety](GIT_SAFETY.md).
+
+## Generator integration
+
+The Contracts package describes validated wizard input, preview files, receipts and pending recovery entries. The Generator package renders trusted bundled templates without filesystem authority. Electron main owns the native parent grant, approval token, journal, filesystem transaction and managed workspace adoption. The renderer never supplies an absolute path or file payload. The generated application runs without a Studio package or a network integration with Studio.
 
 ## Platform risks
 
