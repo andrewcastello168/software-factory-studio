@@ -7,6 +7,8 @@ import { isCrudSelection } from './schema';
 import type { CrudSelection } from './schema';
 import { isModuleSelection, moduleCompatibility, MODULE_CATALOG } from './generator-modules';
 import type { ApplicationType, DatabaseChoice, ModuleSelection } from './generator-modules';
+import { NODE_STACK, stackDefinition } from './stacks';
+import type { StackArchitecture, StackId } from './stacks';
 
 export const GENERATOR_CHANNEL = {
   choose: 'factory:generator-choose-parent',
@@ -19,7 +21,7 @@ export const GENERATOR_CHANNEL = {
 
 export const STARTER = {
   appType: 'full-stack',
-  stack: 'node-express-react-postgres',
+  stack: NODE_STACK,
   database: 'postgresql',
   architecture: 'layered-web',
   engineering: 'standard-engineering',
@@ -42,7 +44,9 @@ export interface LegacyStarterConfig {
   engineering: typeof STARTER.engineering;
 }
 
-export interface StarterConfig extends Omit<LegacyStarterConfig, 'appType'> {
+export interface StarterConfig extends Omit<LegacyStarterConfig, 'appType' | 'stack' | 'architecture'> {
+  stack: StackId;
+  architecture: StackArchitecture;
   appType: ApplicationType;
   database: DatabaseChoice;
   modules: ModuleSelection[];
@@ -113,13 +117,14 @@ export function isStarterPort(value: unknown): value is number {
 const coreKeys = ['name', 'slug', 'port', 'appType', 'stack', 'architecture', 'engineering'];
 
 function hasSupportedCore(value: Record<string, unknown>) {
+  const stack = stackDefinition(value.stack);
   return isStarterName(value.name) && isStarterSlug(value.slug) && isStarterPort(value.port)
-    && value.appType === STARTER.appType && value.stack === STARTER.stack
-    && value.architecture === STARTER.architecture && value.engineering === STARTER.engineering;
+    && value.appType === STARTER.appType && stack !== undefined
+    && value.architecture === stack.architecture && value.engineering === STARTER.engineering;
 }
 
 export function isLegacyStarterConfig(value: unknown): value is LegacyStarterConfig {
-  return isRecord(value) && hasExactKeys(value, coreKeys) && hasSupportedCore(value);
+  return isRecord(value) && hasExactKeys(value, coreKeys) && value.stack === NODE_STACK && hasSupportedCore(value);
 }
 
 export function isStarterConfig(value: unknown): value is StarterConfig {
@@ -128,7 +133,8 @@ export function isStarterConfig(value: unknown): value is StarterConfig {
     && (!Object.hasOwn(value, 'library') || isLibrarySelection(value.library))
     && value.database === STARTER.database && Array.isArray(value.modules)
     && value.modules.length <= MODULE_CATALOG.length && value.modules.every(isModuleSelection)
-    && moduleCompatibility(STARTER.appType, STARTER.database, value.modules).length === 0;
+    && (stackDefinition(value.stack)?.modules
+      ? moduleCompatibility(STARTER.appType, STARTER.database, value.modules).length === 0 : value.modules.length === 0);
 }
 
 export function isGeneratorRequest(value: unknown): value is GeneratorRequest {

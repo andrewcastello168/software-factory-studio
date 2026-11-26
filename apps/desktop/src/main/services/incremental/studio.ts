@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { isAbsolute, relative, sep } from 'node:path';
-import { failure, INCREMENTAL_LIMITS, success } from '@factory/contracts';
+import { GO_STACK, failure, INCREMENTAL_LIMITS, success } from '@factory/contracts';
 import type {
   ErrorCode, GitState, IncrementalApproval, IncrementalInspection, IncrementalPreview, IncrementalSelection, OpenProject, Result,
 } from '@factory/contracts';
@@ -131,7 +131,7 @@ export class IncrementalStudio {
       const sources = source.migrations.map(({ name, sha256 }) => ({ name, sha256, external: !ownership.has('db/migrations/' + name) }));
       return {
         revision: captured.revision, branch: repo?.branch ?? null, head: repo?.head ?? null,
-        profile: { stack: 'Node / PostgreSQL · v2', architecture: 'Layered Web · v1', engineering: project.config.library ? project.config.library.profile.name + ' · v' + project.config.library.profile.version : 'Standard Engineering · v1',
+        profile: { stack: project.config.stack === GO_STACK ? 'Go / PostgreSQL · v1' : 'Node / PostgreSQL · v2', architecture: project.config.stack === GO_STACK ? 'Go Service · v1' : 'Layered Web · v1', engineering: project.config.library ? project.config.library.profile.name + ' · v' + project.config.library.profile.version : 'Standard Engineering · v1',
           modules: project.config.modules.map(({ id, version }) => id + ' · ' + version) },
         tables: eligibility(project, schema), files: inventory, sources, issues, history, recovery: pending?.preview ?? null,
       };

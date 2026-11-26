@@ -1,4 +1,4 @@
-import { IDENTITY_MODULES, MODULE_CATALOG } from '@factory/contracts';
+import { GO_STACK, IDENTITY_MODULES, MODULE_CATALOG } from '@factory/contracts';
 import type { ModuleSelection } from '@factory/contracts';
 import { useEffect, useRef, useState } from 'react';
 import { FileCode, FilePlus2, FileWarning, GitBranch, ListChecks, RefreshCw, ShieldCheck } from 'lucide-react';
@@ -61,6 +61,7 @@ function ChangePreview({ change }: { change: IncrementalChange }) {
 
 export function GenerationReview({ project, signal }: { project: OpenProject; signal: string }) {
   const bridge = incrementalBridge;
+  const goProject = project.metadata.status === 'managed' && project.metadata.descriptor.stackId === GO_STACK;
   const [inspection, setInspection] = useState<IncrementalInspection>();
   const [backend, setBackend] = useState<string[]>([]);
   const [frontend, setFrontend] = useState<string[]>([]);
@@ -131,7 +132,7 @@ export function GenerationReview({ project, signal }: { project: OpenProject; si
   return <section className="schema-panel incremental-panel" aria-label="Generation Review">
     <header className="schema-header">
       <div className="schema-title"><ListChecks size={22} aria-hidden="true" /><div>
-        <h2>Generation Review</h2><p><bdi>{project.name}</bdi> · Incremental CRUD and modules</p>
+        <h2>Generation Review</h2><p><bdi>{project.name}</bdi> · {goProject ? 'Incremental CRUD' : 'Incremental CRUD and modules'}</p>
       </div></div>
       <Button className="outlined-button" disabled={!bridge || Boolean(busy)} onClick={() => bridge
         && void run('Inspecting checked-out sources…', () => bridge.inspect(project.id), setInspection)}><RefreshCw size={14} />Refresh</Button>
@@ -184,7 +185,7 @@ export function GenerationReview({ project, signal }: { project: OpenProject; si
             <FileCode size={14} />Preview Changes
           </Button>
         </div>}
-        {!recovery && inspection.profile && <details className="incremental-sources">
+        {!recovery && inspection.profile && !goProject && <details className="incremental-sources">
           <summary>Install optional modules</summary>
           <fieldset className="generator-modules">
             <legend>Choose exact releases and dependencies</legend>

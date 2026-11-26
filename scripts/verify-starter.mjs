@@ -56,7 +56,7 @@ async function stop(process) {
 
 const appEnvironment = { ...process.env };
 delete appEnvironment.NODE_ENV;
-const vite = await createServer({ root, configFile: false, server: { middlewareMode: true, watch: null } });
+const vite = await createServer({ root, configFile: false, server: { middlewareMode: true, watch: null, ws: false } });
 
 async function inventoryRequests(url) {
   async function call(path, status, method = 'GET', fields) {
@@ -131,7 +131,7 @@ async function inventoryBrowser(page, incremental) {
   await updated.waitFor({ state: 'hidden' });
 }
 
-async function addSuppliers(fixture) {
+async function addSuppliers(fixture, go) {
   const { IncrementalStudio } = await vite.ssrLoadModule('/apps/desktop/src/main/services/incremental/studio.ts');
   const { IncrementalStore } = await vite.ssrLoadModule('/apps/desktop/src/main/services/incremental/storage.ts');
   const { admitRoot } = await vite.ssrLoadModule('/apps/desktop/src/main/services/projects/filesystem.ts');
@@ -141,8 +141,9 @@ async function addSuppliers(fixture) {
   const projectId = randomUUID();
   const migration = await readFile(resolve(root, 'tests/fixtures/suppliers.sql'), 'utf8');
   const migrationPath = join(fixture, 'db/migrations/0003_suppliers.sql');
-  const servicePath = join(fixture, 'server/features/crud/service.ts');
-  const custom = (await readFile(servicePath, 'utf8')) + '\nexport const clientBusinessRule = "Existing inventory approval policy";\n';
+  const service = go ? 'internal/records/service.go' : 'server/features/crud/service.ts';
+  const servicePath = join(fixture, service);
+  const custom = (await readFile(servicePath, 'utf8')) + '\n// Existing inventory approval policy.\n';
   const studio = new IncrementalStudio(new IncrementalStore(userData), {
     root: (id) => id === projectId ? rootGrant : undefined,
     project: async () => undefined, git: async () => success({ state: 'not-repository', detail: 'Standalone fixture' }),
@@ -155,12 +156,26 @@ async function addSuppliers(fixture) {
   try {
     await writeFile(servicePath, custom);
     await writeFile(migrationPath, migration, { flag: 'wx' });
+    if (go) {
+      const entrypoint = join(fixture, 'internal/httpapp/http.go');
+      const original = await readFile(entrypoint, 'utf8');
+      await writeFile(entrypoint, original + '\n// Local routing policy.\n');
+      const revision = verified(await studio.inspect(projectId)).revision;
+      const conflict = verified(await studio.preview({ projectId, revision, backend: ['suppliers'], frontend: ['suppliers'] }));
+      assert(conflict.changes.some(({ path, action }) => path === 'internal/httpapp/http.go' && action === 'conflict'));
+      assert.equal((await studio.action({ projectId, id: conflict.id }, 'apply')).ok, false);
+      const incompatible = verified(await studio.preview({ projectId, revision, backend: [], frontend: [],
+        modules: [{ id: 'authentication', version: '1.0.0' }] }));
+      assert(incompatible.issues.some((issue) => issue.includes('no verified optional module releases')));
+      assert.equal(await readFile(entrypoint, 'utf8'), original + '\n// Local routing policy.\n');
+      await writeFile(entrypoint, original);
+    }
     const inspected = verified(await studio.inspect(projectId));
     const select = { projectId, revision: inspected.revision, backend: ['suppliers'], frontend: ['suppliers'] };
     assert(inspected.sources.some(({ name, external }) => name === '0003_suppliers.sql' && external));
     const review = verified(await studio.preview(select));
     assert.deepEqual(review.issues, []);
-    assert(review.changes.some(({ path, action }) => path === 'server/features/crud/service.ts' && action === 'protected'));
+    assert(review.changes.some(({ path, action }) => path === service && action === 'protected'));
     assert(!review.changes.some(({ path }) => path.startsWith('db/')));
     const applied = verified(await studio.action({ projectId, id: review.id }, 'apply'));
     assert.deepEqual(applied.issues, []);
@@ -206,17 +221,22 @@ async function installIdentity(fixture, authentication) {
   } finally { studio.dispose(); await rm(profile, { recursive: true, force: true, maxRetries: 5 }); }
 }
 
-async function verify(plan, demo, inventory, incremental, identity, authentication) {
+async function verify(plan, demo, inventory, incremental, identity, authentication, go) {
   const fixture = await mkdtemp(join(tmpdir(), 'studio-generated-app-'));
   const port = plan.config.port;
   const url = 'http://127.0.0.1:' + port;
   const env = { ...appEnvironment, HOST: '127.0.0.1', PORT: String(port), DATABASE_URL: '', TEST_DATABASE_URL: '' };
+  if (go) {
+    env.GOTOOLCHAIN = 'local';
+    env.GOFLAGS = '-buildvcs=false';
+  }
   if (identity) {
     env.AUTH_ORIGIN = url;
     env.AUTH_ALLOW_INSECURE_LOOPBACK = '1';
     env.AUTH_BOOTSTRAP_EMAIL = fixtureIdentity.email;
   }
   const fromProject = createRequire(join(fixture, 'package.json'));
+  const fromStudio = createRequire(resolve(root, 'apps/desktop/package.json'));
   let server;
   let development;
   let client;
@@ -234,12 +254,37 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
       });
       if (result.status !== 0) throw new Error('Generated project command failed: pnpm ' + args.join(' '));
     };
+    const goCommand = (args, expected = 0) => {
+      const result = spawnSync('go', args, { cwd: fixture, env, encoding: 'utf8', timeout: 240_000 });
+      assert.equal(result.status, expected, 'go ' + args.join(' ') + '\n' + (result.stdout ?? '') + (result.stderr ?? '') + (result.error ?? ''));
+      return result.stdout;
+    };
+    const binary = join(fixture, process.platform === 'win32' ? 'factory-server.exe' : 'factory-server');
+    const launch = () => go
+      ? spawn(binary, [], { cwd: fixture, env, stdio: 'inherit' })
+      : spawn(process.execPath, ['--experimental-strip-types', 'server/server.ts'], { cwd: fixture, env, stdio: 'inherit' });
+    const migrate = (expected = 0) => go ? goCommand(['run', '-mod=readonly', './cmd/migrate'], expected) : run('db:migrate');
+    const buildGo = () => goCommand(['build', '-mod=readonly', '-o', binary, './cmd/server']);
     run('install', '--frozen-lockfile');
+    if (go) {
+      assert.match(goCommand(['version']), /go1\.26\.11 /u);
+      goCommand(['mod', 'download']);
+      goCommand(['mod', 'verify']);
+      if (process.env.FACTORY_GO_SECURITY === '1') {
+        run('audit', '--prod', '--audit-level', 'high');
+        const database = process.env.FACTORY_GO_VULNERABILITY_DB;
+        const audit = spawnSync('govulncheck', [...(database ? ['-db', database] : []), './...'],
+          { cwd: fixture, env, encoding: 'utf8', timeout: 240_000 });
+        const report = (audit.stdout ?? '') + (audit.stderr ?? '') + (audit.error ?? '');
+        assert.equal(audit.status, 0, report);
+        console.log(report.trim());
+      }
+    }
 
     // Give each configuration a fresh schema in the dedicated fixture database.
     // The identifier is generated here and cannot contain externally supplied SQL.
     if (database) {
-      const { Client } = fromProject('pg');
+      const { Client } = (go ? fromStudio : fromProject)('pg');
       client = new Client({ connectionString: database });
       await client.connect();
       schema = 'starter_' + randomUUID().replaceAll('-', '');
@@ -252,14 +297,15 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
     }
 
     if (incremental) {
-      if (database) run('db:migrate');
-      server = spawn(process.execPath, ['--experimental-strip-types', 'server/server.ts'], { cwd: fixture, env, stdio: 'inherit' });
+      if (database) migrate();
+      if (go) buildGo();
+      server = launch();
       await ready(server, url + '/api/health');
       assert.equal((await fetch(url + '/api/crud/products')).status, database ? 200 : 503);
       assert.equal((await fetch(url + '/api/crud/suppliers')).status, 404);
       await stop(server);
       server = undefined;
-      await addSuppliers(fixture);
+      await addSuppliers(fixture, go);
     }
     if (identity === 'installed') {
       if (database) run('db:migrate');
@@ -267,9 +313,29 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
     }
     run('lint');
     run('typecheck');
-    run('test');
+    if (go) {
+      const sources = plan.files.filter(({ path }) => path.endsWith('.go')).map(({ path }) => path);
+      assert.equal(spawnSync('gofmt', ['-l', ...sources], { cwd: fixture, encoding: 'utf8' }).stdout.trim(), '');
+      goCommand(['vet', '-mod=readonly', './...']);
+      goCommand(['test', '-mod=readonly', './...']);
+      goCommand(['build', '-mod=readonly', './cmd/...']);
+      buildGo();
+    } else run('test');
     run('build');
-    if (database) run('db:migrate');
+    if (database) migrate();
+    if (database && go) {
+      const baseline = join(fixture, 'db/migrations/0001_baseline.sql');
+      const before = await readFile(baseline, 'utf8');
+      await writeFile(baseline, before + '\n-- Different checksum.\n');
+      migrate(1);
+      await writeFile(baseline, before);
+      const invalid = join(fixture, 'db/migrations/0099_rejected.sql');
+      await writeFile(invalid, 'CREATE TABLE rollback_review (id int); SELECT no_such_column FROM rollback_review;');
+      migrate(1);
+      await rm(invalid);
+      assert.equal((await client.query('SELECT to_regclass($1) AS name', [schema + '.rollback_review'])).rows[0].name, null);
+      assert.match(migrate(), /Applied migrations: 0/u);
+    }
     if (identity && database) {
       const boot = () => spawnSync(process.execPath, ['--experimental-strip-types', 'server/features/identity/bootstrap.ts'], {
         cwd: fixture, env, input: fixtureIdentity.password + '\n', encoding: 'utf8', timeout: 15_000,
@@ -280,7 +346,7 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
     const viteBin = join(dirname(fromProject.resolve('vite/package.json')), 'bin', 'vite.js');
     const developmentPort = await freePort();
     const developmentUrl = 'http://127.0.0.1:' + developmentPort;
-    server = spawn(process.execPath, ['--experimental-strip-types', 'server/server.ts'], { cwd: fixture, env, stdio: 'inherit' });
+    server = launch();
     await ready(server, url + '/api/health');
     development = spawn(process.execPath, [viteBin, '--strictPort', '--port', String(developmentPort)], { cwd: fixture, env, stdio: 'inherit' });
     await ready(development, developmentUrl + '/api/health');
@@ -289,23 +355,36 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
     development = undefined;
     await stop(server);
 
-    server = spawn(process.execPath, ['--env-file-if-exists=.env', 'dist/server/server.js'], { cwd: fixture, env, stdio: 'inherit' });
+    server = go ? launch() : spawn(process.execPath, ['--env-file-if-exists=.env', 'dist/server/server.js'], { cwd: fixture, env, stdio: 'inherit' });
     await ready(server, url + '/api/health');
     const readiness = await fetch(url + '/api/ready');
     assert.equal(readiness.status, database ? 200 : 503);
-    if (database) assert.deepEqual(await readiness.json(), { data: { status: 'ready', database: 'postgresql' } });
+    if (database) assert.deepEqual(await readiness.json(), { data: { status: 'ready', ...(go ? {} : { database: 'postgresql' }) } });
     const welcome = await fetch(url + '/api/welcome');
     assert.equal(welcome.status, identity ? (database ? 401 : 503) : demo ? (database ? 200 : 503) : 404);
     if (database && demo) assert.deepEqual(await welcome.json(), { data: { message: 'Welcome from PostgreSQL.' } });
     if (database && identity) await verifyIdentity(url, client, schema, identity === 'full');
-    else if (database && inventory) await inventoryRequests(url);
+    else if (database && inventory) {
+      await inventoryRequests(url);
+      if (go) {
+        const request = await fetch(url + '/api/crud/products?limit=1&limit=2');
+        assert.equal(request.status, 400);
+        const patch = (fields) => fetch(url + '/api/crud/warehouses/record?id=1', {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields),
+        });
+        assert.equal((await patch({ aisle: 32768 })).status, 400);
+        assert.equal((await patch({ external_id: 'invalid-uuid' })).status, 400);
+        const external_id = randomUUID();
+        assert.deepEqual((await (await patch({ external_id, aisle: 42 })).json()).data, { id: 1, name: 'Central', external_id, aisle: 42 });
+        assert.equal((await (await patch({ external_id: null })).json()).data.external_id, null);
+      }
+    }
     const frontend = await (await fetch(url)).text();
     assert(frontend.includes('<title>Inventory Portal</title>'));
     const bundle = /<script[^>]+src="([^"]+)"/u.exec(frontend)?.[1];
     assert(bundle && (await fetch(url + bundle)).ok);
     if (process.env.FACTORY_STARTER_BROWSER === '1') {
-      const local = createRequire(resolve(root, 'apps/desktop/package.json'));
-      const { chromium } = local('@playwright/test');
+      const { chromium } = fromStudio('@playwright/test');
       const browser = await chromium.launch({
         chromiumSandbox: true,
         ...(process.env.FACTORY_CHROMIUM_PATH ? { executablePath: process.env.FACTORY_CHROMIUM_PATH } : {}),
@@ -321,6 +400,7 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
           await page.getByText(database ? 'PostgreSQL ready.' : 'PostgreSQL unavailable.', { exact: true }).waitFor();
           if (demo) await page.getByText(database ? 'Welcome from PostgreSQL.' : /The welcome example is unavailable/u).waitFor();
           else assert.equal(await page.getByRole('heading', { name: 'Welcome example' }).count(), 0);
+          if (go) await page.getByText('GO', { exact: true }).waitFor();
           if (inventory && database) await inventoryBrowser(page, incremental);
         }
       } finally {
@@ -335,7 +415,13 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
       await verifySecureCookie(url, origin);
     }
     const instructions = await readFile(join(fixture, 'AGENTS.md'), 'utf8');
-    assert(instructions.includes('Standard Engineering profile v1'));
+    if (go) {
+      assert(instructions.includes('Go 1.26.11'));
+      assert(instructions.includes('Client delivery v2'));
+      assert(!instructions.includes('Express') && !instructions.includes('pnpm db:migrate'));
+      assert((await readFile(join(fixture, 'docs/ENGINEERING_PROFILE.md'), 'utf8')).includes('Go Service conventions'));
+      assert.equal((await fetch(url + '/api/auth/session')).status, 404);
+    } else assert(instructions.includes('Standard Engineering profile v1'));
     assert.equal(instructions.includes('Welcome example'), demo);
     if (identity) {
       assert(instructions.includes('Client delivery v2'));
@@ -354,7 +440,7 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
       }
       assert.deepEqual(rows.map(({ table_name }) => table_name), expected.sort());
     }
-    console.log('Standalone ' + (identity ? identity + ' identity' : incremental ? 'incremental inventory CRUD' : inventory ? 'inventory CRUD' : demo ? 'Welcome example' : 'foundation') + ' verified with' + (database ? ' PostgreSQL.' : 'out a database connection.'));
+    console.log('Standalone ' + (go ? 'Go ' : '') + (identity ? identity + ' identity' : incremental ? 'incremental inventory CRUD' : inventory ? 'inventory CRUD' : demo ? 'Welcome example' : 'foundation') + ' verified with' + (database ? ' PostgreSQL.' : 'out a database connection.'));
   } finally {
     try {
       await stop(development);
@@ -369,33 +455,48 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
 
 try {
   const { planProject } = await vite.ssrLoadModule('/packages/generator/src/index.ts');
-  const { AUTHENTICATION, IDENTITY_MODULES, BUSINESS_TEMPLATE, STARTER, WELCOME_EXAMPLE } = await vite.ssrLoadModule('/packages/contracts/src/index.ts');
+  const { AUTHENTICATION, GO_STACK, IDENTITY_MODULES, BUSINESS_TEMPLATE, STARTER, STACKS, WELCOME_EXAMPLE } = await vite.ssrLoadModule('/packages/contracts/src/index.ts');
   const { parseSql } = await vite.ssrLoadModule('/packages/schema/src/index.ts');
   const { schema: inventory, diagnostics } = parseSql(await readFile(resolve(root, 'tests/fixtures/inventory.sql'), 'utf8'));
   assert.deepEqual(diagnostics, []);
   const profile = { kind: 'profile', id: randomUUID(), version: 2, name: 'Client delivery', advice: { Testing: 'Use disposable PostgreSQL schemas.' } };
   const variants = process.env.FACTORY_STARTER_VARIANT ? [process.env.FACTORY_STARTER_VARIANT]
-    : ['foundation', 'welcome', 'inventory', 'incremental', 'identity', 'installed'];
+    : ['foundation', 'welcome', 'inventory', 'incremental', 'identity', 'installed', 'go-foundation', 'go-inventory'];
   for (const variant of variants) {
+    const go = variant.startsWith('go-');
     const identity = variant === 'identity' ? 'full' : variant === 'installed' ? 'installed' : undefined;
-    const records = Boolean(identity || variant === 'inventory' || variant === 'incremental');
+    const records = Boolean(identity || variant === 'inventory' || variant === 'incremental' || variant === 'go-inventory');
     const demo = variant === 'welcome';
-    const incremental = variant === 'incremental';
+    const incremental = variant === 'incremental' || variant === 'go-inventory';
     const selectedSchema = identity === 'installed'
       ? parseSql('CREATE TABLE products (id integer PRIMARY KEY, name text NOT NULL);').schema
       : incremental ? { ...inventory, tables: inventory.tables.filter(({ name }) => name !== 'suppliers')
       .map((table) => table.name !== 'products' ? table : { ...table, columns: table.columns.filter(({ name }) => name !== 'supplier_id'),
         constraints: table.constraints.filter(({ name }) => name !== 'products_supplier_id_fkey') }) } : inventory;
-    const tables = selectedSchema.tables.map(({ name }) => name);
+    const types = go && incremental ? parseSql('ALTER TABLE warehouses ADD COLUMN external_id uuid; ALTER TABLE warehouses ADD COLUMN aisle smallint;', selectedSchema) : null;
+    if (types) assert.deepEqual(types.diagnostics, []);
+    const schema = types?.schema ?? selectedSchema;
+    const tables = schema.tables.map(({ name }) => name);
+    const stack = STACKS[go ? GO_STACK : STARTER.stack];
     const plan = planProject({
       name: 'Inventory Portal', slug: 'inventory-portal', port: await freePort(),
-      appType: STARTER.appType, stack: STARTER.stack, database: STARTER.database,
-      architecture: STARTER.architecture, engineering: STARTER.engineering, modules: identity === 'full' ? [...IDENTITY_MODULES] : demo ? [WELCOME_EXAMPLE] : [],
-      ...(records ? { crud: { schema: selectedSchema, migrations: true, backend: tables, frontend: tables } } : {}),
-      ...(identity ? { library: { profile, template: BUSINESS_TEMPLATE,
-        branding: { color: identity === 'full' ? '#2458a4' : '#594688', theme: 'dark', mark: identity === 'full' ? 'IN' : 'CL' } } } : {}),
+      appType: STARTER.appType, stack: stack.id, database: STARTER.database,
+      architecture: stack.architecture, engineering: STARTER.engineering, modules: identity === 'full' ? [...IDENTITY_MODULES] : demo ? [WELCOME_EXAMPLE] : [],
+      ...(records ? { crud: { schema, migrations: true, backend: tables, frontend: tables } } : {}),
+      ...(identity || go ? { library: { profile, template: BUSINESS_TEMPLATE,
+        branding: { color: identity === 'full' ? '#2458a4' : '#594688', theme: 'dark', mark: go ? 'GO' : identity === 'full' ? 'IN' : 'CL' } } } : {}),
     }, randomUUID());
-    await verify(plan, demo, records, incremental, identity, AUTHENTICATION);
+    if (go) {
+      const node = planProject({ ...plan.config, stack: STARTER.stack, architecture: STARTER.architecture }, randomUUID());
+      const get = (value, path) => value.files.find((entry) => entry.path === path)?.content;
+      assert.notEqual(node.projectId, plan.projectId);
+      assert.equal(get(node, '.factory/engineering.json'), get(plan, '.factory/engineering.json'));
+      assert.notEqual(get(node, 'AGENTS.md'), get(plan, 'AGENTS.md'));
+      assert(!get(node, 'go.mod') && !get(plan, 'server/app.ts'));
+      assert.throws(() => planProject({ ...plan.config, modules: [AUTHENTICATION] }, randomUUID()));
+      assert.deepEqual(planProject(plan.config, plan.projectId), plan);
+    }
+    await verify(plan, demo, records, incremental, identity, AUTHENTICATION, go);
   }
 } finally {
   await vite.close();

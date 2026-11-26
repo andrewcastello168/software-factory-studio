@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, CircleCheck, FileText, FolderOpen, ShieldCheck } from 'lucide-react';
-import { BUILTIN_LIBRARY, IDENTITY_MODULES, isStarterConfig, moduleCompatibility, MODULE_CATALOG, SCHEMA_LIMITS, STANDARD_PROFILE, STARTER, WELCOME_EXAMPLE } from '@factory/contracts';
+import { BUILTIN_LIBRARY, IDENTITY_MODULES, isStarterConfig, moduleCompatibility, MODULE_CATALOG, SCHEMA_LIMITS, STANDARD_PROFILE, STARTER, STACKS, stackDefinition, WELCOME_EXAMPLE } from '@factory/contracts';
 import type {
-  CrudSelection, DatabaseSchema, ErrorCode, LibraryAsset, LibrarySelection, ModuleSelection, GeneratorParent, GeneratorPending, GeneratorPreview, GeneratorReceipt, ProjectSelection, Result, SchemaDiagnostic, StarterConfig,
+  CrudSelection, DatabaseSchema, ErrorCode, LibraryAsset, LibrarySelection, ModuleSelection, GeneratorParent, GeneratorPending, GeneratorPreview, GeneratorReceipt, ProjectSelection, Result, SchemaDiagnostic, StackId, StarterConfig,
 } from '@factory/contracts';
 import { browserPreview } from '../usePreferences';
 import { Button, Dialog, Input } from './Controls';
@@ -42,6 +42,8 @@ export function GeneratorDialog({ close, opened, recovery }: {
   const [slug, setSlug] = useState('');
   const [customSlug, setCustomSlug] = useState(false);
   const [port, setPort] = useState('3000');
+  const [stackId, setStackId] = useState<StackId>(STARTER.stack);
+  const stack = STACKS[stackId];
   const [welcome, setWelcome] = useState(false);
   const [assets, setAssets] = useState<LibraryAsset[]>([...BUILTIN_LIBRARY]);
   const [profileKey, setProfileKey] = useState(assetKey(STANDARD_PROFILE));
@@ -75,12 +77,12 @@ export function GeneratorDialog({ close, opened, recovery }: {
   const template = assets.find((item) => assetKey(item) === templateKey && item.kind === 'template');
   const library = (profile && profile.kind === 'profile' && (profile.id !== STANDARD_PROFILE.id || template))
     ? { profile, ...(template?.kind === 'template' ? { template, ...(brand ? { branding: brand } : {}) } : {}) } : undefined;
-  const modules = [...(welcome ? [WELCOME_EXAMPLE] : []), ...identity];
+  const modules = stack.modules ? [...(welcome ? [WELCOME_EXAMPLE] : []), ...identity] : [];
   const compatibility = moduleCompatibility(STARTER.appType, STARTER.database, modules);
   const config: StarterConfig = {
     name: name.trim().normalize('NFC'), slug, port: Number(port),
-    appType: STARTER.appType, stack: STARTER.stack, database: STARTER.database,
-    architecture: STARTER.architecture, engineering: STARTER.engineering, modules,
+    appType: STARTER.appType, stack: stack.id, database: STARTER.database,
+    architecture: stack.architecture, engineering: STARTER.engineering, modules,
     ...(library ? { library } : {}),
     ...(databaseEnabled ? { crud } : {}),
   };
@@ -209,11 +211,16 @@ export function GeneratorDialog({ close, opened, recovery }: {
         {step === 'engineering' && <section className="generator-section" aria-labelledby="generator-current-step">
           <h3 id="generator-current-step" ref={heading} tabIndex={-1}>Stack and profiles</h3>
           <div className="generator-fields generator-fields--profiles">
-            <label>Technology stack<select defaultValue={STARTER.stack}><option value={STARTER.stack}>{STARTER.stackLabel}</option></select></label>
-            <label>Architecture profile<select defaultValue={STARTER.architecture}><option value={STARTER.architecture}>Layered Web · v1</option></select></label>
+            <label>Technology stack<select value={stack.id} onChange={(event) => {
+              const selected = stackDefinition(event.target.value);
+              if (selected) setStackId(selected.id);
+            }}>{Object.values(STACKS).map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label>
+            <label>Architecture profile<select value={stack.architecture} disabled>
+              <option value={stack.architecture}>{stack.architectureLabel}</option></select></label>
             <label>Engineering profile<select value={profileKey} onChange={(event) => setProfileKey(event.target.value)}>
               {assets.filter(({ kind }) => kind === 'profile').map((asset) => <option key={assetKey(asset)} value={assetKey(asset)}>{asset.name} · v{asset.version}</option>)}</select></label>
           </div>
+          <p className="generator-muted">{stack.backend} · {stack.runtime}</p>
           {libraryBridge && <fieldset className="generator-modules">
             <legend>Application template</legend>
             <label>UI template<select value={templateKey} onChange={(event) => {
@@ -232,7 +239,7 @@ export function GeneratorDialog({ close, opened, recovery }: {
           </fieldset>}
           <fieldset className="generator-modules">
             <legend>Optional features</legend>
-            {libraryBridge && <div className="library-module-picks">
+            {libraryBridge && stack.modules && <div className="library-module-picks">
               {IDENTITY_MODULES.map((pin) => {
                 const item = MODULE_CATALOG.find(({ id }) => id === pin.id)!;
                 return <label className="generator-module" key={pin.id}>
@@ -244,14 +251,15 @@ export function GeneratorDialog({ close, opened, recovery }: {
               })}
               {compatibility.length > 0 && <p role="alert" className="schema-error">{compatibility.join(' ')}</p>}
             </div>}
-            <label className="generator-module">
+            {!stack.modules && <p className="generator-muted">Welcome, Authentication, User Management, RBAC and Audit Logging are unavailable for Go. Schema-based CRUD is available below.</p>}
+            {stack.modules && <label className="generator-module">
               <input type="checkbox" checked={welcome} disabled={Boolean(busy)}
                 aria-describedby="welcome-description" onChange={(event) => setWelcome(event.target.checked)} />
               <span>
                 <strong>Welcome example</strong>
                 <span className="generator-muted" id="welcome-description">Adds a PostgreSQL-backed API route, React panel, and sample migration.</span>
               </span>
-            </label>
+            </label>}
             <details className="generator-planned">
               <summary>Planned options</summary>
               <p className="generator-muted">Backend-only, frontend-only, and database-free templates are planned.</p>
@@ -310,7 +318,7 @@ export function GeneratorDialog({ close, opened, recovery }: {
           <h3 id="generator-current-step" ref={heading} tabIndex={-1}>Review generation plan</h3>
           <div className="generator-destination">
             <div><strong>{plan.files.length} new files</strong><p className="generator-path"><bdi>{plan.directory}</bdi></p>
-              <p className="generator-muted">{plan.config.modules.length
+              <p className="generator-muted">{stackDefinition(plan.config.stack)?.architectureLabel} · {plan.config.modules.length
                 ? plan.config.modules.map(({ id, version }) => (MODULE_CATALOG.find((entry) => entry.id === id)?.label ?? id) + ' v' + version).join(', ')
                 : 'Foundation'}{plan.config.crud ? ' · Schema migration · ' + plan.config.crud.backend.length + (plan.config.crud.backend.length === 1 ? ' API · ' : ' APIs · ')
                   + plan.config.crud.frontend.length + (plan.config.crud.frontend.length === 1 ? ' React page' : ' React pages') : plan.config.modules.length ? '' : ' only'}</p></div>

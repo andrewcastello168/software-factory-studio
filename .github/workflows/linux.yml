@@ -36,6 +36,12 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up pinned Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: '1.26.11'
+          cache-dependency-path: packages/generator/templates/go/go.sum
+
       - name: Set up pinned Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -56,8 +62,22 @@ jobs:
           pnpm test
           pnpm build
 
+      - name: Check out reviewed Go advisory data
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: golang/vulndb
+          ref: d8a8b1ad05e834fdd40b66c80c618ec7a557ba53
+          path: .verification-vulndb
+          persist-credentials: false
+
       - name: Verify standalone generated application
         env:
           FACTORY_REQUIRE_DATABASE: '1'
+          FACTORY_GO_SECURITY: '1'
+          FACTORY_GO_VULNERABILITY_DB: file://${{ github.workspace }}/.verification-vulndb/data/osv
           FACTORY_TEST_DATABASE_URL: postgresql://factory_test:local-ci-fixture-only@127.0.0.1:${{ job.services.postgres.ports[5432] }}/factory_check
-        run: pnpm verify:starter
+        run: |
+          GOTOOLCHAIN=local go install golang.org/x/vuln/cmd/govulncheck@v1.10.0
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          pnpm audit --prod --audit-level high
+          pnpm verify:starter

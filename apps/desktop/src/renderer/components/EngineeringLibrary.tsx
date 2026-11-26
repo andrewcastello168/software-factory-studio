@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BookOpen, Package } from 'lucide-react';
-import { BUSINESS_TEMPLATE, BUILTIN_LIBRARY, isLibraryAsset, MODULE_CATALOG, PROFILE_TOPICS, STANDARD_PROFILE, STARTER } from '@factory/contracts';
+import { BUSINESS_TEMPLATE, BUILTIN_LIBRARY, isLibraryAsset, MODULE_CATALOG, PROFILE_TOPICS, STANDARD_PROFILE, STACKS, GO_STACK } from '@factory/contracts';
 import type { LibraryAsset } from '@factory/contracts';
 import { browserPreview } from '../usePreferences';
 import { Button, Input } from './Controls';
@@ -86,29 +86,32 @@ export function EngineeringLibrary({ page }: { page: LibraryPage }) {
   return <section className="schema-panel engineering-library" aria-label={libraryTitles[page]}>
     <header className="schema-header"><div className="schema-title"><BookOpen size={22} aria-hidden="true" /><div>
       <h2>{libraryTitles[page]}</h2><p>Pinned, reusable project assets</p></div></div></header>
-    {page === 'technology' && <div className="library-card">
-      <h3>{STARTER.stackLabel}</h3>
-      <dl className="library-specs"><dt>Runtime</dt><dd>Node.js 22.16.0 · pnpm 10.13.1</dd>
-        <dt>Backend</dt><dd>TypeScript 6.0.3 · Express 5.2.1 · pg 8.22.0</dd>
-        <dt>Frontend</dt><dd>React 19.3.1 · Vite 8.3.8</dd>
-        <dt>Database</dt><dd>PostgreSQL 17 reference runtime</dd>
-        <dt>Supported projects</dt><dd>Full-stack applications with Layered Web v1</dd>
-        <dt>Generator</dt><dd>Project creation, schema-based CRUD and reviewed incremental module installation</dd></dl>
-      <p className="schema-muted">Additional stacks, backend-only and frontend-only generation are planned.</p>
-    </div>}
-    {page === 'architecture' && <div className="library-card"><h3>Layered Web · v1</h3>
-      <dl className="library-specs"><dt>Controllers</dt><dd>Translate HTTP requests and responses</dd>
-        <dt>Services</dt><dd>Hold application behavior and validation boundaries</dd>
-        <dt>Repositories</dt><dd>Isolate parameterized PostgreSQL operations</dd>
-        <dt>React</dt><dd>Use the same-origin API and approved feature integrations</dd>
-        <dt>Compatibility</dt><dd>All verified Node/PostgreSQL module releases and engineering profiles</dd></dl>
-      <p className="schema-muted">Additional architecture adapters are planned.</p>
-    </div>}
+    {page === 'technology' && <div className="library-modules">{Object.values(STACKS).map((stack) => <div className="library-card" key={stack.id}>
+      <h3>{stack.label} · v{stack.version}</h3>
+      <dl className="library-specs"><dt>Runtime</dt><dd>{stack.runtime}</dd>
+        <dt>Backend</dt><dd>{stack.backend}</dd>
+        <dt>Frontend</dt><dd>{stack.frontend}</dd>
+        <dt>Database</dt><dd>{stack.databaseRuntime} reference runtime</dd>
+        <dt>Supported projects</dt><dd>Full-stack with {stack.architectureLabel}</dd>
+        <dt>Generator</dt><dd>Project creation, schema-based CRUD, reviewed incremental CRUD{stack.modules ? ' and module installation' : ''}</dd></dl>
+      <p className="schema-muted">{stack.unsupported}</p>
+    </div>)}</div>}
+    {page === 'architecture' && <div className="library-modules">{Object.values(STACKS).map((stack) => <div className="library-card" key={stack.id}>
+      <h3>{stack.architectureLabel}</h3>
+      <dl className="library-specs">
+        <dt>HTTP</dt><dd>{stack.id === GO_STACK ? 'Gin handlers and middleware in internal packages' : 'Express controllers and middleware in server packages'}</dd>
+        <dt>Service</dt><dd>Application behavior and request validation boundaries</dd>
+        <dt>Data</dt><dd>Context-aware parameterized PostgreSQL access and a checksum ledger</dd>
+        <dt>Web</dt><dd>Same-origin React API and optional Business Workspace template</dd>
+        <dt>Engineering</dt><dd>Standard Engineering and versioned advisory profiles</dd>
+      </dl>
+    </div>)}</div>}
     {page === 'modules' && <div className="library-modules">{MODULE_CATALOG.map((item) => <article key={item.id} className="library-card">
-      <h3><Package aria-hidden="true" size={16} />{item.label} <small>{item.version ? 'v' + item.version : 'Planned'}</small></h3>
+      <h3><Package aria-hidden="true" size={16} />{item.label} <small>{item.version ? 'v' + item.version : item.id === 'crud' ? 'Node.js and Go' : 'Planned'}</small></h3>
       {item.version && <>
         <p>{item.description ?? 'Optional sample module for the verified starter.'}</p>
         <p>Full-stack · Node / PostgreSQL · Layered Web v1 · all verified engineering profiles</p>
+        <p className="schema-muted">Unavailable for Go.</p>
         <p>{item.requires.length ? 'Requires ' + item.requires.join(', ') : 'No module dependencies'}{item.runtime ? ' · ' + item.runtime : ''}</p>
         {item.artifacts && <ul>{item.artifacts.map((name) => <li key={name}>{name}</li>)}</ul>}
       </>}

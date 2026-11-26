@@ -1,5 +1,5 @@
 import {
-  GENERATOR_LIMITS, AUTHENTICATION, IDENTITY_MODULES, MODULE_CATALOG, isLibrarySelection, moduleCompatibility, orderedModules, hasExactKeys, isGeneratorDigest, isGeneratorPath, isModuleSelection, isRecord, isSchemaName,
+  GENERATOR_LIMITS, GO_STACK, stackDefinition, AUTHENTICATION, IDENTITY_MODULES, MODULE_CATALOG, isLibrarySelection, moduleCompatibility, orderedModules, hasExactKeys, isGeneratorDigest, isGeneratorPath, isModuleSelection, isRecord, isSchemaName,
   isProjectId, isStarterName, isStarterPort, isStarterSlug, STARTER, WELCOME_EXAMPLE,
 } from '@factory/contracts';
 import type { DatabaseSchema, GeneratorFile, IncrementalChange, IncrementalOwnedFile, ModuleSelection, SchemaMigration, StarterConfig } from '@factory/contracts';
@@ -7,6 +7,7 @@ import { validateCrud } from '@factory/schema';
 import { CRUD_OWNER } from './crud';
 import { identityContributions, identityMigration, IDENTITY_PREFIX } from './identity';
 import { planProject, sha256 } from './index';
+import { goCrudPaths, goIntegrationPath } from './go';
 
 const manifestPath = '.factory/generation-manifest.json';
 const versionsPath = '.factory/versions.lock.json';
@@ -17,12 +18,13 @@ const foundationPaths = [
   'server/routes.ts', 'web/main.tsx', 'package.json', 'AGENTS.md', 'README.md',
   'docs/ARCHITECTURE.md', 'docs/CODING_STANDARDS.md', 'docs/REQUIREMENTS.md',
 ];
-const featurePaths = [
-  'docs/DATABASE_SCHEMA.md', 'docs/CRUD_API.md', 'test/crud.test.ts',
-  'server/features/crud/contracts.ts', 'server/features/crud/validation.ts', 'server/features/crud/repository.ts',
-  'server/features/crud/service.ts', 'server/features/crud/controller.ts', 'server/features/crud/register.ts',
-  'web/features/crud/Crud.tsx', 'web/features/crud/crud.css',
+const sharedFeatures = ['docs/DATABASE_SCHEMA.md', 'docs/CRUD_API.md', 'web/features/crud/Crud.tsx', 'web/features/crud/crud.css'];
+const nodeFeatures = [
+  'test/crud.test.ts', 'server/features/crud/contracts.ts', 'server/features/crud/validation.ts',
+  'server/features/crud/repository.ts', 'server/features/crud/service.ts', 'server/features/crud/controller.ts', 'server/features/crud/register.ts',
 ];
+const featurePaths = [...sharedFeatures, ...nodeFeatures];
+const featuresFor = (stack: StarterConfig['stack']) => stack === GO_STACK ? [...sharedFeatures, ...goCrudPaths] : featurePaths;
 const optionalContext = new Set(['AGENTS.md', 'README.md', 'docs/ARCHITECTURE.md', 'docs/CODING_STANDARDS.md', 'docs/REQUIREMENTS.md']);
 const libraryPath = '.factory/engineering.json';
 const identityFiles = [...new Set(identityContributions.flatMap(({ templates }) => templates.map(([path]) => path)))];
@@ -32,10 +34,10 @@ const identityOwner = (path: string) => {
   return suffix && identityMigration(suffix) ? suffix.replaceAll('_', '-') : undefined;
 };
 export const incrementalPaths = [descriptorPath, manifestPath, versionsPath, modulePath, libraryPath, '.env.example',
-  'server/app.ts', ...foundationPaths, ...featurePaths, ...identityFiles];
+  'server/app.ts', 'go.mod', goIntegrationPath, ...goCrudPaths, ...foundationPaths, ...featurePaths, ...identityFiles];
 export const isModuleMigrationPath = (path: string) => Boolean(identityOwner(path));
 export function isIncrementalWritePath(path: string) {
-  return isModuleMigrationPath(path) || [...foundationPaths, ...featurePaths, ...identityFiles, versionsPath, manifestPath, modulePath].includes(path);
+  return isModuleMigrationPath(path) || [...foundationPaths, ...featurePaths, goIntegrationPath, ...goCrudPaths, ...identityFiles, versionsPath, manifestPath, modulePath].includes(path);
 }
 
 export type LocalFile = { state: 'absent' | 'unsafe' } | { state: 'text'; sha256: string; content: string };
@@ -48,7 +50,7 @@ interface VersionedProject {
 const json = (value: unknown) => JSON.stringify(value, null, 2) + '\n';
 const keyed = (files: GeneratorFile[]) => new Map(files.map((file) => [file.path, file]));
 const exact = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
-const ownerFor = (path: string) => featurePaths.includes(path) ? CRUD_OWNER : STARTER.stack;
+const ownerFor = (path: string, stack: StarterConfig['stack']) => featuresFor(stack).includes(path) ? CRUD_OWNER : stack;
 const defaultReason = 'Previously generated content is current.';
 
 export class IncrementalUnsupported extends Error {}
@@ -76,7 +78,7 @@ export function manifestEntries(files: ReadonlyMap<string, LocalFile>) {
   for (const item of manifest.files as unknown[]) {
     if (!isRecord(item) || !hasExactKeys(item, ['path', 'sha256', 'owner', 'action']) || !isGeneratorPath(item.path)
       || item.path === manifestPath || !isGeneratorDigest(item.sha256) || item.action !== 'create'
-      || ![STARTER.stack, CRUD_OWNER, ...MODULE_CATALOG.filter(({ version }) => version).map(({ id }) => id)].some((owner) => owner === item.owner)) return [];
+      || ![STARTER.stack, GO_STACK, CRUD_OWNER, ...MODULE_CATALOG.filter(({ version }) => version).map(({ id }) => id)].some((owner) => owner === item.owner)) return [];
     entries.push({ path: item.path, sha256: item.sha256, owner: item.owner as string, action: item.action });
   }
   return new Set(entries.map(({ path }) => path.toLowerCase())).size === entries.length ? entries : [];
@@ -91,9 +93,10 @@ export function readIncrementalProject(files: ReadonlyMap<string, LocalFile>): V
   const filesOwned = manifestEntries(files);
   const { id, name } = descriptor;
   const slug = pkg.name;
+  const stack = stackDefinition(descriptor.stackId);
   const { version: lockVersion, ...versions } = versionsFile;
-  if (descriptor.version !== 1 || descriptor.type !== STARTER.appType || descriptor.stackId !== STARTER.stack
-    || descriptor.profileId !== STARTER.architecture || !isProjectId(id) || !isStarterName(name) || !isStarterSlug(slug)
+  if (descriptor.version !== 1 || descriptor.type !== STARTER.appType || !stack
+    || descriptor.profileId !== stack.architecture || !isProjectId(id) || !isStarterName(name) || !isStarterSlug(slug)
     || manifest.version !== 2 || manifest.projectId !== id || !isGeneratorDigest(manifest.inputsSha256) || lockVersion !== 2
     || !filesOwned.length || !exact(manifest.versions, versions) || installed.version !== 1 || !exact(installed.installed, versions.modules)
     || !Array.isArray(versions.modules)) {
@@ -111,15 +114,15 @@ export function readIncrementalProject(files: ReadonlyMap<string, LocalFile>): V
     throw new IncrementalUnsupported('The pinned engineering profile or template snapshot is missing or invalid.');
   }
   const config: StarterConfig = {
-    name, slug, port: isStarterPort(portValue) ? portValue : 3000, appType: STARTER.appType, stack: STARTER.stack,
-    architecture: STARTER.architecture, engineering: STARTER.engineering, modules, database: STARTER.database, ...(isLibrarySelection(library) ? { library } : {}),
+    name, slug, port: isStarterPort(portValue) ? portValue : 3000, appType: STARTER.appType, stack: stack.id,
+    architecture: stack.architecture, engineering: STARTER.engineering, modules, database: STARTER.database, ...(isLibrarySelection(library) ? { library } : {}),
   };
   const pinned = keyed(planProject(config, id).files);
   const baseline = object(pinned.get(versionsPath)?.content)!;
   const known = new Map(manifestEntries(new Map([[manifestPath, { state: 'text', content: pinned.get(manifestPath)!.content,
     sha256: pinned.get(manifestPath)!.sha256 }]])).map(({ path, owner }) => [path, owner]));
   if (filesOwned.some(({ path, owner }) => owner === CRUD_OWNER
-    ? !featurePaths.includes(path) && path !== 'db/migrations/0002_schema.sql' && path !== 'db/migrations/0003_schema.sql'
+    ? !featuresFor(config.stack).includes(path) && path !== 'db/migrations/0002_schema.sql' && path !== 'db/migrations/0003_schema.sql'
     : known.get(path) !== owner && (identityOwner(path) !== owner || !modules.some(({ id }) => id === owner)))) {
     throw new IncrementalUnsupported('The manifest claims ownership of paths outside the pinned templates.');
   }
@@ -221,7 +224,13 @@ export function composeIncremental(
 
   const ownership = new Map(project.files.map((file) => [file.path, file]));
   const recorded = new Map(ownership);
-  const descendants = [...foundationPaths, ...featurePaths];
+  if (config.stack === GO_STACK) {
+    const module = files.get('go.mod');
+    if (module?.state !== 'text' || module.sha256 !== before.get('go.mod')?.sha256) {
+      return { changes, backend, frontend, issues: ['The Go module manifest no longer matches the pinned adapter.'] };
+    }
+  }
+  const descendants = [...foundationPaths, ...(config.stack === GO_STACK ? [goIntegrationPath] : []), ...featuresFor(config.stack)];
   for (const path of descendants) {
     const output = after.get(path);
     if (!output) continue;
@@ -230,20 +239,20 @@ export function composeIncremental(
     const owned = ownership.get(path);
     const desired = path === 'docs/DATABASE_SCHEMA.md' ? sourceDoc(output.content, sources) : output.content;
     const intended = sha256(desired);
-    if (local?.state === 'text' && local.sha256 === intended && owned?.owner === ownerFor(path) && owned.sha256 === intended) {
+    if (local?.state === 'text' && local.sha256 === intended && owned?.owner === ownerFor(path, config.stack) && owned.sha256 === intended) {
       changes.push({ path, action: 'unchanged', before: null, after: null, reason: defaultReason });
       continue;
     }
     if (original?.sha256 === intended) {
-      const changed = local?.state !== 'text' || local.sha256 !== intended || owned?.owner !== ownerFor(path) || owned.sha256 !== intended;
-      const critical = path === 'server/routes.ts' || (path === 'web/main.tsx' && frontend.length > 0);
+      const changed = local?.state !== 'text' || local.sha256 !== intended || owned?.owner !== ownerFor(path, config.stack) || owned.sha256 !== intended;
+      const critical = path === 'server/routes.ts' || path === goIntegrationPath || (path === 'web/main.tsx' && frontend.length > 0);
       const action = changed ? (critical || (local?.state !== 'text' && !optionalContext.has(path)) ? 'conflict' : 'protected') : 'unchanged';
       changes.push({ path, action, before: null, after: null,
         reason: action === 'conflict' ? 'A required integration or generated dependency cannot be verified.'
           : changed ? 'The reviewed feature needs no changes to this customized file.' : defaultReason });
       continue;
     }
-    const strict = local?.state === 'text' && owned?.owner === ownerFor(path) && owned.sha256 === local.sha256
+    const strict = local?.state === 'text' && owned?.owner === ownerFor(path, config.stack) && owned.sha256 === local.sha256
       && original?.sha256 === local.sha256;
     const vacant = local?.state === 'absent' && !owned && !original;
     if (!strict && !vacant) {
@@ -254,7 +263,7 @@ export function composeIncremental(
     }
     changes.push({ path, action: strict ? 'modify' : 'create', before: strict ? local.content : null, after: desired,
       reason: strict ? 'Update the verified built-in integration or generated feature.' : 'Add a file for the selected CRUD layers.' });
-    recorded.set(path, { path, sha256: intended, owner: ownerFor(path), action: 'create' });
+    recorded.set(path, { path, sha256: intended, owner: ownerFor(path, config.stack), action: 'create' });
   }
   if (changes.some(({ action }) => action === 'conflict')) issues.push('Resolve the protected integration conflicts before applying this plan.');
   if (!changes.some(({ action }) => action === 'create' || action === 'modify') || issues.length) return { changes, issues, backend, frontend };
@@ -264,13 +273,13 @@ export function composeIncremental(
   const { modules: installed, ...stackBase } = stack;
   const versions = { ...stackBase, schema: { ...feature, ...(previous?.migration ? { migration: previous.migration } : {}), sources }, modules: installed };
   const versionBytes = json({ version, ...versions });
-  recorded.set(versionsPath, { path: versionsPath, sha256: sha256(versionBytes), owner: STARTER.stack, action: 'create' });
+  recorded.set(versionsPath, { path: versionsPath, sha256: sha256(versionBytes), owner: config.stack, action: 'create' });
   const inputsSha256 = sha256(json({ projectId, sources, backend, frontend, versions }));
   const manifest = json({ version: 2, projectId, inputsSha256, versions, files: [...recorded.values()] });
   const beforeVersions = text(files, versionsPath);
   const beforeManifest = text(files, manifestPath);
   const locked = ownership.get(versionsPath);
-  if (!beforeVersions || !beforeManifest || locked?.owner !== STARTER.stack || locked.sha256 !== sha256(beforeVersions)
+  if (!beforeVersions || !beforeManifest || locked?.owner !== config.stack || locked.sha256 !== sha256(beforeVersions)
     || recorded.size > GENERATOR_LIMITS.files) {
     return { changes, issues: ['The portable metadata is modified or exceeds the supported ownership limit.'], backend, frontend };
   }
@@ -292,6 +301,11 @@ export function composeModuleInstall(
   const changes: IncrementalChange[] = [];
   const issues: string[] = [];
   const result = { changes, issues, backend, frontend, modules };
+  if (!stackDefinition(config.stack)?.modules) {
+    issues.push('This stack has no verified optional module releases.');
+    return result;
+  }
+
   if (new Set(requested.map(({ id }) => id)).size !== requested.length) {
     issues.push('Choose each module once.');
     return result;
