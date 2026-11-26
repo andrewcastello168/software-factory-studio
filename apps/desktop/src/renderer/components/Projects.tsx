@@ -11,7 +11,7 @@ const availabilityLabel: Record<ProjectAvailability, string> = {
   ready: 'Available', missing: 'Folder not found', unavailable: 'Folder unavailable', changed: 'Folder changed',
 };
 
-export type ProjectView = 'overview' | 'structure' | 'git' | 'database';
+export type ProjectView = 'overview' | 'structure' | 'git' | 'database' | 'generation';
 
 export function WorkspaceTabs({
   projects, active, onSelect, onClose,

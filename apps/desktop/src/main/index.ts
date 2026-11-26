@@ -3,6 +3,8 @@ import type { IpcMainInvokeEvent } from 'electron';
 import { readFile, realpath } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import {
+  INCREMENTAL_CHANNEL, isIncrementalApproval, isIncrementalInspection, isIncrementalPreview, isIncrementalSelection,
+  isNullableIncrementalInspection,
   SCHEMA_CHANNEL, isMigrationPreview, isNullableSchemaSnapshot, isSchemaConnection, isSchemaEdit,
   isSchemaLayout, isSchemaPhysical, isSchemaPoints, isSchemaProposal, isSchemaPublish, isSchemaSnapshot, isSqlImport,
   CHANNEL, failure, isAppInfo, isPreferences, isPreferenceSnapshot, isPreferenceWrite, success,
@@ -21,6 +23,8 @@ import { GenerationJournal } from './services/generation/journal';
 import { GeneratorStudio } from './services/generation/studio';
 import { DatabaseStudio } from './services/schema/studio';
 import { SchemaStore } from './services/schema/storage';
+import { IncrementalStudio } from './services/incremental/studio';
+import { IncrementalStore } from './services/incremental/storage';
 
 const development = !app.isPackaged && process.env.FACTORY_DESKTOP_DEV === '1';
 let window: BrowserWindow | undefined;
@@ -28,6 +32,7 @@ let projects: ProjectWorkspace | undefined;
 let gitStudio: GitStudio | undefined;
 let generatorStudio: GeneratorStudio | undefined;
 let databaseStudio: DatabaseStudio | undefined;
+let incrementalStudio: IncrementalStudio | undefined;
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'studio', privileges: { standard: true, secure: true, supportFetchAPI: true } },
@@ -134,6 +139,17 @@ function installSchemaBridge() {
   }
 }
 
+function installIncrementalBridge() {
+  handle(INCREMENTAL_CHANNEL.inspect, isIncrementalInspection, (...args) => args.length === 1 && isProjectId(args[0])
+    ? incrementalStudio?.inspect(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(INCREMENTAL_CHANNEL.preview, isIncrementalPreview, (...args) => args.length === 1 && isIncrementalSelection(args[0])
+    ? incrementalStudio?.preview(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  for (const operation of ['apply', 'resume', 'handoff'] as const) {
+    handle(INCREMENTAL_CHANNEL[operation], isNullableIncrementalInspection, (...args) => args.length === 1 && isIncrementalApproval(args[0])
+      ? incrementalStudio?.action(args[0], operation) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  }
+}
+
 async function installProtocol() {
   const root = await realpath(join(__dirname, '../renderer'));
   protocol.handle('studio', async (request) => {
@@ -232,15 +248,25 @@ async function openWindow() {
     canOpen: () => workspace.canOpen(),
     allowsAuxiliaryPath: (path) => workspace.allowsAuxiliaryPath(path),
     adopt: (root) => workspace.adoptCreated(root),
-    generationPending: async (path) => Boolean(await generator.protectsGit(path)) || database.protectsGit(path),
+    generationPending: async (path) => Boolean(await generator.protectsGit(path)) || await database.protectsGit(path) || incremental.protectsGit(path),
     refresh: (id) => workspace.rescan(id),
   }, projectDialogs);
   gitStudio = git;
   const database: DatabaseStudio = new DatabaseStudio(new SchemaStore(app.getPath('userData')), {
     root: (id) => workspace.root(id), git: (id) => git.status(id), gitWriting: () => git.isWriting(),
-    refresh: (id) => workspace.rescan(id),
+    refresh: (id) => workspace.rescan(id), incrementalPending: (path) => incremental.protectsGit(path),
   }, projectDialogs);
   databaseStudio = database;
+  const incremental: IncrementalStudio = new IncrementalStudio(new IncrementalStore(app.getPath('userData')), {
+    root: (id) => workspace.root(id),
+    project: async (id) => {
+      const catalog = await workspace.list();
+      return catalog.ok ? catalog.value.projects.find((project) => project.id === id) : undefined;
+    },
+    git: (id) => git.status(id), gitWriting: () => git.isWriting(), schemaPending: (path) => database.protectsGit(path),
+    refresh: (id) => workspace.rescan(id),
+  }, projectDialogs);
+  incrementalStudio = incremental;
   current.on('focus', () => { void workspace.reconcile(); });
   current.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   current.webContents.on('will-frame-navigate', (event) => event.preventDefault());
@@ -263,12 +289,14 @@ async function openWindow() {
     workspace.dispose();
     generator.dispose();
     database.dispose();
+    incremental.dispose();
     void git.dispose().catch(() => undefined);
     if (window === current) {
       projects = undefined;
       gitStudio = undefined;
       generatorStudio = undefined;
       databaseStudio = undefined;
+      incrementalStudio = undefined;
       window = undefined;
     }
   });
@@ -305,6 +333,7 @@ if (!app.requestSingleInstanceLock()) {
     installGitBridge();
     installGeneratorBridge();
     installSchemaBridge();
+    installIncrementalBridge();
     installBridge(new PreferenceStore(join(app.getPath('userData'), 'preferences.json')));
     await openWindow();
     app.on('activate', () => { if (!window) void openWindow().catch(reportStartupError); });

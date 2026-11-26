@@ -8,6 +8,7 @@ import { composeModules, foundationTemplates } from './modular';
 import { nodeTemplates } from './templates';
 
 export { InvalidCrud } from './crud';
+export * from './incremental';
 
 export interface StarterPlan<Config = StarterConfig | LegacyStarterConfig> {
   projectId: string;

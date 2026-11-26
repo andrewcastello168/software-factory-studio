@@ -845,3 +845,45 @@ kbd {
   .schema-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .schema-designer { grid-template-columns: minmax(100px, 1fr) minmax(0, 2.7fr); }
 }
+
+.incremental-profile, .incremental-profile > span, .incremental-plan > header, .incremental-content > header, .incremental-selection {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.incremental-profile { padding: 7px 0; color: var(--muted); }
+.incremental-selection { align-items: flex-end; justify-content: space-between; margin: 4px 0 8px; }
+.incremental-selection fieldset { flex: 1 1 460px; background: var(--surface); }
+.incremental-selection fieldset > div { grid-template-columns: minmax(0, 1fr) 122px 146px; }
+.incremental-selection fieldset > div > small { grid-column: 1 / -1; padding-bottom: 4px; }
+.incremental-sources { margin: 8px 0; padding: 8px; border: 1px solid var(--line); background: var(--surface); overflow-wrap: anywhere; }
+.incremental-sources ul { padding-inline-start: 16px; list-style: none; }
+.incremental-plan, .incremental-list { border: 1px solid var(--line); background: var(--surface); min-width: 0; }
+.incremental-plan > header, .incremental-content > header { justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.incremental-plan > .dialog-actions { padding: 8px; border-top: 1px solid var(--line); }
+.incremental-grid { display: grid; grid-template-columns: minmax(190px, 31%) minmax(0, 1fr); }
+.incremental-grid > ul, .incremental-list ul { list-style: none; margin: 0; padding: 0; }
+.incremental-grid > ul { max-height: 360px; overflow: auto; border-right: 1px solid var(--line); background: var(--rail); }
+.incremental-grid li > button { width: 100%; justify-content: flex-start; border-radius: 0; text-align: left; }
+.incremental-grid li > button[aria-pressed="true"] { background: var(--selected); color: var(--accent); }
+.incremental-grid li svg { flex-shrink: 0; }
+.incremental-grid li bdi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.incremental-grid li small { flex-shrink: 0; margin-inline-start: auto; }
+.incremental-panel [data-action="conflict"] { color: var(--error); }
+.incremental-panel [data-action="protected"] { color: var(--warning); }
+.incremental-content { min-width: 0; }
+.incremental-diff-heading, .incremental-list h3 { padding: 7px 10px; margin: 0; }
+.incremental-diff { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.incremental-diff[data-created="true"] { grid-template-columns: minmax(0, 1fr); }
+.incremental-diff section { min-width: 0; border: 1px solid var(--line); }
+.incremental-diff h4 { padding: 5px 8px; }
+.incremental-diff pre { padding: 7px; margin: 0; overflow: auto; height: 240px; background: var(--canvas); font: 12px/1.6 "Cascadia Code", Consolas, monospace; tab-size: 2; }
+.incremental-diff span[data-change="before"] { color: var(--error); }
+.incremental-diff span[data-change="after"] { color: var(--success); }
+.incremental-list li { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(75px, .4fr) minmax(0, .7fr); gap: 7px; border-top: 1px solid var(--line); padding: 6px 10px; overflow-wrap: anywhere; }
+@media (max-width: 920px) {
+  .incremental-selection fieldset > div { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .incremental-grid { grid-template-columns: minmax(130px, 34%) minmax(0, 1fr); }
+}
+
+.incremental-diff-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.incremental-diff-heading p { margin: 0; }
+.incremental-context { color: var(--muted); }

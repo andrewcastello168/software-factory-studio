@@ -19,6 +19,7 @@ interface Grant {
   root(id: string): ProjectRoot | undefined;
   git(id: string): Promise<Result<GitState>>;
   gitWriting(): boolean;
+  incrementalPending?(path: string): Promise<boolean>;
   refresh(id: string): Promise<unknown>;
 }
 
@@ -63,6 +64,7 @@ export class DatabaseStudio {
   async #capture(projectId: string, mutation = false) {
     const root = this.#root(projectId);
     if (mutation && this.grant.gitWriting()) throw new Rejected('PROJECT_BUSY');
+    if (mutation && await this.grant.incrementalPending?.(root.path)) throw new Rejected('PROJECT_BUSY');
     const git = await this.grant.git(projectId);
     const state = git.ok ? git.value : { state: 'failed' as const };
     if (mutation && (state.state === 'repository' ? state.operation !== null : state.state !== 'not-repository')) {

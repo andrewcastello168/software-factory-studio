@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  AlertCircle, AppWindow, CircleCheck, Clock3, Database, Folder, FolderOpen, FolderPlus, GitBranch, GitFork, House, LoaderCircle, PanelLeft, RefreshCw, X,
+  AlertCircle, AppWindow, CircleCheck, Clock3, Database, Folder, FolderOpen, FolderPlus, GitBranch, GitFork, House, ListChecks, LoaderCircle, PanelLeft, RefreshCw, X,
   PanelLeftClose, PanelLeftOpen, Settings2,
 } from 'lucide-react';
 import { SIDEBAR } from '@factory/contracts';
@@ -14,6 +14,7 @@ import { useProjects } from './useProjects';
 import { gitBridge, gitLabel, useGit } from './useGit';
 import { CloneDialog, GitPanel } from './components/Git';
 import { DatabasePanel, schemaBridge, supportsDatabaseStudio } from './components/schema/DatabaseStudio';
+import { GenerationReview, incrementalBridge } from './components/GenerationReview';
 import { GeneratorDialog, generatorBridge } from './components/Generator';
 import { ProjectList, ProjectPanel, WorkspaceTabs } from './components/Projects';
 import type { ProjectView } from './components/Projects';
@@ -38,6 +39,7 @@ export function App() {
   const [cloneNotice, setCloneNotice] = useState<string | null>(null);
   const view = activeProject ? views[activeProject.id] ?? 'overview' : null;
   const database = Boolean(schemaBridge && supportsDatabaseStudio(activeProject));
+  const generation = Boolean(incrementalBridge && supportsDatabaseStudio(activeProject));
   const [page, setPage] = useState<Page>('home');
   const [collapsed, setCollapsed] = useState(false);
   const [palette, setPalette] = useState(false);
@@ -164,6 +166,7 @@ export function App() {
     );
   }
 
+  if (generation) commands.push({ id: 'generation', title: 'Generation Review', icon: ListChecks, run: () => openProjectView('generation') });
   if (database) commands.push({ id: 'database', title: 'Database Studio', icon: Database, run: () => openProjectView('database') });
   const notice = state.error ?? (state.storage === 'corrupt'
     ? 'Stored preferences are unreadable. Studio is using defaults.'
@@ -213,7 +216,7 @@ export function App() {
           <>
             <aside className="sidebar">
               <div className="sidebar-heading"><span>Explorer</span><WorkspaceMenu commands={commands} /></div>
-              <Navigation page={active ? null : page} onSelect={openPage} projectView={view} onProjectView={openProjectView} database={database} />
+              <Navigation page={active ? null : page} onSelect={openPage} projectView={view} onProjectView={openProjectView} database={database} generation={generation} />
             </aside>
             <div
               className="separator"
@@ -293,6 +296,9 @@ export function App() {
             )}
             <section role="tabpanel" id="workspace-panel" aria-labelledby={`workspace-tab-${active ?? 'global'}`}>
               {activeProject && view === 'git' ? <GitPanel key={activeProject.id} project={activeProject} git={git} />
+                : activeProject && view === 'generation' && generation ? <GenerationReview key={activeProject.id} project={activeProject}
+                  signal={JSON.stringify([repo?.branch, repo?.head, repo?.operation, repo?.revision,
+                    activeProject.entries.filter(({ path }) => path.startsWith('db/migrations/') || path.startsWith('.factory/'))])} />
                 : activeProject && view === 'database' && database ? <DatabasePanel key={activeProject.id} project={activeProject}
                   sourceSignal={JSON.stringify([repo?.branch, repo?.head, repo?.operation,
                     activeProject.entries.filter(({ path }) => path.startsWith('db/migrations/'))])} />
