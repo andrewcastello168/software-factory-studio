@@ -74,6 +74,7 @@ jobs:
         env:
           FACTORY_REQUIRE_DATABASE: '1'
           FACTORY_GO_SECURITY: '1'
+          FACTORY_DOCKER_VERIFY: '1'
           FACTORY_GO_VULNERABILITY_DB: file://${{ github.workspace }}/.verification-vulndb/data/osv
           FACTORY_TEST_DATABASE_URL: postgresql://factory_test:local-ci-fixture-only@127.0.0.1:${{ job.services.postgres.ports[5432] }}/factory_check
         run: |

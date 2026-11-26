@@ -251,3 +251,5 @@ The isolated task branch is based on `5492acd`. PR #13 and its verified Phase 10
 - P11-06 records artifact and quality evidence locally. Check the Phase 11 pull request for final Linux and Windows x64 workflow evidence.
 
 Local Linux frozen install, lint, typecheck and production build passed. The regression included 94 Vitest and 11 renderer cases. The Phase 11 sandboxed Electron case passed in both themes with failed, passed and stale quality evidence. The direct registry audit from the controlled desktop process encountered the cloud's DNS restriction. Generated CI commands also exercised the advisory check through the normal package manager environment.
+
+The cloud Docker daemon pulled the pinned Node.js, Go and PostgreSQL images. Direct registry probes from its build network failed DNS resolution. The Linux workflow includes Docker build and Compose verification for both reference apps, using its disposable service database and isolated Docker projects.

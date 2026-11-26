@@ -100,10 +100,13 @@ fi
 }
 
 function dockerfile(go: boolean) {
-  const frontend = `FROM ${nodeImage} AS frontend
+  const frontend = `FROM ${nodeImage} AS manifests
 WORKDIR /app
-RUN npm install --global pnpm@${pnpm} --no-audit --no-fund
+ENV CI=true
+RUN npm install --global pnpm@${pnpm} --no-audit --no-fund --fetch-retries=0 --fetch-timeout=20000
 COPY package.json pnpm-lock.yaml ./
+
+FROM manifests AS frontend
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY web ./web
 COPY vite.config.ts tsconfig.json ./
@@ -136,13 +139,16 @@ CMD ["/app/server"]
 `;
   return frontend + `COPY tsconfig.server.json ./
 COPY server ./server
-RUN pnpm build && pnpm prune --prod --ignore-scripts
+RUN pnpm build
+
+FROM manifests AS production
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 FROM ${nodeImage}
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
 WORKDIR /app
 COPY --from=frontend /app/package.json ./package.json
-COPY --from=frontend /app/node_modules ./node_modules
+COPY --from=production /app/node_modules ./node_modules
 COPY --from=frontend /app/dist ./dist
 COPY db/migrations ./db/migrations
 USER node
