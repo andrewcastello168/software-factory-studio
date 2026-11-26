@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import type { OpenProject, Preferences, ProjectCatalog, StudioBridge, SystemTheme } from '@factory/contracts';
+import type { GitRepository, OpenProject, Preferences, ProjectCatalog, StudioBridge, SystemTheme } from '@factory/contracts';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -34,7 +34,22 @@ test.beforeEach(async ({ page }) => {
       }] };
       return { ok: true, value: { projectId: project.id, catalog } } as const;
     };
+    const repo: GitRepository = {
+      state: 'repository', revision: 'a'.repeat(64), root: project.directory, branch: 'main', head: 'b'.repeat(40),
+      upstream: 'origin/main', upstreamRemote: 'origin', ahead: 1, behind: 0, operation: null,
+      changes: [{ path: 'src/index.ts', index: '.', worktree: 'M', original: null, actionable: true }],
+      branches: [{ ref: 'refs/heads/main', oid: 'b'.repeat(40) }, { ref: 'refs/heads/topic', oid: 'c'.repeat(40) },
+        { ref: 'refs/remotes/origin/main', oid: 'd'.repeat(40) }],
+      remotes: [{ name: 'origin', kind: 'https' }],
+    };
     const studio: StudioBridge = {
+      git: {
+        status: async () => ({ ok: true, value: repo }),
+        diff: async () => ({ ok: true, value: { text: '@@ -1 +1 @@\n-return 1\n+return 2', truncated: false } }),
+        compare: async () => ({ ok: true, value: { text: '@@ -1 +1 @@\n-topic before\n+topic after', truncated: false } }),
+        action: async () => ({ ok: false, error: 'ACCESS_DENIED' }),
+        clone: async () => ({ ok: false, error: 'ACCESS_DENIED' }),
+      },
       projects: {
         list: async () => ({ ok: true, value: catalog }),
         openFolder: select,
@@ -80,7 +95,7 @@ test('only functional destinations are available through the workbench and comma
   await page.keyboard.press('Control+k');
   const search = page.getByRole('combobox', { name: 'Search commands' });
   await expect(search).toBeFocused();
-  await search.fill('clone repository');
+  await search.fill('worktree creation');
   await expect(page.getByText('No matching commands.')).toBeVisible();
   await search.press('Escape');
   await expect(commandTrigger).toBeFocused();
@@ -174,4 +189,31 @@ test('projects appear in tabs, can be browsed with disclosures, and reopen from 
   await page.getByRole('tab', { name: 'Renderer fixture' }).press('Delete');
   await expect(page.getByRole('tab', { name: 'Renderer fixture' })).toBeHidden();
   await expect(page.getByRole('heading', { name: 'Recent Projects' })).toBeVisible();
+});
+
+test('Git Studio supports keyboard diff inspection and cancel-only dirty checkout in both themes', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open Folder', exact: true }).click();
+  await page.getByRole('button', { name: 'Git Studio', exact: true }).press('Enter');
+  const branch = page.getByRole('combobox', { name: 'Branch', exact: true });
+  await branch.selectOption('refs/heads/topic');
+  await page.getByRole('button', { name: 'Compare', exact: true }).press('Enter');
+  await expect(page.getByRole('heading', { name: 'Compare HEAD and topic' })).toBeVisible();
+  await expect(page.getByLabel('Git patch')).toContainText('topic after');
+  const file = page.getByRole('button', { name: /src\/index.ts/ }).filter({ hasText: 'src/index.ts' });
+  await file.press('Enter');
+  await expect(page.getByLabel('Git patch')).toContainText('+return 2');
+  const switchBranch = page.getByRole('button', { name: 'Switch', exact: true });
+  await switchBranch.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Checkout blocked' });
+  await expect(dialog).toContainText('src/index.ts');
+  await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(switchBranch).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Pull (FF)', exact: true })).toBeDisabled();
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('fixture:system-theme', { detail: 'dark' })));
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.getByRole('heading', { name: 'Git Studio' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1024);
 });

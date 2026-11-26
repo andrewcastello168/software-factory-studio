@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 import {
   CHANNEL, failure, isAppInfo, isPreferences, isPreferenceSnapshot, isPreferenceWrite,
   isSystemTheme, validateReply, PROJECT_CHANNEL, isProjectCatalog, isProjectId, isProjectSelection,
+  GIT_CHANNEL, isGitAction, isGitCloneRequest, isGitCloneResult, isGitCompareRequest, isGitDiff, isGitDiffRequest,
+  isGitOutcome, isGitState,
 } from '@factory/contracts';
 import type { Result, StudioBridge, Validator } from '@factory/contracts';
 
@@ -35,6 +37,13 @@ const studio: StudioBridge = {
       ipcRenderer.on(PROJECT_CHANNEL.changed, receive);
       return () => ipcRenderer.removeListener(PROJECT_CHANNEL.changed, receive);
     },
+  },
+  git: {
+    status: (id) => invokeProject(GIT_CHANNEL.status, isGitState, id),
+    diff: (request) => isGitDiffRequest(request) ? invoke(GIT_CHANNEL.diff, isGitDiff, request) : Promise.resolve(failure('INVALID_REQUEST')),
+    compare: (request) => isGitCompareRequest(request) ? invoke(GIT_CHANNEL.compare, isGitDiff, request) : Promise.resolve(failure('INVALID_REQUEST')),
+    action: (request) => isGitAction(request) ? invoke(GIT_CHANNEL.action, isGitOutcome, request) : Promise.resolve(failure('INVALID_REQUEST')),
+    clone: (request) => isGitCloneRequest(request) ? invoke(GIT_CHANNEL.clone, isGitCloneResult, request) : Promise.resolve(failure('INVALID_REQUEST')),
   },
   getAppInfo: () => invoke(CHANNEL.appInfo, isAppInfo),
   readPreferences: () => invoke(CHANNEL.readPreferences, isPreferenceSnapshot),

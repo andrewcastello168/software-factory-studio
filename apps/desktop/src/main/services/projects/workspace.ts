@@ -183,6 +183,25 @@ export class ProjectWorkspace {
     }).finally(() => { this.#choosing = false; });
   }
 
+  root(id: string): ProjectRoot | undefined {
+    const tab = this.#tabs.get(id);
+    return !this.#closed && tab?.snapshot.availability === 'ready' ? tab.root : undefined;
+  }
+
+  canOpen(): boolean {
+    return !this.#closed && this.#tabs.size < PROJECT_LIMITS.tabs;
+  }
+
+  adoptCloned(root: ProjectRoot): Promise<Result<ProjectSelection>> {
+    return this.#mutate(async () => {
+      try {
+        return await this.#adopt(root, await scanProject(root));
+      } catch {
+        return failure('PROJECT_UNAVAILABLE');
+      }
+    });
+  }
+
   openFolder(): Promise<Result<ProjectSelection>> {
     return this.#choose();
   }

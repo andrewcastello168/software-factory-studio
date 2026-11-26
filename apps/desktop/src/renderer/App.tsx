@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  AlertCircle, AppWindow, CircleCheck, Clock3, Folder, FolderOpen, GitBranch, House, LoaderCircle, PanelLeft, RefreshCw, X,
+  AlertCircle, AppWindow, CircleCheck, Clock3, Folder, FolderOpen, GitBranch, GitFork, House, LoaderCircle, PanelLeft, RefreshCw, X,
   PanelLeftClose, PanelLeftOpen, Settings2,
 } from 'lucide-react';
 import { SIDEBAR } from '@factory/contracts';
+import type { GitCloneRequest } from '@factory/contracts';
 import { browserPreview, usePreferences } from './usePreferences';
 import { Button, Dialog, IconButton } from './components/Controls';
 import { CommandPalette, WorkspaceMenu } from './components/Commands';
 import type { Command } from './components/Commands';
 import { useProjects } from './useProjects';
+import { gitBridge, gitLabel, useGit } from './useGit';
+import { CloneDialog, GitPanel } from './components/Git';
 import { ProjectList, ProjectPanel, WorkspaceTabs } from './components/Projects';
 import type { ProjectView } from './components/Projects';
 import { Navigation } from './components/Navigation';
@@ -25,6 +28,11 @@ export function App() {
   const [views, setViews] = useState<Record<string, ProjectView>>({});
   const activeProject = workspace.catalog.projects.find((project) => project.id === activeId);
   const active = activeProject?.id ?? null;
+  const git = useGit(activeProject);
+  const repo = git.status?.state === 'repository' ? git.status : null;
+  const [cloning, setCloning] = useState(false);
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [cloneNotice, setCloneNotice] = useState<string | null>(null);
   const view = activeProject ? views[activeProject.id] ?? 'overview' : null;
   const [page, setPage] = useState<Page>('home');
   const [collapsed, setCollapsed] = useState(false);
@@ -55,12 +63,12 @@ export function App() {
     function handleKey(event: KeyboardEvent) {
       if ((mac ? event.metaKey : event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        if (!restore) openPalette();
+        if (!restore && !cloneOpen && !document.querySelector('dialog[open]')) openPalette();
       }
     }
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [mac, openPalette, restore]);
+  }, [mac, openPalette, restore, cloneOpen]);
 
   function openPage(next: Page) {
     setActiveId(null);
@@ -74,6 +82,34 @@ export function App() {
 
   function openFolder() {
     void selectProject(workspace.openFolder());
+  }
+
+  async function clone(input: GitCloneRequest) {
+    if (cloning || !gitBridge) return;
+    setCloning(true);
+    setCloneNotice(null);
+    try {
+      const response = await gitBridge.clone(input);
+      if (response?.ok) {
+        const { selection, level, message } = response.value;
+        if (selection) {
+          workspace.applySelection(selection);
+          const id = selection.projectId;
+          if (id) {
+            setActiveId(id);
+            setViews((current) => ({ ...current, [id]: 'git' }));
+          }
+        }
+        if (level === 'error' || level === 'warning') setCloneNotice(message);
+      } else {
+        setCloneNotice('Studio could not start the clone operation.');
+      }
+    } catch {
+      setCloneNotice('Studio could not reach the desktop Git service.');
+    } finally {
+      setCloning(false);
+      setCloneOpen(false);
+    }
   }
 
   function openProjectView(next: ProjectView) {
@@ -107,11 +143,15 @@ export function App() {
   if (workspace.native && !workspace.opening) {
     commands.splice(1, 0, { id: 'open-folder', title: 'Open Folder', icon: FolderOpen, run: openFolder });
   }
+  if (gitBridge && !cloning && !workspace.opening) {
+    commands.splice(2, 0, { id: 'clone', title: 'Clone Repository', icon: GitFork, run: () => setCloneOpen(true) });
+  }
   if (activeProject) {
     commands.push(
       { id: 'overview', title: 'Project Overview', icon: House, run: () => openProjectView('overview') },
       { id: 'structure', title: 'Project Structure', icon: Folder, run: () => openProjectView('structure') },
-      { id: 'rescan', title: 'Rescan Project', icon: RefreshCw, run: () => void workspace.rescan(activeProject.id) },
+      { id: 'git', title: 'Git Studio', icon: GitBranch, run: () => openProjectView('git') },
+      { id: 'rescan', title: 'Rescan Project', icon: RefreshCw, run: () => { void workspace.rescan(activeProject.id); void git.refresh(); } },
       { id: 'close-project', title: 'Close Project', icon: X, run: () => void closeProject(activeProject.id) },
     );
   }
@@ -150,7 +190,11 @@ export function App() {
           <span className="context-detail context-directory" title={`Working directory: ${activeProject?.directory ?? 'None'}`}>
             <span>Directory</span><bdi>{activeProject?.directory ?? '—'}</bdi>
           </span>
-          <span className="context-detail" title="Git details unavailable"><GitBranch size={14} aria-hidden="true" /><span>Git unavailable</span></span>
+          {activeProject ? <Button className="context-detail context-git" onClick={() => openProjectView('git')}
+            title={repo?.head ?? git.status?.state ?? 'Open Git Studio'}>
+            <GitBranch size={14} aria-hidden="true" /><bdi>{repo?.branch ?? (repo ? 'Detached HEAD' : gitLabel(git.status))}</bdi>
+            {repo && <span className="context-git-status">{gitLabel(repo)}</span>}
+          </Button> : <span className="context-detail"><GitBranch size={14} aria-hidden="true" /><span>Git unavailable</span></span>}
         </div>
         <OpenCommandButton open={openPalette} shortcut={shortcut} />
       </header>
@@ -223,6 +267,10 @@ export function App() {
                 </div>
               </div>
             )}
+            {cloneNotice && <div className="notice-wrap"><div className="notice" role="alert">
+              <AlertCircle size={16} aria-hidden="true" /><span>{cloneNotice}</span>
+              <IconButton label="Dismiss clone result" onClick={() => setCloneNotice(null)}><X size={15} aria-hidden="true" /></IconButton>
+            </div></div>}
             {workspace.error && <div className="notice-wrap"><div className="notice" role="alert">
               <AlertCircle size={16} aria-hidden="true" /><span>{workspace.error}</span>
               <IconButton label="Dismiss project error" onClick={workspace.dismiss}><X size={15} aria-hidden="true" /></IconButton>
@@ -235,12 +283,14 @@ export function App() {
               </div></div>
             )}
             <section role="tabpanel" id="workspace-panel" aria-labelledby={`workspace-tab-${active ?? 'global'}`}>
-              {activeProject && view ? <ProjectPanel
+              {activeProject && view === 'git' ? <GitPanel key={activeProject.id} project={activeProject} git={git} />
+                : activeProject && view ? <ProjectPanel
                 key={activeProject.id}
                 project={activeProject}
-                view={view}
+                view={view === 'structure' ? 'structure' : 'overview'}
                 setView={openProjectView}
-                rescan={() => void workspace.rescan(activeProject.id)}
+                rescan={() => { void workspace.rescan(activeProject.id); void git.refresh(); }}
+                gitContext={repo ? `${repo.branch ?? 'Detached HEAD'} · ${gitLabel(repo)}` : gitLabel(git.status)}
                 locate={workspace.catalog.recents.some((recent) => recent.id === activeProject.recentId)
                   ? () => void selectProject(workspace.locate(activeProject.recentId)) : undefined}
                 opening={workspace.opening}
@@ -249,6 +299,7 @@ export function App() {
                     openSettings={() => openPage('settings')}
                     openPalette={openPalette}
                     openFolder={openFolder}
+                    cloneRepository={gitBridge ? () => setCloneOpen(true) : undefined}
                     openProjects={() => openPage('recents')}
                     native={workspace.native}
                     opening={workspace.opening}
@@ -288,15 +339,16 @@ export function App() {
       </div>
       <footer className="statusbar">
         <span><AppWindow size={13} aria-hidden="true" />{
-          browserPreview ? 'Browser development' : workspace.opening ? 'Opening folder…'
+          browserPreview ? 'Browser development' : cloning ? 'Cloning repository…' : workspace.opening ? 'Opening folder…'
             : activeProject?.refreshing ? 'Scanning project…'
-              : activeProject?.availability === 'ready' ? 'Read-only project' : activeProject ? 'Project unavailable' : 'Desktop workspace'
+              : activeProject?.availability === 'ready' ? (repo ? 'Git workspace' : 'Local project') : activeProject ? 'Project unavailable' : 'Desktop workspace'
         }</span>
         <div>
           <span role="status" className={notice ? 'status-warning' : undefined}><StatusIcon size={13} aria-hidden="true" />{status}</span>
           {state.appInfo && <span aria-label={`Studio version ${state.appInfo.version}`}>v{state.appInfo.version}</span>}
         </div>
       </footer>
+      {cloneOpen && <CloneDialog close={() => setCloneOpen(false)} clone={(input) => void clone(input)} busy={cloning} />}
       {palette && <CommandPalette commands={commands} close={() => setPalette(false)} />}
       {restore && (
         <Dialog title="Restore default preferences?" onClose={() => setRestore(false)}>
