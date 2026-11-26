@@ -44,19 +44,27 @@ test('native New Project opens a verified managed starter after the reviewed app
     await wizard.getByRole('button', { name: 'Choose Folder', exact: true }).click();
     await wizard.getByRole('button', { name: 'Continue', exact: true }).click();
     await expect(wizard.getByRole('combobox', { name: 'Engineering profile' })).toContainText('Standard Engineering');
+    const example = wizard.getByRole('checkbox', { name: 'Welcome example' });
+    await expect(example).not.toBeChecked();
+    await wizard.getByText('Planned options', { exact: true }).click();
+    await expect(wizard.getByRole('list', { name: 'Planned optional modules' })).toContainText('Authentication');
+    await page.screenshot({ path: test.info().outputPath('new-project-modules-light.png') });
     await wizard.getByRole('button', { name: 'Review Files' }).click();
     await expect(wizard.getByRole('heading', { name: 'Review generation plan' })).toBeVisible();
     await expect(wizard.getByRole('region', { name: 'File preview' })).toContainText('Standard Engineering profile v1');
+    await expect(wizard.getByText('Foundation only')).toBeVisible();
+    await expect(wizard.getByRole('button', { name: 'db/migrations/0002_welcome.sql', exact: true })).toHaveCount(0);
     expect(await readdir(parent)).toEqual([]);
     await page.screenshot({ path: test.info().outputPath('new-project-review-light.png') });
     await wizard.getByRole('button', { name: 'Generate Project', exact: true }).click();
     await expect(wizard.getByRole('heading', { name: 'Stack and profiles' })).toBeVisible();
     expect(await readdir(parent)).toEqual([]);
     await instance.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'dark'; });
+    await example.check();
     await wizard.getByRole('button', { name: 'Review Files' }).click();
     await expect(wizard.getByRole('heading', { name: 'Review generation plan' })).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-    await wizard.getByRole('button', { name: 'db/migrations/0001_welcome.sql', exact: true }).click();
+    await wizard.getByRole('button', { name: 'db/migrations/0002_welcome.sql', exact: true }).click();
     await expect(wizard.getByRole('region', { name: 'File preview' })).toContainText('CREATE TABLE welcome_messages');
     await page.screenshot({ path: test.info().outputPath('new-project-review-dark.png') });
     expect(await page.evaluate(() => Reflect.apply(window.studio!.generator.preview, null, [{ destination: '../outside' }])))
@@ -72,6 +80,8 @@ test('native New Project opens a verified managed starter after the reviewed app
       expect(createHash('sha256').update(await readFile(join(project, file.path))).digest('hex')).toBe(file.sha256);
     }
     expect(await readdir(project)).not.toContain('node_modules');
+    expect(JSON.parse(await readFile(join(project, '.factory', 'modules.json'), 'utf8')))
+      .toMatchObject({ installed: [{ id: 'welcome-example', version: '1.0.0', requires: [] }] });
     await wizard.getByRole('button', { name: 'Open Project', exact: true }).click();
     await expect(page.getByRole('tab', { name: 'Inventory Portal' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByText('Managed project', { exact: true })).toBeVisible();

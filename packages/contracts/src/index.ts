@@ -7,6 +7,7 @@ export { hasControlCharacters, hasExactKeys, isRecord } from './validation';
 export * from './projects';
 export * from './git';
 export * from './generator';
+export * from './generator-modules';
 
 export const CHANNEL = {
   appInfo: 'factory:app-info',

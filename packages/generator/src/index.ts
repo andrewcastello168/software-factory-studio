@@ -1,11 +1,14 @@
 import { createHash } from 'node:crypto';
-import { GENERATOR_LIMITS, isGeneratorPath, isProjectId, isStarterConfig, STARTER } from '@factory/contracts';
-import type { GeneratorFile, StarterConfig } from '@factory/contracts';
+import {
+  GENERATOR_LIMITS, isGeneratorPath, isLegacyStarterConfig, isProjectId, isStarterConfig, MODULE_CATALOG, STARTER,
+} from '@factory/contracts';
+import type { GeneratorFile, LegacyStarterConfig, StarterConfig } from '@factory/contracts';
+import { composeModules, foundationTemplates } from './modular';
 import { nodeTemplates } from './templates';
 
-export interface StarterPlan {
+export interface StarterPlan<Config = StarterConfig | LegacyStarterConfig> {
   projectId: string;
-  config: StarterConfig;
+  config: Config;
   digest: string;
   files: GeneratorFile[];
 }
@@ -15,6 +18,9 @@ export function sha256(value: string | Uint8Array) {
 }
 
 const json = (value: unknown) => JSON.stringify(value, null, 2) + '\n';
+const normalize = (text: string) => text.replace(/\r\n/gu, '\n');
+const templateHashes = (templates: readonly (readonly [string, string])[]) =>
+  templates.map(([path, text]) => [path, sha256(normalize(text))]);
 
 function file(path: string, content: string): GeneratorFile {
   if (!isGeneratorPath(path) || Buffer.byteLength(content) > GENERATOR_LIMITS.fileBytes || content.includes('\0')) {
@@ -23,51 +29,105 @@ function file(path: string, content: string): GeneratorFile {
   return { path, content, sha256: sha256(content) };
 }
 
-function renderingConfig(config: StarterConfig): StarterConfig {
+function coreConfig(config: LegacyStarterConfig | StarterConfig) {
   const { name, slug, port, appType, stack, architecture, engineering } = config;
   return { name, slug, port, appType, stack, architecture, engineering };
 }
 
-export function planProject(input: StarterConfig, projectId: string): StarterPlan {
-  if (!isStarterConfig(input) || !isProjectId(projectId)) throw new Error('Unsupported project configuration.');
-  const config = renderingConfig(input);
-  const versions = {
-    generator: STARTER.engineVersion,
-    stack: { id: config.stack, version: STARTER.templateVersion, templateSha256: sha256(json(nodeTemplates.map(
-      ([path, template]) => [path, sha256(template.replace(/\r\n/gu, '\n'))],
-    ))) },
-    architecture: { id: config.architecture, version: STARTER.architectureVersion },
-    engineering: { id: config.engineering, version: STARTER.engineeringVersion },
-  };
-  const values: Readonly<Record<string, string>> = {
-    NAME: config.name,
-    TITLE: JSON.stringify(config.name),
-    PORT: String(config.port),
-    DATABASE: config.slug.replace(/-/gu, '_'),
-  };
-  const files = nodeTemplates.map(([path, template]) => {
-    const text = template.replace(/\r\n/gu, '\n').replace(/@@([A-Z]+)@@/gu, (_all, key: string) => {
+function renderingValues(config: LegacyStarterConfig | StarterConfig) {
+  return { NAME: config.name, TITLE: JSON.stringify(config.name), PORT: String(config.port), DATABASE: config.slug.replace(/-/gu, '_') };
+}
+
+function render(
+  templates: readonly (readonly [string, string])[], slug: string, values: Readonly<Record<string, string>>,
+  testPaths: readonly string[] = [],
+) {
+  return templates.map(([path, template]) => {
+    const text = normalize(template).replace(/@@([A-Z]+)@@/gu, (_all, key: string) => {
       const value = values[key];
       if (value === undefined) throw new Error('Unknown built-in template parameter.');
       return value;
     });
     if (path !== 'package.json') return file(path, text);
-    const manifest = JSON.parse(text) as Record<string, unknown>;
-    return file(path, json({ ...manifest, name: config.slug }));
+    const manifest = JSON.parse(text) as { name: string; scripts: Record<string, string> };
+    if (testPaths.length) {
+      manifest.scripts.test = 'node --experimental-strip-types --env-file-if-exists=.env --test ' + testPaths.join(' ');
+    }
+    return file(path, json({ ...manifest, name: slug }));
   });
-  files.push(
-    file('.factory/project.json', json({
-      version: 1, id: projectId, name: config.name, type: config.appType, stackId: config.stack, profileId: config.architecture,
-    })),
-    file('.factory/versions.lock.json', json({ version: 1, ...versions })),
-  );
-  const fingerprints = () => files.map(({ path, sha256 }) => ({ path, sha256, owner: config.stack, action: 'create' }));
+}
+
+function projectDescriptor(config: LegacyStarterConfig | StarterConfig, projectId: string) {
+  return file('.factory/project.json', json({
+    version: 1, id: projectId, name: config.name, type: config.appType, stackId: config.stack, profileId: config.architecture,
+  }));
+}
+
+function finalize<Config>(
+  config: Config, projectId: string, files: GeneratorFile[], owners: ReadonlyMap<string, string>, fallbackOwner: string,
+  versions: object, manifestVersion: number,
+): StarterPlan<Config> {
+  const fingerprints = () => files.map(({ path, sha256 }) => ({ path, sha256, owner: owners.get(path) ?? fallbackOwner, action: 'create' }));
   files.push(file('.factory/generation-manifest.json', json({
-    version: 1, projectId, inputsSha256: sha256(json({ projectId, config })), versions, files: fingerprints(),
+    version: manifestVersion, projectId, inputsSha256: sha256(json({ projectId, config })), versions, files: fingerprints(),
   })));
   const paths = files.map(({ path }) => path.toLowerCase());
-  if (files.length > GENERATOR_LIMITS.files || new Set(paths).size !== paths.length) {
-    throw new Error('Duplicate or excessive built-in generator outputs.');
+  const entries = new Set(paths);
+  if (files.length > GENERATOR_LIMITS.files || entries.size !== paths.length || paths.some((path) => {
+    const parts = path.split('/');
+    return parts.slice(1).some((_part, index) => entries.has(parts.slice(0, index + 1).join('/')));
+  })) {
+    throw new Error('Conflicting or excessive built-in generator outputs.');
   }
   return { projectId, config, digest: sha256(json({ projectId, config, files: fingerprints() })), files };
+}
+
+/** Reproduce already-approved Phase 04 v1 journals. New IPC requests require the modular configuration. */
+export function planLegacyProject(input: LegacyStarterConfig, projectId: string): StarterPlan<LegacyStarterConfig> {
+  if (!isLegacyStarterConfig(input) || !isProjectId(projectId)) throw new Error('Unsupported legacy project configuration.');
+  const config = { ...coreConfig(input), appType: input.appType };
+  const versions = {
+    generator: '1.0.0',
+    stack: { id: config.stack, version: '1.0.0', templateSha256: sha256(json(templateHashes(nodeTemplates))) },
+    architecture: { id: config.architecture, version: '1.0.0' },
+    engineering: { id: config.engineering, version: '1.0.0' },
+  };
+  const files = render(nodeTemplates, config.slug, renderingValues(config));
+  files.push(projectDescriptor(config, projectId), file('.factory/versions.lock.json', json({ version: 1, ...versions })));
+  return finalize(config, projectId, files, new Map(), config.stack, versions, 1);
+}
+
+export function planProject(input: StarterConfig, projectId: string): StarterPlan<StarterConfig> {
+  if (!isStarterConfig(input) || !isProjectId(projectId)) throw new Error('Unsupported project configuration.');
+  const config: StarterConfig = {
+    ...coreConfig(input), database: input.database,
+    modules: input.modules.map(({ id, version }) => ({ id, version })).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  };
+  const { modules, slots, testPaths } = composeModules(config.modules);
+  const versions = {
+    generator: STARTER.engineVersion,
+    stack: { id: config.stack, version: STARTER.templateVersion, templateSha256: sha256(json(templateHashes(foundationTemplates))) },
+    architecture: { id: config.architecture, version: STARTER.architectureVersion },
+    engineering: { id: config.engineering, version: STARTER.engineeringVersion },
+    database: config.database,
+    modules: modules.map(({ id, version, templates, slots, tests }) => ({
+      id, version, templateSha256: sha256(json({ files: templateHashes(templates), slots, tests })),
+      requires: MODULE_CATALOG.find((module) => module.id === id)!.requires,
+    })),
+  };
+  const values = { ...renderingValues(config), ...slots };
+  const files = render(foundationTemplates, config.slug, values, testPaths);
+  const owners = new Map<string, string>();
+  for (const module of modules) {
+    for (const planned of render(module.templates, config.slug, values)) {
+      files.push(planned);
+      owners.set(planned.path, module.id);
+    }
+  }
+  files.push(
+    projectDescriptor(config, projectId),
+    file('.factory/versions.lock.json', json({ version: 2, ...versions })),
+    file('.factory/modules.json', json({ version: 1, installed: versions.modules })),
+  );
+  return finalize(config, projectId, files, owners, config.stack, versions, 2);
 }

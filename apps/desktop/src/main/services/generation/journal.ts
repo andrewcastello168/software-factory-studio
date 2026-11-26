@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { link, lstat, mkdir, open, readdir, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { GENERATOR_LIMITS, hasExactKeys, isGeneratorDigest, isGeneratorPath, isProjectId, isRecord, isStarterConfig } from '@factory/contracts';
-import type { StarterConfig } from '@factory/contracts';
+import { GENERATOR_LIMITS, hasExactKeys, isGeneratorDigest, isGeneratorPath, isProjectId, isRecord, isLegacyStarterConfig, isStarterConfig } from '@factory/contracts';
+import type { LegacyStarterConfig, StarterConfig } from '@factory/contracts';
 import { admitRoot, checkedDirectory, directoryIdentity, isRootPath, readBoundedFile, withDirectory } from '../projects/filesystem';
 import type { DirectoryIdentity, ProjectRoot } from '../projects/filesystem';
 
@@ -13,7 +13,7 @@ export interface GenerationRecord {
   id: string;
   projectId: string;
   digest: string;
-  config: StarterConfig;
+  config: StarterConfig | LegacyStarterConfig;
   parent: ProjectRoot;
   directories: Record<string, DirectoryIdentity>;
   createdFiles: number;
@@ -44,7 +44,7 @@ function isGenerationRecord(value: unknown): value is GenerationRecord {
   return isRecord(value) && hasExactKeys(value, [
     'version', 'id', 'projectId', 'digest', 'config', 'parent', 'directories', 'createdFiles',
   ]) && value.version === 1 && isProjectId(value.id) && isProjectId(value.projectId)
-    && isGeneratorDigest(value.digest) && isStarterConfig(value.config) && isParent(value.parent)
+    && isGeneratorDigest(value.digest) && (isStarterConfig(value.config) || isLegacyStarterConfig(value.config)) && isParent(value.parent)
     && typeof value.createdFiles === 'number' && Number.isInteger(value.createdFiles)
     && value.createdFiles >= 0 && value.createdFiles <= GENERATOR_LIMITS.files
     && isRecord(value.directories) && Object.keys(value.directories).length <= GENERATOR_LIMITS.files

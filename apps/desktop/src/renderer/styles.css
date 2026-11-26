@@ -725,3 +725,13 @@ kbd {
   .generator-preview { grid-template-columns: minmax(0, 1fr); }
   .generator-preview ul { max-height: 110px; border-right: 0; border-bottom: 1px solid var(--line); }
 }
+
+.generator-modules { min-width: 0; border: 1px solid var(--line); padding: 6px 10px 8px; }
+.generator-modules legend { padding: 0 5px; font-weight: 650; }
+.generator-module { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0 7px; cursor: pointer; }
+.generator-module input { margin-top: 3px; accent-color: var(--accent); }
+.generator-module > span { display: grid; gap: 2px; }
+.generator-planned { border-top: 1px solid var(--line); padding-top: 6px; }
+.generator-planned summary { width: fit-content; cursor: pointer; color: var(--muted); }
+.generator-planned p { margin: 5px 0; }
+.generator-planned ul { display: flex; flex-wrap: wrap; gap: 4px 12px; list-style: none; padding: 0; margin: 0; color: var(--muted); font-size: 12px; }

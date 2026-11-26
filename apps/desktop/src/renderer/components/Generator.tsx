@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, CircleCheck, FileText, FolderOpen, ShieldCheck } from 'lucide-react';
-import { isStarterConfig, STARTER } from '@factory/contracts';
+import { isStarterConfig, MODULE_CATALOG, STARTER, WELCOME_EXAMPLE } from '@factory/contracts';
 import type {
   ErrorCode, GeneratorParent, GeneratorPending, GeneratorPreview, GeneratorReceipt, ProjectSelection, Result, StarterConfig,
 } from '@factory/contracts';
@@ -36,6 +36,7 @@ export function GeneratorDialog({ close, opened, recovery }: {
   const [slug, setSlug] = useState('');
   const [customSlug, setCustomSlug] = useState(false);
   const [port, setPort] = useState('3000');
+  const [welcome, setWelcome] = useState(false);
   const [parent, setParent] = useState<GeneratorParent | null>(null);
   const [plan, setPlan] = useState<GeneratorPreview | null>(null);
   const [receipt, setReceipt] = useState<GeneratorReceipt | null>(null);
@@ -47,7 +48,8 @@ export function GeneratorDialog({ close, opened, recovery }: {
 
   const config: StarterConfig = {
     name: name.trim().normalize('NFC'), slug, port: Number(port),
-    appType: STARTER.appType, stack: STARTER.stack, architecture: STARTER.architecture, engineering: STARTER.engineering,
+    appType: STARTER.appType, stack: STARTER.stack, database: STARTER.database,
+    architecture: STARTER.architecture, engineering: STARTER.engineering, modules: welcome ? [WELCOME_EXAMPLE] : [],
   };
   const valid = isStarterConfig(config);
   const selectedFile = plan?.files.find((item) => item.path === file);
@@ -170,7 +172,25 @@ export function GeneratorDialog({ close, opened, recovery }: {
             <label>Architecture profile<select defaultValue={STARTER.architecture}><option value={STARTER.architecture}>Layered Web · v1</option></select></label>
             <label>Engineering profile<select defaultValue={STARTER.engineering}><option value={STARTER.engineering}>Standard Engineering · v1</option></select></label>
           </div>
-          <p className="generator-muted">Includes a PostgreSQL migration, independent build commands, and project instructions for people and coding assistants.</p>
+          <fieldset className="generator-modules">
+            <legend>Optional features</legend>
+            <label className="generator-module">
+              <input type="checkbox" checked={welcome} disabled={Boolean(busy)}
+                aria-describedby="welcome-description" onChange={(event) => setWelcome(event.target.checked)} />
+              <span>
+                <strong>Welcome example</strong>
+                <span className="generator-muted" id="welcome-description">Adds a PostgreSQL-backed API route, React panel, and sample migration.</span>
+              </span>
+            </label>
+            <details className="generator-planned">
+              <summary>Planned options</summary>
+              <p className="generator-muted">Backend-only, frontend-only, and database-free templates are planned.</p>
+              <ul aria-label="Planned optional modules">
+                {MODULE_CATALOG.filter((module) => module.version === null).map(({ id, label }) =>
+                  <li key={id}>{label}</li>)}
+              </ul>
+            </details>
+          </fieldset>
           <div className="dialog-actions">
             <Button onClick={() => go('project')} disabled={Boolean(busy)}>Back</Button>
             <Button variant="primary" disabled={!bridge || !parent || !valid || Boolean(busy)}
@@ -182,7 +202,10 @@ export function GeneratorDialog({ close, opened, recovery }: {
         {step === 'review' && plan && <section className="generator-section" aria-labelledby="generator-current-step">
           <h3 id="generator-current-step" ref={heading} tabIndex={-1}>Review generation plan</h3>
           <div className="generator-destination">
-            <div><strong>{plan.files.length} new files</strong><p className="generator-path"><bdi>{plan.directory}</bdi></p></div>
+            <div><strong>{plan.files.length} new files</strong><p className="generator-path"><bdi>{plan.directory}</bdi></p>
+              <p className="generator-muted">{plan.config.modules.length
+                ? plan.config.modules.map(({ id, version }) => (MODULE_CATALOG.find((entry) => entry.id === id)?.label ?? id) + ' v' + version).join(', ')
+                : 'Foundation only'}</p></div>
             <ShieldCheck size={19} aria-hidden="true" />
           </div>
           <div className="generator-preview">
