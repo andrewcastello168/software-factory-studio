@@ -82,3 +82,22 @@ The Windows Server 2025 x64 GitHub Actions job passed the frozen installation, l
 The initial run exposed a preferences read failure because Node's Windows path stats omitted the volume serial for a file whose opened handle reported it. The fix retains the exact file ID comparison and checks creation time when that volume serial is unavailable. The Windows filesystem integration and native Electron suites both cover successful reads after a write.
 
 Use the [PowerShell commands](../README.md#development-setup) to reproduce the checks on a local Windows system. Windows installer, upgrade, uninstall, and signing checks remain Phase 12.
+
+## Phase 02 · Project management
+
+Phase 02 starts from `main` at `c5c8d19` with the merged desktop foundation and Windows x64 CI fixes. The existing Windows workflow runs the Phase 02 suites. The base had no tracked Linux workflow, so a Linux job runs the pinned installation, lint, type checking, filesystem integration tests, and build on GitHub. The full Linux browser and native Electron suites run separately in Cloud with sandboxing enabled.
+
+| Gate | Evidence |
+| --- | --- |
+| Native chooser and real folders | The integration suite uses disposable local directories. The built Electron suite checks the directory-only dialog call, then supplies a fixture choice and exercises the same admission and IPC path as the desktop UI. |
+| Read-only opening and portable metadata | Fixtures preserve their directory entries, source bytes, and original descriptor bytes. The descriptor parser covers absent, valid, invalid, newer, and blocked metadata. |
+| Multiple workspaces and persistent recents | Tests cover separate roots sharing a portable UUID, canonical deduplication, tab selection, close and revocation, and reopening a recent after Electron relaunch. |
+| Rescan, filesystem events, and missing paths | Tests cover edits from outside Studio, a manual scan, a missing or replaced root, confirmed relocation, and rejecting an unconfirmed identity mismatch. |
+| Filesystem boundary | Tests cover invalid IPC paths and unknown tokens, traversal and reserved-name validation, scan depth, skipped links, and a native Windows junction fixture. |
+| Git status and clone | The workbench displays the actual working folder and labels Git details unavailable. Phase 03 owns cloning and Git operations. |
+
+Cloud Linux passed lint, type checking, 42 Vitest cases, the production build, eight sandboxed Chromium tests, and two sandboxed Electron tests. GitHub Linux x64 passed the frozen install, lint, type checking, Vitest, and build. [Linux CI](https://github.com/andrewcastello168/software-factory-studio/actions/runs/45745161634)
+
+GitHub Windows Server 2025 x64 passed the frozen install, lint, type checking, build, the same 42 Vitest cases, eight Chromium tests, and two native Electron tests. The initial Windows run exposed descendant watcher handles blocking folder moves and an alias mismatch in the recent-store containment check. Both cases passed after the watcher and path fixes. [Windows CI](https://github.com/andrewcastello168/software-factory-studio/actions/runs/45745161643)
+
+Project Overview in light theme and Project Structure in dark theme were visually inspected from the built Linux app. The Windows test captures the same screens with disposable projects. [Windows screenshots](https://github.com/andrewcastello168/software-factory-studio/actions/runs/45745161643/artifacts/15082792961)

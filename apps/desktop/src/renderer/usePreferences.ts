@@ -7,7 +7,7 @@ import type {
 export const browserPreview = import.meta.env.MODE === 'web';
 const bridge = window.studio;
 
-const errors: Record<ErrorCode, string> = {
+const errors: Partial<Record<ErrorCode, string>> = {
   ACCESS_DENIED: 'This window is not authorized to access preferences.',
   BRIDGE_UNAVAILABLE: 'The desktop preferences service is unavailable.',
   INVALID_REPLY: 'The desktop preferences service returned an invalid response.',
@@ -48,7 +48,7 @@ export function usePreferences() {
         setStorage(result.value.storage);
       } else {
         setStorage(undefined);
-        setError(errors[result.error]);
+        setError(errors[result.error] ?? 'The desktop preferences service returned an unexpected error.');
       }
     }).catch(() => { if (active) setError(errors.BRIDGE_UNAVAILABLE); })
       .finally(() => { if (active) setLoading(false); });
@@ -94,7 +94,7 @@ export function usePreferences() {
         setStorage('ready');
         setSaved(true);
       } else {
-        setError(errors[result.error]);
+        setError(errors[result.error] ?? 'The desktop preferences service returned an unexpected error.');
       }
     } catch {
       setError(errors.BRIDGE_UNAVAILABLE);

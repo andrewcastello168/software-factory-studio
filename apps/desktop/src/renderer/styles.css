@@ -244,26 +244,51 @@ kbd {
 .separator[aria-disabled="true"] { cursor: default; }
 
 .workspace { display: grid; grid-template-rows: 40px minmax(0, 1fr); min-width: 0; }
+.workspace-tabs-bar {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--rail);
+}
 .workspace-tabs {
   display: flex;
   align-items: stretch;
-  gap: 12px;
   min-width: 0;
-  border-bottom: 1px solid var(--line);
-  background: var(--rail);
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 .workspace-tab {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 16px;
+  flex: 0 0 auto;
+  max-width: clamp(125px, 24vw, 240px);
   border-right: 1px solid var(--line);
-  border-top: 2px solid var(--accent);
+  border-top: 2px solid transparent;
+  color: var(--muted);
+}
+.workspace-tab[data-selected="true"] {
+  border-top-color: var(--accent);
   background: var(--canvas);
+  color: var(--ink);
   font-weight: 600;
 }
-.workspace-tab svg { color: var(--accent); }
-.workspace-scope { align-self: center; font-size: 11px; color: var(--muted); }
+.workspace-tab > button {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  min-width: 0;
+  gap: 7px;
+  padding: 0 12px;
+  text-align: start;
+}
+.workspace-tab > button:focus-visible { outline-offset: -3px; }
+.workspace-tab > button bdi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-tab > button svg { color: var(--accent); }
+.workspace-tab > .tooltip-anchor { margin-right: 3px; }
+.workspace-tab .button--icon { width: 25px; min-height: 26px; }
+.workspace-scope { align-self: center; font-size: 11px; color: var(--muted); white-space: nowrap; }
 .workspace-main { min-width: 0; overflow: auto; }
 .workspace-main:focus { outline: none; }
 
@@ -446,4 +471,63 @@ kbd {
 @media (max-width: 740px) {
   .nav-group[data-planned="true"] .nav-planned > span::after { content: none; }
   .nav-group h2 { flex-wrap: wrap; gap: 2px 8px; }
+}
+
+.project-context { min-width: 0; }
+.project-context bdi, .context-directory bdi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.context-directory { min-width: 0; }
+.context-directory > span { flex: 0 0 auto; }
+.home-project-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.project-heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.project-heading > div { min-width: 0; }
+.project-heading .project-path { margin-top: 4px; }
+.project-toolbar, .project-row-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.project-path, .project-mono {
+  color: var(--muted);
+  font: 12px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+.project-list, .structure { border: 1px solid var(--line); background: var(--surface); border-radius: 4px; }
+.project-list-row { display: flex; gap: 10px; align-items: center; padding: 9px 10px; min-height: 52px; }
+.project-list-row + .project-list-row { border-top: 1px solid var(--line); }
+.project-row-info { flex: 1 1 150px; min-width: 0; }
+.project-row-info bdi { display: block; }
+.project-name { font-weight: 600; overflow-wrap: anywhere; }
+.project-icon { color: var(--accent); }
+.project-state { color: var(--muted); font-size: 12px; }
+.project-state--warning, .scan-notice { color: var(--warning); }
+.project-section { margin-bottom: 22px; }
+.project-section h2 { margin-bottom: 8px; }
+.project-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+  padding: 10px 14px;
+  gap: 10px 18px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 4px;
+}
+.project-details dt { color: var(--muted); font-size: 12px; }
+.project-details dd { margin-top: 2px; font-weight: 550; overflow-wrap: anywhere; }
+.project-notice > div { flex: 1 1 160px; }
+.scan-notice { margin-bottom: 10px; }
+.structure-list { list-style: none; }
+.structure-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 28px;
+  padding-right: 8px;
+  gap: 7px;
+  text-align: start;
+  overflow: hidden;
+}
+.structure-row > bdi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.structure-row > svg { color: var(--accent); }
+.structure-note { margin-inline-start: auto; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.structure-empty { padding: 8px 10px; color: var(--muted); }
+@media (max-width: 700px) {
+  .project-list-row { flex-wrap: wrap; }
+  .project-row-info { flex-basis: 140px; }
+  .workspace-scope { display: none; }
 }

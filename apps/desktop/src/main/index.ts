@@ -1,17 +1,20 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, protocol, session } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
 import { readFile, realpath } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import {
   CHANNEL, failure, isAppInfo, isPreferences, isPreferenceSnapshot, isPreferenceWrite, success,
-  validateReply,
+  validateReply, PROJECT_CHANNEL, isProjectCatalog, isProjectId, isProjectSelection,
 } from '@factory/contracts';
 import type { Result, SystemTheme, Validator } from '@factory/contracts';
 import { APP_URL, DEV_URL, PRODUCTION_CSP, isAuthorizedFrame, isRendererDocument, rendererRestrictions, resolveBundledRoute } from './security';
 import { PreferenceStore } from './services/preferences';
+import { RecentStore } from './services/projects/recents';
+import { ProjectWorkspace } from './services/projects/workspace';
 
 const development = !app.isPackaged && process.env.FACTORY_DESKTOP_DEV === '1';
 let window: BrowserWindow | undefined;
+let projects: ProjectWorkspace | undefined;
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'studio', privileges: { standard: true, secure: true, supportFetchAPI: true } },
@@ -50,6 +53,25 @@ function installBridge(store: PreferenceStore) {
   nativeTheme.on('updated', () => {
     if (window && !window.isDestroyed()) window.webContents.send(CHANNEL.systemTheme, systemTheme());
   });
+}
+
+function installProjectBridge() {
+  function forWorkspace<T>(operation: (workspace: ProjectWorkspace, id: string) => Promise<Result<T>>) {
+    return (...args: unknown[]): Result<T> | Promise<Result<T>> => {
+      if (!projects) return failure('ACCESS_DENIED');
+      return args.length === 1 && isProjectId(args[0]) ? operation(projects, args[0]) : failure('INVALID_REQUEST');
+    };
+  }
+
+  handle(PROJECT_CHANNEL.list, isProjectCatalog, (...args) =>
+    args.length ? failure('INVALID_REQUEST') : projects?.list() ?? failure('ACCESS_DENIED'));
+  handle(PROJECT_CHANNEL.openFolder, isProjectSelection, (...args) =>
+    args.length ? failure('INVALID_REQUEST') : projects?.openFolder() ?? failure('ACCESS_DENIED'));
+  handle(PROJECT_CHANNEL.openRecent, isProjectSelection, forWorkspace((workspace, id) => workspace.openRecent(id)));
+  handle(PROJECT_CHANNEL.locateRecent, isProjectSelection, forWorkspace((workspace, id) => workspace.locateRecent(id)));
+  handle(PROJECT_CHANNEL.removeRecent, isProjectCatalog, forWorkspace((workspace, id) => workspace.removeRecent(id)));
+  handle(PROJECT_CHANNEL.rescan, isProjectCatalog, forWorkspace((workspace, id) => workspace.rescan(id)));
+  handle(PROJECT_CHANNEL.close, isProjectCatalog, forWorkspace((workspace, id) => workspace.close(id)));
 }
 
 async function installProtocol() {
@@ -93,6 +115,37 @@ async function openWindow() {
     },
   });
   window = current;
+  const workspace = new ProjectWorkspace(
+    new RecentStore(join(app.getPath('userData'), 'recent-projects.json')),
+    {
+      async choose(previous) {
+        const selected = await dialog.showOpenDialog(current, {
+          title: previous ? 'Locate Project Folder' : 'Open Project Folder',
+          properties: ['openDirectory'],
+          ...(previous ? { defaultPath: previous } : {}),
+        });
+        return selected.canceled ? null : selected.filePaths[0] ?? null;
+      },
+      async confirmReplacement(previous, candidate) {
+        const decision = await dialog.showMessageBox(current, {
+          type: 'warning',
+          title: 'Confirm project folder',
+          message: `Use this folder for “${previous.name}”?`,
+          detail: `The selected folder could not be matched to the saved project.\n\n${candidate.path}`,
+          buttons: ['Cancel', 'Use This Folder'], defaultId: 0, cancelId: 0,
+        });
+        return decision.response === 1;
+      },
+    },
+    (catalog) => {
+      if (window === current && !current.isDestroyed()
+        && isRendererDocument(current.webContents.getURL(), development) && isProjectCatalog(catalog)) {
+        current.webContents.send(PROJECT_CHANNEL.changed, catalog);
+      }
+    },
+  );
+  projects = workspace;
+  current.on('focus', () => { void workspace.reconcile(); });
   current.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   current.webContents.on('will-frame-navigate', (event) => event.preventDefault());
   current.webContents.on('will-navigate', (event) => event.preventDefault());
@@ -110,7 +163,13 @@ async function openWindow() {
     if (isMainFrame && !isRendererDocument(url, development)) setImmediate(recoverDocument);
   });
   current.once('ready-to-show', () => current.show());
-  current.on('closed', () => { if (window === current) window = undefined; });
+  current.on('closed', () => {
+    workspace.dispose();
+    if (window === current) {
+      projects = undefined;
+      window = undefined;
+    }
+  });
   await current.loadURL(development ? DEV_URL : APP_URL);
 }
 
@@ -140,6 +199,7 @@ if (!app.requestSingleInstanceLock()) {
       respond({ cancel: belongsToWindow && unexpectedNavigation });
     });
     if (!development) await installProtocol();
+    installProjectBridge();
     installBridge(new PreferenceStore(join(app.getPath('userData'), 'preferences.json')));
     await openWindow();
     app.on('activate', () => { if (!window) void openWindow().catch(reportStartupError); });

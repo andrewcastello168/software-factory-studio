@@ -4,7 +4,13 @@ Software Factory Studio is a planned local-first, Git-native desktop engineering
 
 ## Repository status
 
-Phase 01 delivers the Electron desktop foundation with Home, Settings, a command palette, resizable navigation, and local appearance preferences. Planned project and library views are identified in the workspace. Windows x64 is the first desktop target. See [Progress](docs/PROGRESS.md) for platform-specific evidence and remaining gates.
+Phase 02 adds read-only local project workspaces to the Electron desktop foundation. Open and browse project folders, keep several projects in tabs, and reopen them from Recent Projects. Windows x64 is the first desktop target. See [Progress](docs/PROGRESS.md) for platform-specific evidence and remaining gates.
+
+## Open a local project
+
+Use **Open Folder** in the desktop app to select a local directory. The project opens in its own tab. **Project Overview** shows the working directory and any portable descriptor. **Project Structure** lists files and expandable folders, with symbolic links and junctions shown as skipped. Studio reconciles external changes automatically. Use **Rescan** to refresh on demand.
+
+**Recent Projects** stores folder references in Studio application data. Use **Locate** when a folder has moved, or remove its recent entry. If Studio cannot match the selected directory to the saved project, the native dialog asks which folder to use. An existing `.factory/project.json` with `version: 1` and a UUID `id` supplies portable identity. The optional `name`, `type`, `stackId`, and `profileId` fields provide display metadata. Studio reads this descriptor directly and leaves the project contents intact. Git details and cloning are part of Phase 03.
 
 ## Development setup
 
