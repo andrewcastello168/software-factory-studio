@@ -235,10 +235,14 @@ test('opens a linked worktree separately and reviews a native Git merge', async 
     git(linked, 'commit', '-m', 'Add isolated feature');
     await page.getByRole('button', { name: 'Refresh', exact: true }).click();
     await advanced.getByRole('button', { name: 'Integrate', exact: true }).click();
-    await advanced.getByRole('combobox', { name: 'Source branch', exact: true }).selectOption('refs/heads/feature');
+    const source = advanced.getByRole('combobox', { name: 'Source branch', exact: true });
+    const expected = git(linked, 'rev-parse', '--short=8', 'HEAD');
+    // Refresh is asynchronous and an old branch row must not authorize a new preview.
+    await expect(source.locator('option[value="refs/heads/feature"]')).toHaveText('feature · ' + expected, { timeout: 15_000 });
+    await source.selectOption('refs/heads/feature');
     await advanced.getByRole('button', { name: 'Review Integration' }).click();
     const preview = page.getByRole('dialog', { name: 'Review merge?' });
-    await expect(preview).toContainText('Fast-forward only');
+    await expect(preview).toContainText('Fast-forward only', { timeout: 15_000 });
     await expect(preview).toContainText('isolated feature');
     await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'dark'; });
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');

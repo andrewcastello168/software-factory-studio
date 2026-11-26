@@ -221,3 +221,5 @@ Phase 09 starts on the isolated work branch at 5daa4c9, including merged PR #11 
 | P09-06 | Local end-to-end verification covers all eight generated Node and Go reference cases using PostgreSQL. The delivery pull request records Linux and Windows x64 CI, renderer and Electron results, dependency scan evidence, and screenshots. |
 
 The Phase 09 trust boundaries and independent development database setup are documented in [Git safety](GIT_SAFETY.md) and the [parallel development guide](PARALLEL_DEVELOPMENT.md).
+
+The first Windows native merge smoke clicked Review while its explicit Git refresh was still reading the linked commit. The fixture now waits for the source selector to show the actual new commit ID. Production stale-review checks and test assertions remain in force.
