@@ -27,6 +27,7 @@ interface GitWorkspace {
   allowsAuxiliaryPath(path: string): boolean;
   adopt(root: ProjectRoot): Promise<Result<ProjectSelection>>;
   refresh(id: string): Promise<unknown>;
+  generationPending?(directory: string): Promise<boolean>;
 }
 
 type Inspected = RepositorySnapshot | Exclude<GitState, { state: 'repository' }>;
@@ -185,6 +186,10 @@ export class GitStudio {
       let message: string;
       try {
         git = await this.#git();
+        const root = this.workspace.root(request.id);
+        if (root && await this.workspace.generationPending?.(root.path)) {
+          throw new GitFailure('Resume or review the interrupted generation before changing this repository.');
+        }
         if (!git) throw new GitFailure('Install native Git in a supported system location and restart Studio.');
         const result = request.operation === 'init'
           ? await this.#init(git, request.id)

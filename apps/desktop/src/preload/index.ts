@@ -4,6 +4,7 @@ import {
   isSystemTheme, validateReply, PROJECT_CHANNEL, isProjectCatalog, isProjectId, isProjectSelection,
   GIT_CHANNEL, isGitAction, isGitCloneRequest, isGitCloneResult, isGitCompareRequest, isGitDiff, isGitDiffRequest,
   isGitOutcome, isGitState,
+  GENERATOR_CHANNEL, isGeneratorParent, isGeneratorPending, isGeneratorPreview, isGeneratorReceipt, isGeneratorRequest,
 } from '@factory/contracts';
 import type { Result, StudioBridge, Validator } from '@factory/contracts';
 
@@ -44,6 +45,14 @@ const studio: StudioBridge = {
     compare: (request) => isGitCompareRequest(request) ? invoke(GIT_CHANNEL.compare, isGitDiff, request) : Promise.resolve(failure('INVALID_REQUEST')),
     action: (request) => isGitAction(request) ? invoke(GIT_CHANNEL.action, isGitOutcome, request) : Promise.resolve(failure('INVALID_REQUEST')),
     clone: (request) => isGitCloneRequest(request) ? invoke(GIT_CHANNEL.clone, isGitCloneResult, request) : Promise.resolve(failure('INVALID_REQUEST')),
+  },
+  generator: {
+    chooseParent: () => invoke(GENERATOR_CHANNEL.choose, isGeneratorParent),
+    preview: (input) => isGeneratorRequest(input) ? invoke(GENERATOR_CHANNEL.preview, isGeneratorPreview, input)
+      : Promise.resolve(failure('INVALID_REQUEST')),
+    apply: (id) => invokeProject(GENERATOR_CHANNEL.apply, isGeneratorReceipt, id),
+    pending: () => invoke(GENERATOR_CHANNEL.pending, isGeneratorPending),
+    resume: (id) => invokeProject(GENERATOR_CHANNEL.resume, isGeneratorReceipt, id),
   },
   getAppInfo: () => invoke(CHANNEL.appInfo, isAppInfo),
   readPreferences: () => invoke(CHANNEL.readPreferences, isPreferenceSnapshot),

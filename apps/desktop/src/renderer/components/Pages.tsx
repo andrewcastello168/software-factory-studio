@@ -3,11 +3,12 @@ import type { Theme } from '@factory/contracts';
 import { Button } from './Controls';
 
 export function Home({
-  openSettings, openPalette, openFolder, openProjects, native, opening, projectCount, cloneRepository,
+  openSettings, openPalette, openFolder, openProjects, native, opening, projectCount, cloneRepository, newProject,
 }: {
   openSettings: () => void;
   openPalette: () => void;
   openFolder: () => void;
+  newProject?: (() => void) | undefined;
   cloneRepository?: (() => void) | undefined;
   openProjects: () => void;
   native: boolean;
@@ -27,9 +28,10 @@ export function Home({
             <span className="empty-icon"><FolderOpen size={20} aria-hidden="true" /></span>
             <div>
               <h3>{projectCount ? `${projectCount} open ${projectCount === 1 ? 'project' : 'projects'}` : 'No project open'}</h3>
-              <p>{native ? 'Open an existing folder or clone a Git repository.' : 'Local folders are available in the desktop app.'}</p>
+              <p>{native ? 'Create an application, open a folder, or clone a Git repository.' : 'Local folders are available in the desktop app.'}</p>
               {native && <div className="home-project-actions">
-                <Button variant="primary" onClick={openFolder} disabled={opening}>Open Folder</Button>
+                {newProject && <Button variant="primary" onClick={newProject} disabled={opening}>New Project</Button>}
+                <Button variant={newProject ? 'quiet' : 'primary'} onClick={openFolder} disabled={opening}>Open Folder</Button>
                 <Button onClick={openProjects}>Recent Projects<ArrowUpRight size={14} aria-hidden="true" /></Button>
               </div>}
             </div>

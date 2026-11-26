@@ -17,7 +17,8 @@
     "build": "pnpm --filter @factory/desktop build",
     "test:renderer": "pnpm --filter @factory/desktop test:renderer",
     "test:electron": "pnpm --filter @factory/desktop test:electron",
-    "dev:web": "pnpm --filter @factory/desktop dev:web"
+    "dev:web": "pnpm --filter @factory/desktop dev:web",
+    "verify:starter": "node scripts/verify-starter.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
