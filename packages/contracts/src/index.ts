@@ -1,3 +1,4 @@
+export * from './stacks';
 import type { LibraryBridge } from './library';
 import { hasExactKeys, isRecord } from './validation';
 import type { ProjectBridge } from './projects';

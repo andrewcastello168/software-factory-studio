@@ -1,7 +1,7 @@
 import { opendir, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { TextDecoder } from 'node:util';
-import { isMigrationName, SCHEMA_LIMITS, STARTER } from '@factory/contracts';
+import { isMigrationName, SCHEMA_LIMITS, stackDefinition } from '@factory/contracts';
 import type { DatabaseSchema, SchemaDiagnostic, SchemaMigration } from '@factory/contracts';
 import { identityMigration, sha256 } from '@factory/generator';
 import { diagnostic, emptySchema, parseSql, planMigration } from '@factory/schema';
@@ -38,14 +38,16 @@ export function modelSources(migrations: readonly SchemaMigration[]) {
 
 export async function readSources(root: ProjectRoot) {
   const metadata = await readProjectMetadata(root);
-  if (metadata.status !== 'managed' || metadata.descriptor.stackId !== STARTER.stack || metadata.descriptor.profileId !== STARTER.architecture) {
+  const stack = metadata.status === 'managed' ? stackDefinition(metadata.descriptor.stackId) : undefined;
+  if (metadata.status !== 'managed' || !stack || metadata.descriptor.profileId !== stack.architecture) {
     throw new SourceUnavailable();
   }
-  const db = join(root.path, 'db');
+  const [base, child] = stack.migrationDirectory.split('/') as [string, string];
+  const db = join(root.path, base);
   const directory = await withDirectory(root.path, root.identity, async (parent) => {
-    const dbIdentity = directoryIdentity(await lstat(join(parent, 'db'), { bigint: true }));
+    const dbIdentity = directoryIdentity(await lstat(join(parent, base), { bigint: true }));
     return withDirectory(db, dbIdentity, async (opened) => ({
-      path: join(db, 'migrations'), identity: directoryIdentity(await lstat(join(opened, 'migrations'), { bigint: true })),
+      path: join(db, child), identity: directoryIdentity(await lstat(join(opened, child), { bigint: true })),
     }));
   });
   return withDirectory(directory.path, directory.identity, async (opened) => {

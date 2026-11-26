@@ -51,3 +51,9 @@ Generation Review uses supported checked-out migration files directly. It flags 
 ## Phase 07 module migrations
 
 Bundled identity migrations are versioned DDL. The generator preserves previously applied files and appends reviewed module SQL to the current sequence when installing into a compatible project. The reserved factory_identity_ namespace cannot be used for generated business CRUD. Development apply still requires separate consent. Identity session, role, account, throttling and audit tables are internal infrastructure.
+
+## Go adapter
+
+Go and Node managed projects use the same Database Studio source interpretation, physical inspection, verified development apply, and canonical source order. The generated Go migration command uses pgx and the same SHA-256 checksum ledger and advisory transaction lock. Review authored SQL before explicit CLI apply. Keep transaction control and nontransactional commands outside migrations. Backend startup only checks readiness and has no migration entry point. The app CLI expects a reviewed target in `DATABASE_URL`; Studio continues to require its narrower dedicated development target and native approval.
+
+Go CRUD uses int16, int32, bool and validated strings for text, UUID and ISO date, plus explicit null handling. Database constraints remain authoritative. Related tables, unique/check constraints, and foreign-key actions use the existing schema engine. Composite keys and broader supported schema types can be generated as SQL without CRUD. Unsupported SQL blocks source-driven generation with diagnostics.

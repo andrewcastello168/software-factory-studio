@@ -1,6 +1,6 @@
 import { parseSql } from '@factory/schema';
 import { describe, expect, it } from 'vitest';
-import { isGeneratorPath, isStarterConfig, moduleCompatibility, STARTER, WELCOME_EXAMPLE } from '@factory/contracts';
+import { AUTHENTICATION, GO_STACK, STACKS, isGeneratorPath, isStarterConfig, moduleCompatibility, STARTER, WELCOME_EXAMPLE } from '@factory/contracts';
 import type { StarterConfig } from '@factory/contracts';
 import { planLegacyProject, planProject, sha256 } from './index';
 
@@ -111,4 +111,19 @@ it('locks the explicit schema and generates only compatible selected CRUD layers
   });
   expect(full.files.find(({ path }) => path === 'pnpm-lock.yaml')).toEqual(migrationOnly.files.find(({ path }) => path === 'pnpm-lock.yaml'));
   expect(() => planProject({ ...config, crud: { ...api, backend: [], frontend: ['products'] } }, id)).toThrow(/requires the generated API/u);
+});
+
+it('resolves the exact Go adapter with its own locks and rejects cross-stack configurations', () => {
+  const input = { ...config, stack: GO_STACK, architecture: STACKS[GO_STACK].architecture };
+  const plan = planProject(input, id);
+  expect(plan).toEqual(planProject(input, id));
+  const contents = new Map(plan.files.map(({ path, content }) => [path, content]));
+  expect(contents.get('go.mod')).toContain('module example.com/factory/client-cafe');
+  expect(contents.get('go.mod')).toContain('go 1.26.11');
+  expect(contents.get('go.sum')).toContain('github.com/gin-gonic/gin v1.12.0');
+  expect(contents.get('package.json')).not.toContain('"express"');
+  expect(contents.get('server/app.ts')).toBeUndefined();
+  expect(JSON.parse(contents.get('.factory/versions.lock.json')!).stack).toMatchObject({ id: GO_STACK, version: '1.0.0', sdk: 1 });
+  expect(isStarterConfig({ ...input, architecture: STARTER.architecture })).toBe(false);
+  expect(isStarterConfig({ ...input, modules: [AUTHENTICATION] })).toBe(false);
 });

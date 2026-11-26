@@ -14,12 +14,12 @@ export function normalizeLibrary(input: LibrarySelection): LibrarySelection {
   };
 }
 
-export function libraryFiles(input: LibrarySelection, project: string) {
+export function libraryFiles(input: LibrarySelection, project: string, baseline = 'Node, TypeScript, Express, React, Vite and PostgreSQL with Layered Web conventions') {
   const { profile, template, branding } = input;
   const selected = branding ?? template;
   const mark = selected?.mark || [...project].filter((char) => /[\p{L}\p{N}]/u.test(char)).slice(0, 2).join('').toUpperCase();
   const guidance = '# Engineering profile\n\n' + profile.name + ', version ' + profile.version
-    + '\n\nThe baseline enforces Node, TypeScript, Express, React, Vite and PostgreSQL with Layered Web conventions. '
+    + '\n\nThe baseline enforces ' + baseline + '. '
     + 'See ARCHITECTURE.md and CODING_STANDARDS.md for the implemented baseline. '
     + 'The guidance below is advisory and leaves the client requirements in REQUIREMENTS.md.\n\n'
     + PROFILE_TOPICS.flatMap((topic) => {

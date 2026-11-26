@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Database, FileCode, GitCompareArrows, Network, RefreshCw, Table2 } from 'lucide-react';
-import { isSchemaConnection, SCHEMA_LIMITS, STARTER } from '@factory/contracts';
+import { isSchemaConnection, SCHEMA_LIMITS, stackDefinition } from '@factory/contracts';
 import type {
   DatabaseSchema, ErrorCode, MigrationPreview, OpenProject, Result, SchemaConnection, SchemaMigration, SchemaPhysical, SchemaPoint, SchemaSnapshot,
 } from '@factory/contracts';
@@ -11,7 +11,7 @@ import { Diagram } from './Diagram';
 
 export const schemaBridge = browserPreview ? undefined : window.studio?.schema;
 export const supportsDatabaseStudio = (project: OpenProject | undefined) => project?.metadata.status === 'managed'
-  && project.metadata.descriptor.stackId === STARTER.stack && project.metadata.descriptor.profileId === STARTER.architecture;
+  && project.metadata.descriptor.profileId === stackDefinition(project.metadata.descriptor.stackId)?.architecture;
 
 const errors: Partial<Record<ErrorCode, string>> = {
   ACCESS_DENIED: 'Open this project again to authorize Database Studio.',

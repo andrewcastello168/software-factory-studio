@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
-  AUDIT_LOGGING, AUTHENTICATION, GENERATOR_LIMITS, RBAC, SCHEMA_LIMITS, WELCOME_EXAMPLE, isGeneratorPath, isLegacyStarterConfig, isProjectId, isStarterConfig, MODULE_CATALOG, STARTER,
+  AUDIT_LOGGING, AUTHENTICATION, GENERATOR_LIMITS, GO_STACK, NODE_STACK, RBAC, SCHEMA_LIMITS, WELCOME_EXAMPLE, isGeneratorPath, isLegacyStarterConfig, isProjectId, isStarterConfig, MODULE_CATALOG, STARTER, STACKS,
 } from '@factory/contracts';
 import type { GeneratorFile, LegacyStarterConfig, StarterConfig } from '@factory/contracts';
 import { composeCrud, CRUD_OWNER, InvalidCrud, normalizeCrud } from './crud';
@@ -9,6 +9,7 @@ import { nodeTemplates } from './templates';
 import auditManagement from '../templates/identity/web/Management.tsx?raw';
 import { identityGuide, IDENTITY_PREFIX, identityValues, protectCrudTemplate } from './identity';
 import { libraryFiles, normalizeLibrary } from './library';
+import { composeGo } from './go';
 export { identityMigration, IDENTITY_PREFIX } from './identity';
 
 export { InvalidCrud } from './crud';
@@ -37,7 +38,7 @@ function file(path: string, content: string): GeneratorFile {
   return { path, content, sha256: sha256(content) };
 }
 
-function coreConfig(config: LegacyStarterConfig | StarterConfig) {
+function coreConfig<Config extends LegacyStarterConfig | StarterConfig>(config: Config): Pick<Config, 'name' | 'slug' | 'port' | 'appType' | 'stack' | 'architecture' | 'engineering'> {
   const { name, slug, port, appType, stack, architecture, engineering } = config;
   return { name, slug, port, appType, stack, architecture, engineering };
 }
@@ -114,11 +115,15 @@ export function planProject(input: StarterConfig, projectId: string): StarterPla
     modules: input.modules.map(({ id, version }) => ({ id, version })).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   };
   if (config.crud && Buffer.byteLength(json(config)) > 36_000) throw new InvalidCrud('Schema exceeds the portable generation limit.');
+  if (config.crud?.schema.tables.some(({ name }) => name.startsWith(IDENTITY_PREFIX))) throw new InvalidCrud('The identity table namespace is reserved.');
+  return stackAdapters[config.stack].plan(config, projectId);
+}
+
+function planNode(config: StarterConfig, projectId: string): StarterPlan<StarterConfig> {
   const { modules, slots, testPaths } = composeModules(config.modules);
   const withWelcome = modules.some(({ id }) => id === WELCOME_EXAMPLE.id);
   const auth = modules.some(({ id }) => id === AUTHENTICATION.id);
   const managementPage = modules.some(({ id }) => id === AUDIT_LOGGING.id || id === 'user-management');
-  if (config.crud?.schema.tables.some(({ name }) => name.startsWith(IDENTITY_PREFIX))) throw new InvalidCrud('The identity table namespace is reserved.');
   const infrastructure = Number(withWelcome) + (auth ? 3 : 0)
     + (modules.some(({ id }) => id === RBAC.id) ? 3 : 0) + (modules.some(({ id }) => id === AUDIT_LOGGING.id) ? 1 : 0);
   if ((config.crud?.schema.tables.length ?? 0) + infrastructure > SCHEMA_LIMITS.tables) {
@@ -215,3 +220,30 @@ export function planProject(input: StarterConfig, projectId: string): StarterPla
   );
   return finalize(config, projectId, files, owners, config.stack, versions, 2);
 }
+
+function planGo(config: StarterConfig, projectId: string): StarterPlan<StarterConfig> {
+  const { templates, feature, library, slots, versions, webValues } = composeGo(config,
+    (sources) => sha256(json(templateHashes(sources))), sha256);
+  const values = { ...renderingValues(config), ...slots, ...webValues, ...library?.values };
+  const files = render(templates, config.slug, values);
+  const owners = new Map<string, string>();
+  for (const [path, content] of feature) {
+    files.push(path.startsWith('web/') ? render([[path, content]], config.slug, values)[0]! : file(path, normalize(content)));
+    owners.set(path, CRUD_OWNER);
+  }
+  if (library) files.push(...render(library.files, config.slug, values), file('docs/ENGINEERING_PROFILE.md', library.guidance),
+    file('.factory/engineering.json', json(config.library)));
+  files.push(projectDescriptor(config, projectId), file('.factory/versions.lock.json', json({ version: 2, ...versions })),
+    file('.factory/modules.json', json({ version: 1, installed: [] })));
+  return finalize(config, projectId, files, owners, config.stack, versions, 2);
+}
+
+interface BuiltInStackAdapter {
+  manifest: typeof STACKS[StarterConfig['stack']];
+  plan(config: StarterConfig, projectId: string): StarterPlan<StarterConfig>;
+}
+
+const stackAdapters = {
+  [NODE_STACK]: { manifest: STACKS[NODE_STACK], plan: planNode },
+  [GO_STACK]: { manifest: STACKS[GO_STACK], plan: planGo },
+} satisfies Record<StarterConfig['stack'], BuiltInStackAdapter>;

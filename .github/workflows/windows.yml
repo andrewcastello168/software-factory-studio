@@ -27,6 +27,12 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up pinned Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: '1.26.11'
+          cache-dependency-path: packages/generator/templates/go/go.sum
+
       - name: Set up pinned Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -108,4 +114,5 @@ jobs:
             apps/desktop/test-results/**/database-studio-*.png
             apps/desktop/test-results/**/generation-review-*.png
             apps/desktop/test-results/**/engineering-library-*.png
+            apps/desktop/test-results/**/technology-catalog-*.png
           retention-days: 7

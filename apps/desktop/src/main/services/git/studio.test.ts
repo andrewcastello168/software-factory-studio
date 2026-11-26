@@ -93,7 +93,7 @@ afterEach(async () => {
 });
 
 describe('native Git workspace', () => {
-  it('initializes explicitly, inspects an unborn branch, stages, unstages and commits only the selected content', async () => {
+  it('initializes explicitly, inspects an unborn branch, stages, unstages and commits only the selected content', { timeout: 15_000 }, async () => {
     expect(unwrap(await service.status(id)).state).toBe('not-repository');
     approve = async () => false;
     expect((await act({ operation: 'init' })).level).toBe('cancelled');

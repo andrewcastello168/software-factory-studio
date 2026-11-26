@@ -190,3 +190,19 @@ The isolated `work` branch started from `main` at `262f134`, after the merge of 
 | P07-05 | Local Linux x64 passed frozen installation, lint, type checks, the production build, 80 Vitest cases, 11 renderer cases, and seven sandboxed Electron cases. The optional public Git HTTPS smoke runs in Windows CI. All six generated application variants passed independent verification with PostgreSQL. The Studio and generated production dependency audits found no known vulnerabilities. The delivery pull request records platform CI and the screenshot artifact. |
 
 Business Workspace v1 supports a text mark, primary color, and theme. Personal profiles publish advisory guidance, with the built-in generator enforcing the versioned stack and integration contract. Executable imports, arbitrary upgrades or removals, additional stacks, and a visual editor remain unavailable.
+
+## Phase 08 · Multi-stack support and SDK validation
+
+Phase 08 starts at `9e8bb22` on the isolated `work` branch. The second parent matches the head of merged PR #10. The Go adapter is a built-in SDK implementation. No extra runtime loader or third stack is enabled.
+
+| Gate | Verification |
+| --- | --- |
+| P08-01 | Studio plans the exact Go stack deterministically and rejects a Node architecture or an identity module on Go. Existing Node, portable manifest and legacy journal regression cases remain in the suite. |
+| P08-02 | Disposable PostgreSQL 17 fixtures verify generated Go health and readiness, checksum mismatch and transactional rollback, frozen pnpm install, Go hash verification, formatting, vet, tests and production build. Vite proxies to the service in development and the production binary serves the compiled frontend assets. |
+| P08-03 | Inventory verification sends real HTTP and browser CRUD requests, checks unique/check/foreign-key behavior and nulls, validates UUID and smallint, and tests pagination and filtering. Reviewed incremental supplier CRUD preserves manual SQL and custom service code without repeat writes. |
+| P08-04 | Built Electron selects the correct architecture for Go, shows incompatible modules and opens the approved workspace in Database Studio and Generation Review. Verifier compares two independent projects using the same portable engineering profile and stack-specific AGENTS.md and runtime files. |
+| P08-05 | Local Linux passed frozen installation, lint, typecheck, production build, 81 Vitest checks and 11 renderer checks. The pull request records the platform jobs, screenshots and dependency audit evidence for the delivered head. |
+
+The Go vulnerability check uses upstream advisory data. The initial scan reported reachable transitive dependency advisories. The resulting lock pins golang.org/x/net v0.63.0 and quic-go v0.59.1. The Linux workflow scans generated source with govulncheck v1.10.0 and the upstream advisory snapshot recorded in the workflow. See the [stack matrix](STACK_PLUGIN_SDK.md#built-in-sdk-v1) for boundaries and exact versions.
+
+The initial Windows run exceeded Vitest’s default five-second budget in the existing Git initialization and staging fixture. Its test budget now matches the other multistep Git integration cases. The Git execution limits and assertions are unchanged.

@@ -16,7 +16,7 @@ Keep the main process responsive. Move expensive parsing and planning to a worke
 
 Phase 01 starts with `apps/desktop` for main, preload, and renderer entry points, and `packages/contracts` for shared schemas and cross-boundary types used immediately. Keep main services in `apps/desktop/src/main/services` while only the desktop consumes them. Main and preload have separate build entry points, privileges, and compilation contexts. Renderer and contracts cannot import main code. Use import restrictions and TypeScript configuration to enforce the direction.
 
-Phase 04 adds `packages/generator` for versioned built-in templates and deterministic plans. Introduce `packages/schema` once Phase 05 has a consumer and fixtures. Introduce a separate stack adapter package and public SDK boundary when the Go implementation exercises it in Phase 08. Phase 04 can organize its built-in Node adapter inside the generation package. The future CLI can reuse pure planning and approved platform adapters. Keep workspace package names stable and avoid directories for unused layers.
+Phase 04 adds `packages/generator` for versioned built-in templates and deterministic plans. Introduce `packages/schema` once Phase 05 has a consumer and fixtures. Phase 08 adds a versioned stack adapter interface inside the generator package and publishes safe capability discovery through contracts. Keep executable built-ins at that boundary until a separate package has a consumer. The future CLI can reuse pure planning and approved platform adapters. Keep workspace package names stable and avoid directories for unused layers.
 
 Use TypeScript in strict mode and pin Node and pnpm for a reproducible frozen-lockfile install. Use Electron, React, Vite, and Tailwind in Phase 01. Select build and test integration after checking Electron's embedded Node/Chromium, host Node, pnpm and native binary support, and the bundler and test matrices. Bundle a sandbox-compatible preload entry and smoke-test it in real Electron. See [Testing strategy](TESTING_STRATEGY.md) for dependency validation.
 
@@ -69,3 +69,7 @@ The existing generator composes initial and incremental files for the pinned sta
 ## Phase 07 library boundary
 
 Main stores personal engineering assets in an application-data catalog. The renderer can list and publish validated declarative records. The fixed Node adapter receives exact snapshots and module selections and returns reviewed code and source documents. The generated application contains all runtime components and needs no connection to Studio. Profile and branding reuse never reads client databases or project secret configuration.
+
+## Multiple built-in stacks
+
+The Phase 08 SDK is an interface and registration table inside the generator package with read-only discovery in contracts. It needs no extra workspace package or runtime loading boundary. Studio dispatches a validated stack and architecture pair through the same workspace preview, approval, publication and recovery services. Stack-specific planners only contribute deterministic source bytes. The Go adapter keeps `cmd/` executable entry points, `internal/` packages and a frontend Vite build. Node keeps Layered Web and its existing optional modules. Both consume the shared PostgreSQL schema and portable locks.
