@@ -200,8 +200,23 @@ export function composeDesign(project: VersionedProject, files: ReadonlyMap<stri
   }
   const html = '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
     + '<title>Studio page</title></head><body><div id="root"></div><script type="module" src="/features/StudioPage.tsx"></script></body></html>\n';
-  const nextVite = config.content.replace('emptyOutDir: true', "emptyOutDir: true, rolldownOptions: { input: { main: resolve('web/index.html'), studio: resolve('web/studio-page.html') } }");
-  if (nextVite === config.content) { issues.push('The pinned Vite entry could not be identified.'); return result; }
+  const originalVite = `  return {
+    root: 'web',
+    plugins: [react()],
+    build: { outDir: resolve('dist/web'), emptyOutDir: true },`;
+  if (!config.content.includes(originalVite)) { issues.push('The pinned Vite entry could not be identified.'); return result; }
+  // A Windows cwd can use an 8.3 alias while Vite resolves HTML to its long path.
+  // Derive the root, output and both HTML inputs from the same native identity.
+  const pageVite = `  const webRoot = realpathSync.native(resolve('web'));
+  return {
+    root: webRoot,
+    plugins: [react()],
+    build: {
+      outDir: resolve(webRoot, '../dist/web'),
+      emptyOutDir: true,
+      rolldownOptions: { input: { main: resolve(webRoot, 'index.html'), studio: resolve(webRoot, 'studio-page.html') } },
+    },`;
+  const nextVite = "import { realpathSync } from 'node:fs';\n" + config.content.replace(originalVite, pageVite);
   write(vite, nextVite, 'Add a second entry point to the exact pinned Vite configuration.');
   write(pageFiles[0], html, 'Create the standalone browser entry at /studio-page.html.');
   write(pageFiles[1], renderPage(entry, endpoint), 'Build the selected React layout using the project’s Business Workspace branding.');

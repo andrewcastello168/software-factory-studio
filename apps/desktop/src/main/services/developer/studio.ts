@@ -357,14 +357,15 @@ export class DeveloperStudio {
   }
 
   #record(job: Job, stream: RuntimeLog['stream'], line: string) {
-    const text = redact(line.replace(escapeSequence, ''), job.secrets).replaceAll('\0', '�').slice(0, 2048);
+    const plain = line.replace(escapeSequence, '');
+    const text = redact(plain, job.secrets).replaceAll('\0', '�').slice(0, 2048);
     job.lines.push({ at: new Date().toISOString(), stream, text });
     if (job.lines.length > maxLines) job.lines.shift();
     if (job.process.state === 'running' && job.process.port !== null) {
-      if (job.process.task === 'frontend' && line.includes('http://127.0.0.1:' + job.process.port + '/')) job.process.ready = true;
+      if (job.process.task === 'frontend' && plain.includes('http://127.0.0.1:' + job.process.port + '/')) job.process.ready = true;
       if (job.process.task === 'backend') {
         try {
-          const event: unknown = JSON.parse(line);
+          const event: unknown = JSON.parse(plain);
           if (isRecord(event) && ((event.event === 'listening' && event.port === job.process.port)
             || (event.msg === 'listening' && event.address === '127.0.0.1:' + job.process.port))) job.process.ready = true;
         } catch { /* Ordinary runtime text. */ }
