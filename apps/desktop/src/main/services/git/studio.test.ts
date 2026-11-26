@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { success } from '@factory/contracts';
-import type { GitAction, GitActionInput, GitRepository, Result } from '@factory/contracts';
+import type { GitAction, GitActionInput, GitRepository, GitReviewInput, GitScope, Result } from '@factory/contracts';
 import { admitRoot } from '../projects/filesystem';
 import type { ProjectRoot } from '../projects/filesystem';
 import { findGit } from './process';
@@ -72,7 +72,12 @@ beforeEach(async () => {
   grants = new Map([[id, await admitRoot(work)]]);
   approve = async () => true;
   choices = [];
-  service = new GitStudio({
+  await mkdir(join(fixture, 'Profile'));
+  service = createService();
+});
+
+function createService() {
+  return new GitStudio({
     root: (key) => grants.get(key),
     canOpen: () => true,
     allowsAuxiliaryPath: () => true,
@@ -84,8 +89,8 @@ beforeEach(async () => {
   }, {
     confirm: () => approve(),
     chooseDirectory: async () => choices.shift() ?? null,
-  });
-});
+  }, join(fixture, 'Profile'));
+}
 
 afterEach(async () => {
   await service?.dispose();
@@ -299,4 +304,213 @@ it('accepts only reviewed transport formats and canonical Git path syntax', () =
   expect(localRemotePath('../bare.git')).toBeNull();
   for (const name of ['../outside', '.git/config', 'git~1/config', 'foo:stream', 'AUX.txt', 'inner/link\\name']) expect(safeGitPath(name)).toBe(false);
   expect(safeGitPath('src/café file.ts')).toBe(true);
+});
+
+
+type ReviewInput = GitReviewInput extends infer Value ? Value extends GitScope ? Omit<Value, keyof GitScope> : never : never;
+
+async function review(input: ReviewInput) {
+  const result = unwrap(await service.advanced.review({ id, revision: (await status()).revision, ...input }));
+  if (!result) throw new Error('The fixture did not authorize a required directory.');
+  return result;
+}
+async function advanced(input: ReviewInput) {
+  const plan = await review(input);
+  if (!plan.ticket) throw new Error(plan.blocked ?? 'The review did not allow a write.');
+  return unwrap(await service.advanced.apply({ id, ticket: plan.ticket }));
+}
+async function details(key = id) {
+  const state = unwrap(await service.status(key));
+  if (state.state !== 'repository') throw new Error(JSON.stringify(state));
+  return unwrap(await service.advanced.details({ id: key, revision: state.revision }));
+}
+
+it('isolates approved linked worktree grants and guards registration, checkout and removal', { timeout: 60_000 }, async () => {
+  const before = await baseline();
+  choices = [fixture];
+  const created = await advanced({ kind: 'worktree-add', ref: 'refs/heads/main', folder: 'Feature café', branch: 'feature' });
+  expect(created, created.message).toMatchObject({ level: 'success', selection: { projectId: cloned } });
+  const linked = join(fixture, 'Feature café');
+  const second = join(fixture, 'Parallel feature');
+  git(work, 'worktree', 'add', '-b', 'parallel', second, 'main');
+  await writeFile(join(second, 'parallel.txt'), 'independent patch\n');
+  git(second, 'add', '--', 'parallel.txt');
+  git(second, 'commit', '-m', 'Independent feature');
+  expect(existsSync(join(linked, 'parallel.txt'))).toBe(false);
+  expect(existsSync(join(work, 'parallel.txt'))).toBe(false);
+  const state = unwrap(await service.status(cloned));
+  expect(state).toMatchObject({ state: 'repository', branch: 'feature', head: before.head, repositoryId: before.repositoryId });
+  expect(state.state === 'repository' && state.worktreeId).not.toBe(before.worktreeId);
+  const blocked = await review({ kind: 'switch', ref: 'refs/heads/feature' });
+  expect(blocked.blocked).toContain('checked out');
+  expect(blocked.ticket).toBeNull();
+  await writeFile(join(linked, 'app.txt'), 'feature-only\n');
+  expect(await readFile(join(work, 'app.txt'), 'utf8')).toBe('original\n');
+  let row = (await details()).worktrees.findIndex(({ branch }) => branch === 'refs/heads/feature');
+  expect(row).toBeGreaterThan(0);
+  choices = [linked];
+  expect((await review({ kind: 'worktree-remove', row, path: linked })).blocked).toContain('dirty');
+  await writeFile(join(linked, 'app.txt'), 'original\n');
+  git(work, 'worktree', 'lock', linked);
+  expect((await review({ kind: 'worktree-remove', row, path: linked })).blocked).toContain('locked');
+  git(work, 'worktree', 'unlock', linked);
+  choices = [linked];
+  expect((await advanced({ kind: 'worktree-open', row, path: linked })).selection?.projectId).toBe(cloned);
+  grants.delete(cloned);
+  expect(await service.status(cloned)).toEqual({ ok: false, error: 'ACCESS_DENIED' });
+  choices = [linked];
+  expect(await advanced({ kind: 'worktree-remove', row, path: linked })).toMatchObject({ level: 'success' });
+  expect(existsSync(linked)).toBe(false);
+  expect(git(work, 'rev-parse', 'feature')).toBe(before.head);
+  git(work, 'worktree', 'add', '-b', 'missing', linked, 'main');
+  await rename(linked, join(fixture, 'Moved checkout'));
+  row = (await details()).worktrees.findIndex(({ branch }) => branch === 'refs/heads/missing');
+  expect((await details()).worktrees[row]).toMatchObject({ missing: true });
+  expect((await review({ kind: 'worktree-remove', row, path: linked })).ticket).toBeNull();
+});
+
+it('previews dirty branch transitions, stashes tracked and explicitly included untracked files and preserves index', { timeout: 60_000 }, async () => {
+  await baseline();
+  git(work, 'branch', 'topic');
+  await writeFile(join(work, 'app.txt'), 'staged\n');
+  git(work, 'add', 'app.txt');
+  await writeFile(join(work, 'app.txt'), 'unstaged\n');
+  await writeFile(join(work, 'notes.txt'), 'untracked\n');
+  const blocked = await review({ kind: 'switch', ref: 'refs/heads/topic' });
+  expect(blocked.files).toEqual(expect.arrayContaining(['MM app.txt', '?? notes.txt']));
+  expect(blocked.ticket).toBeNull();
+  expect((await advanced({ kind: 'stash-create', message: 'Save working draft', untracked: true })).level).toBe('success');
+  expect((await status()).changes).toHaveLength(0);
+  expect((await advanced({ kind: 'switch', ref: 'refs/heads/topic' })).level).toBe('success');
+  const stash = (await details()).stashes[0]!;
+  expect((await review({ kind: 'stash-inspect', row: 0, oid: stash.oid })).patch?.text).toContain('+unstaged');
+  expect((await advanced({ kind: 'stash-pop', row: 0, oid: stash.oid })).level).toBe('success');
+  expect((await status()).changes).toEqual(expect.arrayContaining([expect.objectContaining({ path: 'app.txt', index: 'M', worktree: 'M' })]));
+  expect(await readFile(join(work, 'notes.txt'), 'utf8')).toBe('untracked\n');
+  expect((await details()).stashes).toHaveLength(0);
+});
+
+async function divergent() {
+  await baseline();
+  git(work, 'switch', '-c', 'topic');
+  await writeFile(join(work, 'app.txt'), 'topic content\n');
+  git(work, 'commit', '-am', 'Reviewed topic change');
+  const topic = git(work, 'rev-parse', 'HEAD');
+  git(work, 'switch', 'main');
+  await writeFile(join(work, 'app.txt'), 'main content\n');
+  git(work, 'commit', '-am', 'Reviewed main change');
+  return { topic, main: git(work, 'rev-parse', 'HEAD') };
+}
+
+it('reviews divergent merges and lets editors resolve or abort with scoped conflict evidence', { timeout: 60_000 }, async () => {
+  const { main } = await divergent();
+  const planned = await review({ kind: 'merge', source: 'refs/heads/topic', strategy: 'merge' });
+  expect(planned.detail).toContain('diverged');
+  expect(planned.patch?.text).toContain('topic content');
+  expect((await advanced({ kind: 'merge', source: 'refs/heads/topic', strategy: 'merge' })).status).toMatchObject({ operation: 'merge' });
+  await service.dispose();
+  service = createService();
+  expect((await details())).toMatchObject({ conflicts: ['app.txt'], recovery: true });
+  const conflict = await review({ kind: 'conflict-inspect', row: 0 });
+  expect(conflict.versions.map(({ value }) => value.text.trim())).toEqual(['original', 'main content', 'topic content']);
+  expect((await review({ kind: 'conflict-stage', row: 0 })).blocked).toContain('Conflict markers');
+  expect((await advanced({ kind: 'abort' })).level).toBe('success');
+  expect(git(work, 'rev-parse', 'HEAD')).toBe(main);
+  expect(await readFile(join(work, 'app.txt'), 'utf8')).toBe('main content\n');
+  expect((await advanced({ kind: 'merge', source: 'refs/heads/topic', strategy: 'merge' })).level).toBe('warning');
+  await writeFile(join(work, 'app.txt'), 'reviewed resolution\n');
+  expect((await advanced({ kind: 'conflict-stage', row: 0 })).level).toBe('success');
+  expect((await advanced({ kind: 'continue' })).level).toBe('success');
+  expect(git(work, 'rev-list', '--parents', '-n', '1', 'HEAD').split(' ')).toHaveLength(3);
+});
+
+it('replays reviewed unpublished commits and supports cherry-pick conflicts with explicit recovery', { timeout: 60_000 }, async () => {
+  const { topic, main } = await divergent();
+  const inProgress = await advanced({ kind: 'rebase', source: 'refs/heads/topic' });
+  expect(inProgress, inProgress.message).toMatchObject({ level: 'warning', status: { operation: 'rebase', branch: null } });
+  expect((await review({ kind: 'conflict-inspect', row: 0 })).detail).toContain('Ours is the upstream');
+  await writeFile(join(work, 'app.txt'), 'reviewed rebase\n');
+  expect((await advanced({ kind: 'conflict-stage', row: 0 })).level).toBe('success');
+  const continued = await advanced({ kind: 'continue' });
+  expect(continued, continued.message).toMatchObject({ level: 'success', status: { operation: null, branch: 'main' } });
+  expect(git(work, 'rev-parse', 'HEAD^')).toBe(topic);
+  const rebased = git(work, 'rev-parse', 'HEAD');
+  expect(rebased).not.toBe(main);
+  const pick = await advanced({ kind: 'cherry-pick', source: main });
+  expect(pick, pick.message).toMatchObject({ level: 'warning', status: { operation: 'cherry-pick' } });
+  expect((await advanced({ kind: 'abort' })).level).toBe('success');
+  expect(git(work, 'rev-parse', 'HEAD')).toBe(rebased);
+  expect(await readFile(join(work, 'app.txt'), 'utf8')).toBe('reviewed rebase\n');
+});
+
+it('rejects advanced reviews after branch and worktree drift, and serializes native writes', { timeout: 45_000 }, async () => {
+  const first = await baseline();
+  git(work, 'branch', 'topic');
+  const plan = await review({ kind: 'switch', ref: 'refs/heads/topic' });
+  expect(plan.ticket).toBeTruthy();
+  let resume!: () => void;
+  let started!: () => void;
+  const waiting = new Promise<void>((resolve) => { started = resolve; });
+  approve = async () => {
+    started();
+    await new Promise<void>((resolve) => { resume = resolve; });
+    git(work, 'branch', 'extra-drift');
+    return true;
+  };
+  const pending = service.advanced.apply({ id, ticket: plan.ticket! });
+  await waiting;
+  const parallel = await service.action({ id, revision: first.revision, operation: 'create', name: 'concurrent' });
+  expect(parallel).toEqual({ ok: false, error: 'PROJECT_BUSY' });
+  resume();
+  expect(unwrap(await pending).level).toBe('error');
+  expect(git(work, 'branch', '--show-current')).toBe('main');
+});
+
+
+it('blocks unexpected linked metadata and never follows a junction-backed destination', { timeout: 45_000 }, async () => {
+  await baseline();
+  const linked = join(fixture, 'Linked review');
+  const outside = join(fixture, 'Outside');
+  await mkdir(outside);
+  const alias = join(fixture, 'Alias');
+  await symlink(outside, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  choices = [alias];
+  expect((await review({ kind: 'worktree-add', ref: 'refs/heads/main', folder: 'Child', branch: 'branch' })).ticket).toBeNull();
+  expect(existsSync(join(outside, 'Child'))).toBe(false);
+  git(work, 'worktree', 'add', '-b', 'branch', linked, 'main');
+  grants.set(cloned, await admitRoot(linked));
+  const associated = await readFile(join(linked, '.git'), 'utf8');
+  await writeFile(join(associated.trim().slice(8), 'gitdir'), join(outside, '.git') + '\n');
+  expect(unwrap(await service.status(cloned)).state).toBe('unsupported');
+  expect(existsSync(join(outside, '.git'))).toBe(false);
+});
+
+it('guards published rebase ranges, branch deletion and selected-file replacement', { timeout: 60_000 }, async () => {
+  const { main, topic } = await divergent();
+  git(work, 'update-ref', 'refs/remotes/origin/published', main);
+  expect((await review({ kind: 'rebase', source: 'refs/heads/topic' })).blocked).toContain('may already be published');
+  expect((await review({ kind: 'branch-delete', ref: 'refs/heads/topic' })).blocked).toContain('already merged');
+  git(work, 'branch', 'backup');
+  expect((await advanced({ kind: 'branch-rename', ref: 'refs/heads/backup', name: 'renamed' })).level).toBe('success');
+  expect((await advanced({ kind: 'branch-delete', ref: 'refs/heads/renamed' })).level).toBe('success');
+  const changed = await advanced({ kind: 'file-replace', ref: 'refs/heads/topic', path: 'app.txt' });
+  expect(changed, changed.message).toMatchObject({ level: 'success', status: { head: main, branch: 'main' } });
+  expect(await readFile(join(work, 'app.txt'), 'utf8')).toBe('topic content\n');
+  expect(git(work, 'rev-parse', 'topic')).toBe(topic);
+  expect((await status()).changes).toMatchObject([{ index: '.', worktree: 'M' }]);
+});
+
+it('keeps shared stash entries after conflicts and blocks common credential paths', { timeout: 55_000 }, async () => {
+  await baseline();
+  await writeFile(join(work, 'app.txt'), 'saved alternative\n');
+  await writeFile(join(work, '.env.local'), 'FIXTURE=value\n');
+  expect((await review({ kind: 'stash-create', message: 'Credentials excluded', untracked: true })).blocked).toContain('credentials');
+  expect((await advanced({ kind: 'stash-create', message: 'Save only tracked', untracked: false })).level).toBe('success');
+  expect(await readFile(join(work, '.env.local'), 'utf8')).toBe('FIXTURE=value\n');
+  await rm(join(work, '.env.local'));
+  await writeFile(join(work, 'app.txt'), 'new branch content\n');
+  git(work, 'commit', '-am', 'New conflicting commit');
+  const entry = (await details()).stashes[0]!;
+  expect((await advanced({ kind: 'stash-pop', row: 0, oid: entry.oid })).level).toBe('warning');
+  expect((await details()).stashes[0]?.oid).toBe(entry.oid);
 });

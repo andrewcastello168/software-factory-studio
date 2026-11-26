@@ -1,3 +1,4 @@
+import type { GitAdvancedBridge } from './git-advanced';
 import type { ProjectSelection, Result } from './index';
 import { isProjectId, isProjectSegment, isProjectSelection, PROJECT_LIMITS } from './projects';
 import { hasControlCharacters, hasExactKeys, isRecord } from './validation';
@@ -35,6 +36,9 @@ export interface GitRepository {
   state: 'repository';
   revision: string;
   root: string;
+  commonDirectory?: string;
+  repositoryId?: string;
+  worktreeId?: string;
   branch: string | null;
   head: string | null;
   upstream: string | null;
@@ -95,6 +99,7 @@ export interface GitCloneResult {
 }
 
 export interface GitBridge {
+  advanced?: GitAdvancedBridge;
   status(id: string): Promise<Result<GitState>>;
   diff(request: GitDiffRequest): Promise<Result<GitDiff>>;
   compare(request: GitCompareRequest): Promise<Result<GitDiff>>;
@@ -202,8 +207,10 @@ export function isGitState(value: unknown): value is GitState {
       && ['unavailable', 'not-repository', 'missing', 'unsupported', 'failed'].some((state) => value.state === state);
   }
   return hasExactKeys(value, ['state', 'revision', 'root', 'branch', 'head', 'upstream', 'upstreamRemote',
-    'ahead', 'behind', 'operation', 'changes', 'branches', 'remotes'])
+    'ahead', 'behind', 'operation', 'changes', 'branches', 'remotes',
+    ...('worktreeId' in value ? ['worktreeId', 'repositoryId', 'commonDirectory'] : [])])
     && isRevision(value.revision) && bounded(value.root, PROJECT_LIMITS.absolutePath)
+    && (!('worktreeId' in value) || (isRevision(value.worktreeId) && isRevision(value.repositoryId) && bounded(value.commonDirectory, PROJECT_LIMITS.absolutePath)))
     && optional(value.branch, 1024) && (value.head === null || isGitOid(value.head))
     && optional(value.upstream, 1024) && (value.upstreamRemote === null || isGitRemoteName(value.upstreamRemote))
     && ((value.ahead === null && value.behind === null) || (count(value.ahead) && count(value.behind)))

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
@@ -6,7 +7,8 @@ import pg from 'pg';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { STARTER, success } from '@factory/contracts';
 import type { GitState, Result, SchemaConnection } from '@factory/contracts';
-import { parseSql } from '@factory/schema';
+import { parseSql, planMigration } from '@factory/schema';
+import { GitStudio } from '../git/studio';
 import { admitRoot } from '../projects/filesystem';
 import type { ProjectRoot } from '../projects/filesystem';
 import { SchemaStore } from './storage';
@@ -214,3 +216,58 @@ it.skipIf(!process.env.FACTORY_TEST_DATABASE_URL)('observes and applies real Pos
     await client.end();
   }
 }, 30_000);
+
+
+it.skipIf(!process.env.FACTORY_TEST_DATABASE_URL)('refreshes checked-out schema sources while the physical database and ledger stay unchanged', { timeout: 45_000 }, async () => {
+  const endpoint = new URL(process.env.FACTORY_TEST_DATABASE_URL!);
+  if (endpoint.hostname !== '127.0.0.1' || endpoint.pathname !== '/factory_check') throw new Error('Use the disposable loopback factory_check database.');
+  const namespace = 'studio_git_' + randomUUID().replaceAll('-', '');
+  const client = new pg.Client({ connectionString: endpoint.href });
+  const native = (...args: string[]) => execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', ...args],
+    { cwd: root.path, stdio: 'ignore' });
+  const service = new GitStudio({
+    root: (id) => id === projectId ? root : undefined,
+    canOpen: () => false, allowsAuxiliaryPath: () => true, adopt: async () => { throw new Error('Unrequested admission'); },
+    refresh: async () => undefined, generationPending: (path) => studio.protectsGit(path),
+  }, { chooseDirectory: async () => null, confirm: async () => true }, data);
+  studio.dispose();
+  studio = new DatabaseStudio(new SchemaStore(data), {
+    root: (id) => id === projectId ? root : undefined,
+    git: (id) => service.status(id), gitWriting: () => service.isWriting(), refresh: async () => undefined,
+  }, { confirm: async () => true });
+  await client.connect();
+  try {
+    await client.query('CREATE SCHEMA ' + namespace);
+    native('init', '-b', 'main');
+    native('add', '.');
+    native('commit', '-m', 'Initial baseline');
+    const version = value(await studio.inspect(projectId));
+    const settings: SchemaConnection = {
+      projectId, revision: version.revision, namespace, host: '127.0.0.1', port: Number(endpoint.port || 5432),
+      database: 'factory_check', user: decodeURIComponent(endpoint.username), password: decodeURIComponent(endpoint.password),
+    };
+    expect(value(await studio.physical(settings))?.pending).toEqual(['0001_baseline.sql']);
+    expect(value(await studio.physical(settings, true))?.applied).toHaveLength(1);
+    native('switch', '-c', 'feature');
+    const change = planMigration(version.schema, parseSql('CREATE TABLE branch_only (id integer PRIMARY KEY);').schema);
+    expect(change.diagnostics).toEqual([]);
+    await writeFile(join(migrations, '0002_feature.sql'), change.sql);
+    native('add', '.');
+    native('commit', '-m', 'Add reviewed feature SQL');
+    native('switch', 'main');
+    const state = value(await service.status(projectId));
+    if (state.state !== 'repository') throw new Error('Expected a scoped Git checkout.');
+    const reviewed = value(await service.advanced.review({ id: projectId, revision: state.revision, kind: 'switch', ref: 'refs/heads/feature' }));
+    expect(reviewed?.ticket).toBeTruthy();
+    expect(value(await service.advanced.apply({ id: projectId, ticket: reviewed!.ticket! })).level).toBe('success');
+    const feature = value(await studio.inspect(projectId));
+    expect(feature.schema.tables.map(({ name }) => name)).toContain('branch_only');
+    expect(value(await studio.physical({ ...settings, revision: feature.revision }))?.pending).toEqual(['0002_feature.sql']);
+    expect((await client.query('SELECT to_regclass($1) AS name', [namespace + '.branch_only'])).rows[0].name).toBeNull();
+    expect((await client.query('SELECT name FROM ' + namespace + '.schema_migrations')).rows).toEqual([{ name: '0001_baseline.sql' }]);
+  } finally {
+    await service.dispose();
+    await client.query('DROP SCHEMA IF EXISTS ' + namespace + ' CASCADE');
+    await client.end();
+  }
+});

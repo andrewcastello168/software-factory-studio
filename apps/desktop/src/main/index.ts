@@ -1,4 +1,6 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session } from 'electron';
+import { GIT_ADVANCED_CHANNEL, isGitAdvancedOutcome, isGitApproved, isGitReview, isGitReviewInput, isGitScope,
+  isGitWorkspaceDetails } from '@factory/contracts';
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, shell } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
 import { readFile, realpath } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
@@ -99,6 +101,12 @@ function installProjectBridge() {
 }
 
 function installGitBridge() {
+  handle(GIT_ADVANCED_CHANNEL.details, isGitWorkspaceDetails, (...args) => args.length === 1 && isGitScope(args[0])
+    ? gitStudio?.advanced.details(args[0]) ?? failure('PROJECT_UNAVAILABLE') : failure('INVALID_REQUEST'));
+  handle(GIT_ADVANCED_CHANNEL.review, isGitReview, (...args) => args.length === 1 && isGitReviewInput(args[0])
+    ? gitStudio?.advanced.review(args[0]) ?? failure('PROJECT_UNAVAILABLE') : failure('INVALID_REQUEST'));
+  handle(GIT_ADVANCED_CHANNEL.apply, isGitAdvancedOutcome, (...args) => args.length === 1 && isGitApproved(args[0])
+    ? gitStudio?.advanced.apply(args[0]) ?? failure('PROJECT_UNAVAILABLE') : failure('INVALID_REQUEST'));
   handle(GIT_CHANNEL.status, isGitState, (...args) => args.length === 1 && isProjectId(args[0])
     ? gitStudio?.status(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
   handle(GIT_CHANNEL.diff, isGitDiff, (...args) => args.length === 1 && isGitDiffRequest(args[0])
@@ -256,7 +264,7 @@ async function openWindow() {
     adopt: (root) => workspace.adoptCreated(root),
     generationPending: async (path) => Boolean(await generator.protectsGit(path)) || await database.protectsGit(path) || incremental.protectsGit(path),
     refresh: (id) => workspace.rescan(id),
-  }, projectDialogs);
+  }, { ...projectDialogs, reveal: (path) => shell.showItemInFolder(path) }, app.getPath('userData'));
   gitStudio = git;
   const database: DatabaseStudio = new DatabaseStudio(new SchemaStore(app.getPath('userData')), {
     root: (id) => workspace.root(id), git: (id) => git.status(id), gitWriting: () => git.isWriting(),

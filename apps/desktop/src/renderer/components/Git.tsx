@@ -1,4 +1,6 @@
+import { GitAdvancedPanel } from './GitAdvanced';
 import { useState } from 'react';
+import type { ProjectSelection } from '@factory/contracts';
 import type { ReactNode } from 'react';
 import { ArrowDown, ArrowUp, CircleAlert, FileText, GitBranch, GitCommitHorizontal, GitFork, Minus, Plus, RefreshCw } from 'lucide-react';
 import { isGitAction, isGitCloneRequest } from '@factory/contracts';
@@ -98,7 +100,7 @@ function Changes({ repository, area, selected, choose, busy, request }: {
   </section>;
 }
 
-export function GitPanel({ project, git }: { project: OpenProject; git: ReturnType<typeof useGit> }) {
+export function GitPanel({ project, git, opened }: { project: OpenProject; git: ReturnType<typeof useGit>; opened(selection: ProjectSelection): void }) {
   const [inspected, setInspected] = useState<{ id: string; revision: string; key: string; value: Inspection } | null>(null);
   const [ref, setRef] = useState('');
   const [selectedRemote, setSelectedRemote] = useState('');
@@ -106,6 +108,7 @@ export function GitPanel({ project, git }: { project: OpenProject; git: ReturnTy
   const [branchName, setBranchName] = useState('');
   const [branchDialog, setBranchDialog] = useState(false);
   const [dirtyDialog, setDirtyDialog] = useState(false);
+  const [switchRef, setSwitchRef] = useState<string | null>(null);
   const [pending, setPending] = useState<GitAction['operation'] | null>(null);
   const [result, setResult] = useState<Pick<GitOutcome, 'level' | 'message'> | null>(null);
   const context = git.status;
@@ -167,6 +170,7 @@ export function GitPanel({ project, git }: { project: OpenProject; git: ReturnTy
   }
 
   function switchBranch() {
+    if (target && gitBridge?.advanced) { setSwitchRef(target.ref); return; }
     if (!target || !target.ref.startsWith('refs/heads/')) return;
     if (repo?.changes.length) setDirtyDialog(true);
     else void request({ operation: 'switch', ref: target.ref });
@@ -220,10 +224,12 @@ export function GitPanel({ project, git }: { project: OpenProject; git: ReturnTy
           <Button className="outlined-button" disabled={disabled || !tracks} onClick={() => void request({ operation: 'push' })}>Push</Button>
         </div>
       </div>
-      {repo.operation && <StatusMessage result={{ level: 'warning', message: `Git ${repo.operation} is in progress. Finish or abort it in your Git client. Studio has blocked changes.` }} />}
+      {repo.operation && <StatusMessage result={{ level: 'warning', message: `Git ${repo.operation} is in progress. Review conflicts and use the supported Continue or Abort action.` }} />}
       {(repo.ahead ?? 0) > 0 && (repo.behind ?? 0) > 0 && <StatusMessage result={{ level: 'warning', message: 'Local and upstream history have diverged. Compare the upstream branch before reconciling in your Git client.' }} />}
       {repo.remotes.some((item) => item.kind === 'unsupported') && <p className="git-hint">Some remotes use transports outside Studio’s HTTPS and local bare repository policy.</p>}
       {repo.changes.length > 0 && tracks && <p className="git-hint">Fast-forward pull is available when the working tree is clean.</p>}
+      {gitBridge?.advanced && <GitAdvancedPanel bridge={gitBridge.advanced} id={project.id} repository={repo} switchRef={switchRef}
+        clearSwitch={() => setSwitchRef(null)} opened={opened} refresh={git.refresh} />}
       <div className="git-split">
         <div className="git-files">
           <Changes repository={repo} area="working" selected={activeInspection?.key ?? null} choose={(row, area) => void inspect({ row, area })} busy={busy} request={(input) => void request(input)} />

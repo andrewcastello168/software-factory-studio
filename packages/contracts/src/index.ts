@@ -10,6 +10,7 @@ import type { GeneratorBridge } from './generator';
 export { hasControlCharacters, hasExactKeys, isRecord } from './validation';
 export * from './projects';
 export * from './git';
+export * from './git-advanced';
 export * from './generator';
 export * from './generator-modules';
 export * from './schema';

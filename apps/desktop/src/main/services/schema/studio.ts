@@ -70,7 +70,9 @@ export class DatabaseStudio {
     if (mutation && (state.state === 'repository' ? state.operation !== null : state.state !== 'not-repository')) {
       throw new Rejected('SCHEMA_CONFLICT');
     }
-    const refs = state.state === 'repository' ? [state.branch, state.head, state.operation] : [state.state];
+    const refs = state.state === 'repository'
+      ? [state.branch, state.head, state.operation, ...(state.commonDirectory && pathKey(state.commonDirectory) !== pathKey(join(root.path, '.git'))
+        ? [state.repositoryId, state.worktreeId] : [])] : [state.state];
     const history = await readSources(root);
     if (this.#root(projectId) !== root) throw new Rejected('SCHEMA_STALE');
     if (mutation && this.grant.gitWriting()) throw new Rejected('PROJECT_BUSY');

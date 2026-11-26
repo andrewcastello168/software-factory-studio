@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { lstat, readdir, realpath } from 'node:fs/promises';
-import { dirname, isAbsolute, join } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GIT_LIMIT, hasControlCharacters, isGitOid, isGitRef, isGitRemoteName, isProjectSegment, PROJECT_LIMITS } from '@factory/contracts';
 import type { GitBranch, GitChange, GitRepository, GitState } from '@factory/contracts';
-import { checkedDirectory, directoryIdentity, pathKey, readBoundedFile, withDirectory } from '../projects/filesystem';
+import { checkedDirectory, directoryIdentity, isRootPath, pathKey, readBoundedFile, withDirectory } from '../projects/filesystem';
 import type { ProjectRoot } from '../projects/filesystem';
 import { GitFailure } from './process';
 import type { NativeGit } from './process';
@@ -108,15 +108,29 @@ async function auditMetadata(root: ProjectRoot, metadata: string) {
       if (stat.isDirectory()) pending.push(path);
     }
   }
-  for (const relative of ['objects/info/alternates', 'objects/info/http-alternates', 'info/grafts', 'commondir']) {
+  for (const relative of ['objects/info/alternates', 'objects/info/http-alternates', 'info/grafts', 'commondir', 'config.worktree']) {
     if (await fileStat(join(metadata, relative))) {
       throw new RestrictedRepository('Git object alternates, grafts, or external common directories are outside the Phase 03 boundary.');
     }
   }
-  for (const name of ['worktrees', 'modules']) {
+  const registrations = join(metadata, 'worktrees');
+  if ((await fileStat(registrations))?.isDirectory()) {
+    const entries = await readdir(registrations);
+    if (entries.length > 63) throw new RestrictedRepository('Too many registered worktrees to review.');
+    for (const entry of entries) {
+      const directory = join(registrations, entry);
+      await checkedDirectory(directory);
+      const pointer = await markerText(join(directory, 'gitdir'));
+      if (!isProjectSegment(entry) || !isLocalGitPath(pointer) || basename(pointer) !== '.git'
+        || await markerText(join(directory, 'commondir')) !== '../..' || await fileStat(join(directory, 'config.worktree'))) {
+        throw new RestrictedRepository('A linked worktree registration contains unsupported metadata.');
+      }
+    }
+  }
+  for (const name of ['modules']) {
     const path = join(metadata, name);
     if ((await fileStat(path))?.isDirectory() && (await readdir(path)).length) {
-      throw new RestrictedRepository('Registered linked worktrees and submodules require the advanced Git workspace policy.');
+      throw new RestrictedRepository('Submodule metadata is outside the Git Studio workspace policy.');
     }
   }
   await checkedDirectory(metadata, directoryIdentity(top));
@@ -124,8 +138,69 @@ async function auditMetadata(root: ProjectRoot, metadata: string) {
   return directoryIdentity(top);
 }
 
-export async function repositoryConfig(git: NativeGit, root: ProjectRoot, bare = false): Promise<RepositoryConfig> {
-  const metadata = bare ? root.path : join(root.path, '.git');
+export interface GitMetadata {
+  directory: string;
+  common: string;
+  primary: string;
+  repositoryId: string;
+  worktreeId: string;
+}
+
+async function markerText(path: string) {
+  const stat = await fileStat(path);
+  if (!stat?.isFile() || pathKey(await realpath(path)) !== pathKey(path)) {
+    throw new RestrictedRepository('A Git metadata marker is missing, linked, or unsupported.');
+  }
+  const text = await readBoundedFile(path, stat, 8192, (bytes) => new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  const line = text.replace(/\r?\n$/u, '');
+  if (!line || hasControlCharacters(line)) throw new RestrictedRepository('The Git marker does not contain a supported path.');
+  return line;
+}
+
+export const isLocalGitPath = (path: string) => isRootPath(path) && !/^(?:\\|\/\/)/u.test(path);
+
+export async function gitMetadata(root: ProjectRoot): Promise<GitMetadata> {
+  await checkedDirectory(root.path, root.identity);
+  const marker = join(root.path, '.git');
+  const stat = await fileStat(marker);
+  let directory = marker;
+  let common = marker;
+  if (stat?.isFile()) {
+    const text = await markerText(marker);
+    if (!text.startsWith('gitdir: ')) throw new RestrictedRepository('This folder does not have a registered Git worktree marker.');
+    const stored = text.slice(8);
+    // Native absolute registrations constrain both ends. Portable or custom
+    // gitfiles must be repaired externally before Studio uses them.
+    if (!isLocalGitPath(stored)) {
+      throw new RestrictedRepository('Git Studio supports standard local worktree registrations with absolute paths.');
+    }
+    directory = resolve(stored);
+    const registry = dirname(directory);
+    common = dirname(registry);
+    if (basename(registry) !== 'worktrees' || basename(common) !== '.git' || !isProjectSegment(basename(directory))) {
+      throw new RestrictedRepository('The Git pointer does not target a conventional worktree registration.');
+    }
+    await checkedDirectory(common);
+    await checkedDirectory(registry);
+    await checkedDirectory(directory);
+    const backlink = await markerText(join(directory, 'gitdir'));
+    if (await markerText(join(directory, 'commondir')) !== '../..'
+      || !isLocalGitPath(backlink) || pathKey(backlink) !== pathKey(marker)
+      || await fileStat(join(directory, 'config.worktree'))) {
+      throw new RestrictedRepository('The Git worktree registration does not match this workspace.');
+    }
+  } else if (!stat?.isDirectory()) {
+    throw new RestrictedRepository('This Git marker is not a supported working repository.');
+  }
+  const commonIdentity = directoryIdentity(await checkedDirectory(common));
+  const identity = directoryIdentity(await checkedDirectory(directory));
+  const repositoryId = digest(pathKey(common), JSON.stringify(commonIdentity));
+  return { common, directory, primary: dirname(common), repositoryId,
+    worktreeId: digest(repositoryId, pathKey(root.path), JSON.stringify(root.identity), JSON.stringify(identity)) };
+}
+
+export async function repositoryConfig(git: NativeGit, root: ProjectRoot, bare = false, location?: GitMetadata): Promise<RepositoryConfig> {
+  const metadata = bare ? root.path : (location ?? await gitMetadata(root)).common;
   const identity = await auditMetadata(root, metadata);
   const configPath = join(metadata, 'config');
   const stat = await fileStat(configPath);
@@ -233,6 +308,7 @@ export interface RepositorySnapshot {
   raw: (string[] | null)[];
   config: RepositoryConfig;
   hiddenChanges: boolean;
+  metadata: GitMetadata;
 }
 
 export async function inspectRepository(git: NativeGit, root: ProjectRoot): Promise<RepositorySnapshot | Exclude<GitState, { state: 'repository' }>> {
@@ -253,16 +329,14 @@ export async function inspectRepository(git: NativeGit, root: ProjectRoot): Prom
     return bare ? { state: 'unsupported', detail: 'Open a Git working folder to use source control. Bare repositories are supported as local remotes.' }
       : { state: 'not-repository', detail: 'This folder has no Git repository.' };
   }
-  if (!info.isDirectory()) {
-    throw new RestrictedRepository('This Git marker is a link or pointer to external metadata. Open a standalone repository.');
-  }
-  const config = await repositoryConfig(git, root);
+  const metadata = await gitMetadata(root);
+  const config = await repositoryConfig(git, root, false, metadata);
   const options = { readOnly: true };
   const [status, refs, index, operation] = await Promise.all([
     git.repo(root.path, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all', '--ignore-submodules=all', '--renames'], options),
     git.repo(root.path, ['for-each-ref', '--format=%(refname)%09%(objectname)%09%(symref)', 'refs/heads/', 'refs/remotes/'], options),
     git.repo(root.path, ['ls-files', '-v', '--stage', '-z'], options),
-    operationState(marker),
+    operationState(metadata.directory),
   ]);
   const indexEntries = index.bytes.toString('utf8').split('\0');
   if (indexEntries.some((record) => /^[A-Za-z] 160000 /u.test(record))) {
@@ -289,9 +363,11 @@ export async function inspectRepository(git: NativeGit, root: ProjectRoot): Prom
   const tracking = parsed.headers.get('branch.upstream');
   const upstream = tracking ?? (isGitRemoteName(upstreamRemote) && upstreamMerge ? `${upstreamRemote}/${upstreamMerge.slice(11)}` : null);
   const ab = (/^\+(\d+) -(\d+)$/u).exec(parsed.headers.get('branch.ab') ?? '');
-  const indexStat = await fileStat(join(marker, 'index'));
+  const indexPath = join(metadata.directory, 'index');
+  const indexStat = await fileStat(indexPath);
   const indexHash = indexStat
-    ? await readBoundedFile(join(marker, 'index'), indexStat, 8_000_000, (contents) => digest(contents)) : '';
+    ? await readBoundedFile(indexPath, indexStat, 8_000_000, (contents) => digest(contents)) : '';
+  if ((await gitMetadata(root)).worktreeId !== metadata.worktreeId) throw new RestrictedRepository('The worktree registration changed during inspection.');
   await checkedDirectory(root.path, root.identity);
   // Git's XY status stays unchanged when a dirty file is edited again.
   // Include filesystem identities so an older diff or row review goes stale.
@@ -311,7 +387,8 @@ export async function inspectRepository(git: NativeGit, root: ProjectRoot): Prom
   const state: GitRepository = {
     state: 'repository',
     root: root.path,
-    revision: digest(config.hash, status.bytes, refs.bytes, indexHash, operation ?? '', JSON.stringify(stamps)),
+    commonDirectory: metadata.common, repositoryId: metadata.repositoryId, worktreeId: metadata.worktreeId,
+    revision: digest(metadata.worktreeId, config.hash, status.bytes, refs.bytes, indexHash, operation ?? '', JSON.stringify(stamps)),
     branch: branch === '(detached)' ? null : branch,
     head: head === '(initial)' ? null : head,
     upstream,
@@ -324,7 +401,7 @@ export async function inspectRepository(git: NativeGit, root: ProjectRoot): Prom
     remotes: config.remotes.map(({ name, kind }) => ({ name, kind })),
   };
   const hiddenChanges = indexEntries.some((record) => /^[Sa-z] /u.test(record));
-  return { state, raw: parsed.raw, config, hiddenChanges };
+  return { state, raw: parsed.raw, config, hiddenChanges, metadata };
 }
 
 export async function checkWorktreePath(root: ProjectRoot, path: string, fingerprint = false): Promise<string> {
@@ -352,15 +429,17 @@ export async function checkWorktreePath(root: ProjectRoot, path: string, fingerp
 /** Checkout only ordinary tree entries with portable paths. Never materialize links or gitlinks. */
 export async function checkoutTree(git: NativeGit, root: ProjectRoot, oid: string, checkExisting: boolean) {
   const output = await git.repo(root.path, ['ls-tree', '-r', '-z', oid], { readOnly: true, limit: 4_000_000 });
+  const entries: { path: string; oid: string }[] = [];
   const names = new Map<string, string>();
   const parents = new Set<string>();
   const files = new Set<string>();
   for (const line of output.bytes.toString('utf8').split('\0').filter(Boolean)) {
-    const entry = /^(100644|100755) blob [a-f0-9]+\t(.+)$/u.exec(line);
-    const path = entry?.[2];
+    const entry = /^(100644|100755) blob ([a-f0-9]+)\t(.+)$/u.exec(line);
+    const path = entry?.[3];
     if (!path || !safeGitPath(path)) {
       throw new GitFailure('The target contains links, submodules, or paths Studio cannot safely check out.');
     }
+    entries.push({ path, oid: entry![2]! });
     files.add(path);
     const parts = path.split('/');
     let prefix = '';
@@ -378,4 +457,5 @@ export async function checkoutTree(git: NativeGit, root: ProjectRoot, oid: strin
   if ([...parents].some((parent) => files.has(parent))) {
     throw new GitFailure('The target contains a conflicting file and directory.');
   }
+  return entries;
 }
