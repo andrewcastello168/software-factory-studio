@@ -9,7 +9,7 @@ const electronAndNode = {
 };
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/test-results/**', '**/playwright-report/**', '**/coverage/**'] },
+  { ignores: ['**/dist/**', '**/test-results/**', '**/playwright-report/**', '**/coverage/**', 'packages/generator/templates/**'] },
   js.configs.recommended,
   tseslint.configs.recommended,
   {

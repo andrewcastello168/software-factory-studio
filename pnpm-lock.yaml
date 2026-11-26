@@ -38,6 +38,9 @@ importers:
       '@factory/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@factory/generator':
+        specifier: workspace:*
+        version: link:../../packages/generator
       lucide-react:
         specifier: 1.80.0
         version: 1.80.0(@types/react@19.3.3)(react@19.3.1)
@@ -77,6 +80,16 @@ importers:
         version: 8.3.8(@types/node@24.12.0)(esbuild@0.28.2)(jiti@2.7.0)
 
   packages/contracts: {}
+
+  packages/generator:
+    dependencies:
+      '@factory/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@types/node':
+        specifier: 24.12.0
+        version: 24.12.0
 
 packages:
 
