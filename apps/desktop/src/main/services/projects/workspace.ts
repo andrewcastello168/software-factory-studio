@@ -8,7 +8,7 @@ import type {
 } from '@factory/contracts';
 import { admitRoot, checkedDirectory, pathError, pathKey, sameDirectory } from './filesystem';
 import type { ProjectRoot } from './filesystem';
-import { readProjectMetadata, scanProject } from './scan';
+import { isExcludedProjectEntry, readProjectMetadata, scanProject } from './scan';
 import type { ProjectScan } from './scan';
 import { RecentStore } from './recents';
 import type { RecentReference } from './recents';
@@ -19,6 +19,7 @@ interface ProjectTab {
   watchers: Map<string, { close: () => void; identity: ProjectRoot['identity'] }>;
   timer: ReturnType<typeof setTimeout> | null;
   scan: Promise<void> | null;
+  manual: Promise<void> | null;
   dirty: boolean;
 }
 
@@ -137,7 +138,9 @@ export class ProjectWorkspace {
     if (existing?.scan) {
       existing.snapshot = { ...existing.snapshot, name: recent.name, recentId: recent.id };
     } else {
-      const tab: ProjectTab = existing ?? { root, snapshot, watchers: new Map(), timer: null, scan: null, dirty: false };
+      const tab: ProjectTab = existing ?? {
+        root, snapshot, watchers: new Map(), timer: null, scan: null, manual: null, dirty: false,
+      };
       tab.snapshot = snapshot;
       this.#tabs.set(id, tab);
       this.#watch(tab, scan.watched);
@@ -273,7 +276,11 @@ export class ProjectWorkspace {
   }
 
   #watch(tab: ProjectTab, directories: ProjectScan['watched']) {
-    const known = new Map(directories.map((entry) => [entry.path, entry.identity]));
+    // Watching individual descendants on Windows can prevent moving their
+    // parent directory. One native recursive watch keeps only the root open.
+    const recursive = process.platform === 'win32';
+    const watched = recursive ? directories.slice(0, 1) : directories;
+    const known = new Map(watched.map((entry) => [entry.path, entry.identity]));
     for (const [path, watcher] of tab.watchers) {
       const identity = known.get(path);
       if (identity && sameDirectory(identity, watcher.identity)) {
@@ -286,17 +293,21 @@ export class ProjectWorkspace {
     for (const [path, identity] of known) {
       let watcher: FSWatcher;
       try {
-        // Watcher events are invalidations. Event filenames never enter a filesystem call.
-        watcher = watch(path, { persistent: false }, () => this.#schedule(tab));
+        // Event names only filter noise. They never enter a filesystem call.
+        watcher = watch(path, { persistent: false, recursive }, (_event, name) => {
+          if (!name || !name.split(/[\\/]/u).some(isExcludedProjectEntry)) this.#schedule(tab);
+        });
       } catch {
         continue;
       }
+      const registration = { close: () => watcher.close(), identity };
       watcher.on('error', () => {
         watcher.close();
+        if (tab.watchers.get(path) !== registration) return;
         tab.watchers.delete(path);
         this.#schedule(tab);
       });
-      tab.watchers.set(path, { close: () => watcher.close(), identity });
+      tab.watchers.set(path, registration);
     }
   }
 
@@ -353,9 +364,19 @@ export class ProjectWorkspace {
   async rescan(id: string): Promise<Result<ProjectCatalog>> {
     const tab = this.#tabs.get(id);
     if (!tab) return failure('ACCESS_DENIED');
+    tab.manual ??= this.#manualScan(tab).finally(() => { tab.manual = null; });
+    await tab.manual;
+    return this.#tabs.get(id) === tab ? success(this.#catalog()) : failure('ACCESS_DENIED');
+  }
+
+  async #manualScan(tab: ProjectTab) {
+    // Finish a watcher scan that started before the manual request.
+    await tab.scan;
+    if (this.#tabs.get(tab.snapshot.id) !== tab) return;
+    if (tab.timer) clearTimeout(tab.timer);
+    tab.timer = null;
     await this.#scan(tab, true);
     await this.#refreshRecents();
-    return success(this.#catalog());
   }
 
   async reconcile() {

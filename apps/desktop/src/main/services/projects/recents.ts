@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { lstat, mkdir, open, realpath, rename, rm } from 'node:fs/promises';
-import { dirname, isAbsolute, relative, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { hasExactKeys, isProjectId, isRecord, PROJECT_LIMITS } from '@factory/contracts';
 import type { RecentProject } from '@factory/contracts';
 import { isRootPath, pathKey, readBoundedFile } from './filesystem';
@@ -30,10 +30,20 @@ export class RecentStore {
   constructor(private readonly file: string) {}
 
   async isInside(project: string): Promise<boolean> {
-    const directory = dirname(this.file);
-    const canonical = await realpath(directory).catch(() => directory);
-    const path = relative(pathKey(project), pathKey(canonical));
-    return path === '' || (!isAbsolute(path) && path !== '..' && !path.startsWith(`..${sep}`));
+    let directory = dirname(this.file);
+    const missing: string[] = [];
+    for (;;) {
+      try {
+        const canonical = join(await realpath(directory), ...missing.reverse());
+        const path = relative(pathKey(project), pathKey(canonical));
+        return path === '' || (!isAbsolute(path) && path !== '..' && !path.startsWith(`..${sep}`));
+      } catch (error) {
+        const parent = dirname(directory);
+        if (!isRecord(error) || error.code !== 'ENOENT' || parent === directory) return true;
+        missing.push(basename(directory));
+        directory = parent;
+      }
+    }
   }
 
   async load(): Promise<RecentReference[] | null> {

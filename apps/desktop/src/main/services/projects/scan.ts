@@ -10,6 +10,10 @@ const MAX_METADATA_BYTES = 16 * 1024;
 const MAX_WATCHED_DIRECTORIES = 128;
 const excluded = new Set(['.git', 'node_modules']);
 
+export function isExcludedProjectEntry(name: string): boolean {
+  return excluded.has(name.toLowerCase());
+}
+
 interface ScanDirectory {
   path: string;
   relative: string;
@@ -122,7 +126,7 @@ export async function scanProject(root: ProjectRoot): Promise<ProjectScan> {
               partial = true;
               continue;
             }
-            if (excluded.has(name.toLowerCase())) continue;
+            if (isExcludedProjectEntry(name)) continue;
 
             // Recheck actual entries at the requested path, including Windows junctions.
             const key = name.normalize('NFC');
