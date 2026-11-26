@@ -3,6 +3,7 @@ import type { IpcMainInvokeEvent } from 'electron';
 import { readFile, realpath } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import {
+  LIBRARY_CHANNEL, isLibraryAsset, isLibraryAssets,
   INCREMENTAL_CHANNEL, isIncrementalApproval, isIncrementalInspection, isIncrementalPreview, isIncrementalSelection,
   isNullableIncrementalInspection,
   SCHEMA_CHANNEL, isMigrationPreview, isNullableSchemaSnapshot, isSchemaConnection, isSchemaEdit,
@@ -24,6 +25,7 @@ import { GeneratorStudio } from './services/generation/studio';
 import { DatabaseStudio } from './services/schema/studio';
 import { SchemaStore } from './services/schema/storage';
 import { IncrementalStudio } from './services/incremental/studio';
+import { LibraryStore } from './services/library';
 import { IncrementalStore } from './services/incremental/storage';
 
 const development = !app.isPackaged && process.env.FACTORY_DESKTOP_DEV === '1';
@@ -57,6 +59,10 @@ function handle<T>(channel: string, validator: Validator<T>, operation: (...args
 }
 
 function installBridge(store: PreferenceStore) {
+  const library = new LibraryStore(app.getPath('userData'));
+  handle(LIBRARY_CHANNEL.list, isLibraryAssets, (...args) => args.length ? failure('INVALID_REQUEST') : library.list());
+  handle(LIBRARY_CHANNEL.publish, isLibraryAsset, (...args) => args.length === 1 && isLibraryAsset(args[0])
+    ? library.publish(args[0]) : failure('INVALID_REQUEST'));
   handle(CHANNEL.appInfo, isAppInfo, (...args) => {
     const info = { version: app.getVersion(), platform: process.platform };
     return args.length ? failure('INVALID_REQUEST') : isAppInfo(info) ? success(info) : failure('INVALID_REPLY');

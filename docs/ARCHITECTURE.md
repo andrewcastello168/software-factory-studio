@@ -64,3 +64,8 @@ The pure Schema package validates the bounded PostgreSQL model, interprets SQL, 
 ## Phase 06 incremental generation
 
 The existing generator composes initial and incremental files for the pinned starter. The desktop incremental service captures the granted workspace, ordered migration bytes and Git identity, owns the approval and recovery journal, and verifies each output. Generation Review displays the plan and delegates operations over named IPC commands. History and pending before/after bytes are bounded in per-user application data. Project source remains independent of Studio.
+
+
+## Phase 07 library boundary
+
+Main stores personal engineering assets in an application-data catalog. The renderer can list and publish validated declarative records. The fixed Node adapter receives exact snapshots and module selections and returns reviewed code and source documents. The generated application contains all runtime components and needs no connection to Studio. Profile and branding reuse never reads client databases or project secret configuration.

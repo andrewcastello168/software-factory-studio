@@ -1,3 +1,5 @@
+import { isModuleSelection } from './generator-modules';
+import type { ModuleSelection } from './generator-modules';
 import type { Result } from './index';
 import { isGeneratorDigest, isGeneratorPath } from './generator';
 import { isProjectId } from './projects';
@@ -9,7 +11,7 @@ export const INCREMENTAL_CHANNEL = {
   resume: 'factory:incremental-resume', handoff: 'factory:incremental-handoff',
 } as const;
 
-export const INCREMENTAL_LIMITS = { writes: 32, inventory: 320, history: 12, bytes: 180_000, journal: 2_500_000 } as const;
+export const INCREMENTAL_LIMITS = { writes: 56, inventory: 320, history: 12, bytes: 180_000, journal: 2_500_000 } as const;
 export const ownershipStates = ['generated', 'modified', 'missing', 'user', 'discovered', 'protected'] as const;
 export interface IncrementalOwnedFile { path: string; state: typeof ownershipStates[number]; owner: string | null }
 export interface IncrementalTable { name: string; api: boolean; page: boolean; reason: string | null }
@@ -24,7 +26,7 @@ export interface IncrementalInspection {
   recovery: IncrementalPreview | null;
 }
 export interface IncrementalSelection {
-  projectId: string; revision: string; backend: string[]; frontend: string[];
+  projectId: string; revision: string; backend: string[]; frontend: string[]; modules?: ModuleSelection[];
 }
 export interface IncrementalApproval { projectId: string; id: string }
 export interface IncrementalChange {
@@ -33,7 +35,7 @@ export interface IncrementalChange {
 }
 export interface IncrementalPreview {
   id: string; digest: string; changes: IncrementalChange[]; issues: string[];
-  backend: string[]; frontend: string[];
+  backend: string[]; frontend: string[]; modules?: ModuleSelection[];
 }
 
 export interface IncrementalBridge {
@@ -51,10 +53,11 @@ function list<T>(x: unknown, max: number, check: (v: unknown) => v is T): x is T
 const issue = (x: unknown): x is string => string(x, 300);
 const nullableString = (x: unknown, max: number) => x === null || string(x, max);
 const names = (x: unknown): x is string[] => list(x, SCHEMA_LIMITS.tables, isSchemaName) && new Set(x).size === x.length;
-const choices = (x: Record<string, unknown>) => names(x.backend) && names(x.frontend);
+const choices = (x: Record<string, unknown>) => names(x.backend) && names(x.frontend)
+  && (!Object.hasOwn(x, 'modules') || list(x.modules, 12, isModuleSelection));
 
 export function isIncrementalSelection(x: unknown): x is IncrementalSelection {
-  return isRecord(x) && hasExactKeys(x, ['projectId', 'revision', 'backend', 'frontend'])
+  return isRecord(x) && hasExactKeys(x, ['projectId', 'revision', 'backend', 'frontend', ...(Object.hasOwn(x, 'modules') ? ['modules'] : [])])
     && isProjectId(x.projectId) && isGeneratorDigest(x.revision) && choices(x);
 }
 
@@ -70,7 +73,7 @@ function change(x: unknown): x is IncrementalChange {
 }
 
 export function isIncrementalPreview(x: unknown): x is IncrementalPreview {
-  return isRecord(x) && hasExactKeys(x, ['id', 'digest', 'changes', 'issues', 'backend', 'frontend'])
+  return isRecord(x) && hasExactKeys(x, ['id', 'digest', 'changes', 'issues', 'backend', 'frontend', ...(Object.hasOwn(x, 'modules') ? ['modules'] : [])])
     && isProjectId(x.id) && isGeneratorDigest(x.digest) && list(x.changes, INCREMENTAL_LIMITS.writes, change)
     && list(x.issues, 64, issue) && choices(x);
 }

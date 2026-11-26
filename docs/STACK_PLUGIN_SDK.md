@@ -33,3 +33,8 @@ The built-in Node adapter consumes the version 1 model from the Schema package. 
 
 
 Phase 06 exercises the incremental planning boundary using the built-in Node adapter. The planner needs the pinned manifest, checked-out source schema and prior feature selections. It returns exact before/after artifacts and conflict reasons. Filesystem approval, staged publication and recovery stay in the desktop service. Third-party executable adapters remain outside the current release.
+
+
+## Authoring a built-in module
+
+Add the exact release and compatibility requirements to the catalog. Define dependencies and conflicts explicitly. Bundle reviewed source, SQL, tests and docs in the trusted adapter. Keep environment values out of template inputs and specify each runtime setting in the catalog. Register the narrow integration through the adapter's existing contribution slots. Reserve file ownership and PostgreSQL names. Verify fresh generation, unsupported selections, unchanged-module replay and applicable incremental installation with disposable projects before enabling the release. Publish a new version for changed executable artifacts. External executable packages and arbitrary imported template code are unsupported.

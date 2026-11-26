@@ -46,3 +46,8 @@ Use the pinned PostgreSQL 17 fixture database at loopback. Set FACTORY_TEST_DATA
 ## Phase 06 verification
 
 The incremental Vitest fixtures cover native Git staleness, external SQL, customized and missing files, junctions, and restart from a failed publication checkpoint. The standalone verifier starts an initial inventory app on a disposable PostgreSQL namespace before adding the supplier migration, preserves a client service edit, runs production builds and verifies the expanded API and React flow. The built Electron test performs wizard creation, plan navigation, cancelled consent, reviewed apply, and a zero-write repeat in a temporary workspace. The Windows workflow uploads the captured dark and light plans.
+
+
+## Phase 07 verification
+
+The same CI workflows run six standalone configurations including the full authenticated and incrementally installed reference applications. Verification uses separate PostgreSQL namespaces and generated credentials, tests credential and role boundaries through HTTP, and exercises protected browser pages. The native suite captures engineering profile publish and the exact wizard review using a disposable profile and controlled native confirmation.

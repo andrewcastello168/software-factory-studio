@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { TextDecoder } from 'node:util';
 import { isMigrationName, SCHEMA_LIMITS, STARTER } from '@factory/contracts';
 import type { DatabaseSchema, SchemaDiagnostic, SchemaMigration } from '@factory/contracts';
-import { sha256 } from '@factory/generator';
+import { identityMigration, sha256 } from '@factory/generator';
 import { diagnostic, emptySchema, parseSql, planMigration } from '@factory/schema';
 import { directoryIdentity, readBoundedFile, withDirectory } from '../projects/filesystem';
 import type { ProjectRoot } from '../projects/filesystem';
@@ -28,7 +28,9 @@ export function modelSources(migrations: readonly SchemaMigration[]) {
       diagnostics.push(...result.diagnostics);
       break;
     }
-    if (!knownWelcome && planMigration(schema, result.schema).sql !== sql) safe = false;
+    const moduleName = /^\d{4}_([a-z_]+)\.sql$/u.exec(migration.name)?.[1];
+    const knownModule = moduleName && identityMigration(moduleName) === sql;
+    if (!knownWelcome && !knownModule && planMigration(schema, result.schema).sql !== sql) safe = false;
     schema = result.schema;
   }
   return { schema, diagnostics: diagnostics.slice(0, SCHEMA_LIMITS.diagnostics), safe };

@@ -1,11 +1,15 @@
 import { createHash } from 'node:crypto';
 import {
-  GENERATOR_LIMITS, isGeneratorPath, isLegacyStarterConfig, isProjectId, isStarterConfig, MODULE_CATALOG, STARTER,
+  AUDIT_LOGGING, AUTHENTICATION, GENERATOR_LIMITS, RBAC, SCHEMA_LIMITS, WELCOME_EXAMPLE, isGeneratorPath, isLegacyStarterConfig, isProjectId, isStarterConfig, MODULE_CATALOG, STARTER,
 } from '@factory/contracts';
 import type { GeneratorFile, LegacyStarterConfig, StarterConfig } from '@factory/contracts';
 import { composeCrud, CRUD_OWNER, InvalidCrud, normalizeCrud } from './crud';
 import { composeModules, foundationTemplates } from './modular';
 import { nodeTemplates } from './templates';
+import auditManagement from '../templates/identity/web/Management.tsx?raw';
+import { identityGuide, IDENTITY_PREFIX, identityValues, protectCrudTemplate } from './identity';
+import { libraryFiles, normalizeLibrary } from './library';
+export { identityMigration, IDENTITY_PREFIX } from './identity';
 
 export { InvalidCrud } from './crud';
 export * from './incremental';
@@ -106,14 +110,44 @@ export function planProject(input: StarterConfig, projectId: string): StarterPla
   const config: StarterConfig = {
     ...coreConfig(input), database: input.database,
     ...(input.crud ? { crud: normalizeCrud(input.crud) } : {}),
+    ...(input.library ? { library: normalizeLibrary(input.library) } : {}),
     modules: input.modules.map(({ id, version }) => ({ id, version })).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   };
   if (config.crud && Buffer.byteLength(json(config)) > 36_000) throw new InvalidCrud('Schema exceeds the portable generation limit.');
   const { modules, slots, testPaths } = composeModules(config.modules);
-  const crud = config.crud && composeCrud(config.crud, modules.length > 0);
+  const withWelcome = modules.some(({ id }) => id === WELCOME_EXAMPLE.id);
+  const auth = modules.some(({ id }) => id === AUTHENTICATION.id);
+  const managementPage = modules.some(({ id }) => id === AUDIT_LOGGING.id || id === 'user-management');
+  if (config.crud?.schema.tables.some(({ name }) => name.startsWith(IDENTITY_PREFIX))) throw new InvalidCrud('The identity table namespace is reserved.');
+  const infrastructure = Number(withWelcome) + (auth ? 3 : 0)
+    + (modules.some(({ id }) => id === RBAC.id) ? 3 : 0) + (modules.some(({ id }) => id === AUDIT_LOGGING.id) ? 1 : 0);
+  if ((config.crud?.schema.tables.length ?? 0) + infrastructure > SCHEMA_LIMITS.tables) {
+    throw new InvalidCrud('The business schema and module tables exceed the project schema limit.');
+  }
+  const crud = config.crud && composeCrud(config.crud, withWelcome);
+  const library = config.library && libraryFiles(config.library, config.name);
+  if (library) {
+    slots.AGENTFEATURES += '- Follow docs/ENGINEERING_PROFILE.md for the advisory profile ' + config.library!.profile.name
+      + ' v' + config.library!.profile.version + '. Keep client requirements separate.\n';
+    slots.READMEFEATURES += 'See [Engineering profile](docs/ENGINEERING_PROFILE.md) for the pinned advisory conventions.\n\n';
+    if (config.library?.template) slots.ARCHFEATURES += '\nThe selected Business Workspace template provides the application layout and project branding.\n';
+  }
+  if (auth) {
+    slots.WEBIMPORTS = slots.WEBIMPORTS.replace('IdentityGate, RecordAccess', config.crud?.frontend.length ? 'IdentityGate, RecordAccess' : 'IdentityGate');
+    const registration = '  registerIdentity(router, pool);\n';
+    slots.APIROUTES = registration + slots.APIROUTES.replace(registration, '');
+    slots.AGENTFEATURES += '- Installed identity releases: ' + config.modules.filter(({ id }) => id !== WELCOME_EXAMPLE.id)
+      .map(({ id, version }) => id + ' v' + version).join(', ') + '.\n';
+  }
+  if (config.library?.template) slots.WEBIMPORTS += "import { BusinessShell } from './features/business/BusinessShell.tsx';\n";
   if (crud) {
     for (const key of Object.keys(slots) as (keyof typeof slots)[]) slots[key] += crud.slots[key];
     testPaths.push(...crud.testPaths);
+  }
+  if (auth) {
+    slots.WEBPANELS = slots.WEBPANELS.replace('<CrudWorkspace />', '<RecordAccess>{(canWrite) => <CrudWorkspace readOnly={!canWrite} />}</RecordAccess>');
+    slots.READMEFEATURES = slots.READMEFEATURES.replace(' These routes have no built-in authentication.', '');
+    slots.REQFEATURES = slots.REQFEATURES.replace(' Access control is a deployment requirement.', '');
   }
   const versions = {
     generator: STARTER.engineVersion,
@@ -121,28 +155,55 @@ export function planProject(input: StarterConfig, projectId: string): StarterPla
     architecture: { id: config.architecture, version: STARTER.architectureVersion },
     engineering: { id: config.engineering, version: STARTER.engineeringVersion },
     database: config.database,
+    ...(library && config.library ? { library: {
+      profile: { id: config.library.profile.id, version: config.library.profile.version },
+      ...(config.library.template ? { template: { id: config.library.template.id, version: config.library.template.version, sha256: sha256(json(templateHashes(library.files))) } } : {}),
+      sha256: sha256(json(config.library)),
+    } } : {}),
     ...(crud ? { schema: { id: CRUD_OWNER, version: '1.0.0', migration: crud.migrationPath,
       templateSha256: sha256(json({ files: templateHashes(crud.files), slots: crud.slots, values: crud.values })),
       backend: config.crud!.backend, frontend: config.crud!.frontend } } : {}),
-    modules: modules.map(({ id, version, templates, slots, tests }) => ({
-      id, version, templateSha256: sha256(json({ files: templateHashes(templates), slots, tests })),
+    modules: modules.map(({ id, version, templates, slots, tests, migration }) => ({
+      id, version, templateSha256: sha256(json({ files: templateHashes(templates), slots, tests, ...(migration ? { migration: [migration[0], sha256(normalize(migration[1]))] } : {}) })),
       requires: MODULE_CATALOG.find((module) => module.id === id)!.requires,
     })),
   };
-  const values = { ...renderingValues(config), ...slots, ...crud?.values };
-  const files = render(foundationTemplates, config.slug, values, testPaths);
+  const values = { ...renderingValues(config), ...slots, ...crud?.values, ...library?.values, ...identityValues(config.modules) };
+  let root = '<App />';
+  if (auth) root = '<IdentityGate>' + root + '</IdentityGate>';
+  if (config.library?.template) root = '<BusinessShell>' + root + '</BusinessShell>';
+  const foundation = root === '<App />' ? foundationTemplates : foundationTemplates.map(([path, text]) =>
+    [path, path === 'web/main.tsx' ? text.replace('render(<App />)', 'render(' + root + ')') : text] as const);
+  const files = render(foundation, config.slug, values, testPaths);
   const owners = new Map<string, string>();
+  let sequence = 1 + Number(withWelcome) + Number(Boolean(crud));
   for (const module of modules) {
+    if (module.migration) {
+      const path = 'db/migrations/' + String(++sequence).padStart(4, '0') + '_' + module.migration[0] + '.sql';
+      files.push(file(path, normalize(module.migration[1])));
+      owners.set(path, module.id);
+    }
     for (const planned of render(module.templates, config.slug, values)) {
       files.push(planned);
       owners.set(planned.path, module.id);
     }
   }
+  if (auth) {
+    for (const additional of [
+      file('docs/IDENTITY.md', identityGuide(config.modules.filter(({ id }) => id !== WELCOME_EXAMPLE.id))),
+      ...(managementPage ? render([['web/features/identity/Management.tsx', auditManagement]], config.slug, values) : []),
+    ]) { files.push(additional); owners.set(additional.path, AUTHENTICATION.id); }
+  }
+  if (library) files.push(...render(library.files, config.slug, values), file('docs/ENGINEERING_PROFILE.md', library.guidance),
+    file('.factory/engineering.json', json(config.library)));
   if (crud) {
     for (const [path, content] of crud.files) {
       // SQL and documentation are finalized data, not template expressions.
       const planned = path.startsWith('db/') || path.startsWith('docs/')
-        ? file(path, content) : render([[path, content]], config.slug, values)[0]!;
+        ? file(path, auth && path === 'docs/CRUD_API.md'
+          ? content.replace('These generated routes are unauthenticated. Use appropriate deployment and access controls.',
+            'These generated routes require an active session. Follow docs/IDENTITY.md for authorization details.') : content)
+        : render([[path, auth ? protectCrudTemplate(path, content) : content]], config.slug, values)[0]!;
       files.push(planned);
       owners.set(path, CRUD_OWNER);
     }

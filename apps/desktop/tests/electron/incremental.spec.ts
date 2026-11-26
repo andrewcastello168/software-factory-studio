@@ -87,6 +87,25 @@ test('reviews incremental files in the built workbench and preserves the supplie
     await expect(review.getByRole('button', { name: 'Apply Generation', exact: true })).toBeDisabled();
     await review.getByRole('button', { name: 'History', exact: true }).click();
     await expect(review.getByRole('region', { name: 'Generation history' })).toContainText('Applied');
+
+    await review.getByRole('button', { name: 'Review plan', exact: true }).click();
+    await review.getByText('Install optional modules', { exact: true }).click();
+    await review.getByRole('checkbox', { name: 'Install User management', exact: true }).check();
+    const previewModule = review.getByRole('button', { name: 'Preview Module Installation' });
+    await previewModule.click();
+    await expect(plan.getByRole('alert')).toContainText('requires authentication');
+    await review.getByRole('checkbox', { name: 'Install Authentication', exact: true }).check();
+    await previewModule.click();
+    await expect(plan).toContainText('authentication v1.0.0');
+    await expect(plan).toContainText('0004_authentication.sql');
+    await expect(apply).toBeEnabled();
+    await page.screenshot({ path: test.info().outputPath('generation-review-module-install.png') });
+    await apply.click();
+    await expect(review.getByText('Generation result verified.', { exact: false })).toBeVisible();
+    await expect(review.getByRole('checkbox', { name: 'Install Authentication', exact: true })).toBeDisabled();
+    expect(await readFile(customPath, 'utf8')).toBe(custom);
+    expect(await readFile(join(project, 'db/migrations/0003_suppliers.sql'), 'utf8')).toBe(migration);
+    expect(await readdir(join(project, 'db/migrations'))).toHaveLength(4);
   } finally {
     await instance?.close();
     await rm(fixture, { recursive: true, force: true, maxRetries: 5 });

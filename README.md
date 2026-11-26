@@ -48,6 +48,10 @@ Open **Generation Review** in a compatible modular Node/PostgreSQL starter. Stud
 
 Use **History** to inspect generation receipts. If a publication is interrupted, open the same workspace to review and resume or hand it off for manual inspection. See [Generator specification](docs/GENERATOR_SPECIFICATION.md) for compatibility and recovery limits.
 
+## Engineering Library and MVP
+
+Browse the verified stack, engineering profiles, Business Workspace template, and optional identity modules. Publish personal profiles and template versions in the library, then select exact versions in **New Project**. Use **Generation Review** to install eligible modules into an existing starter with an explicit preview. See [MVP getting started](docs/MVP_GETTING_STARTED.md).
+
 ## Development setup
 
 Use Node.js **22.16.0** and pnpm **10.13.1**. The application has no service or credential setup. Install Git for the project workflows and integration tests. Install the binary explicitly before running the desktop app. These commands work from PowerShell after installing the pinned Windows x64 Node release.

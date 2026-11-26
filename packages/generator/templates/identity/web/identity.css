@@ -1,0 +1,12 @@
+.identity-bar { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; padding: .65rem 1rem; }
+.identity-bar nav { display: flex; gap: .4rem; flex: 1 0 auto; flex-wrap: wrap; }
+.identity-bar button[aria-pressed="true"] { outline: 2px solid var(--brand, #2458a4); }
+.identity-login { max-width: 28rem; margin: 2rem auto; padding: 1rem; }
+.identity-admin { min-width: 0; padding: 1rem; }
+.identity-form { display: grid; gap: .65rem; max-width: 34rem; padding: .75rem; margin: .75rem 0; border: 1px solid currentColor; }
+.identity-form label { display: grid; gap: .4rem; }
+.identity-form label:has(input[type="checkbox"]) { display: flex; align-items: center; }
+.identity-grid { overflow: auto; margin-block: .65rem; }
+.identity-grid table { width: 100%; text-align: start; border-collapse: collapse; }
+.identity-grid th, .identity-grid td { padding: .45rem; border-bottom: 1px solid currentColor; text-align: start; }
+.identity-admin button, .identity-login button, .identity-bar button { padding: .35rem .65rem; }

@@ -5,7 +5,7 @@ import type {
   ErrorCode, GitState, IncrementalApproval, IncrementalInspection, IncrementalPreview, IncrementalSelection, OpenProject, Result,
 } from '@factory/contracts';
 import {
-  classifyOwned, composeIncremental, eligibility, incrementalPaths, IncrementalUnsupported, manifestEntries,
+  classifyOwned, composeIncremental, composeModuleInstall, eligibility, incrementalPaths, IncrementalUnsupported, manifestEntries,
   previousSources, readIncrementalProject, sha256,
 } from '@factory/generator';
 import type { LocalFile } from '@factory/generator';
@@ -37,7 +37,7 @@ const covers = (parent: string, child: string) => {
 };
 const notices = (error: unknown) => error instanceof IncrementalUnsupported ? error.message.slice(0, 300)
   : 'The project, manifests, or migration paths could not be safely inspected.';
-const protectedInputs = ['.factory/project.json', '.factory/modules.json', '.env.example'];
+const protectedInputs = ['.factory/project.json', '.factory/modules.json', '.factory/engineering.json', '.env.example'];
 
 export class IncrementalStudio {
   #closed = false;
@@ -64,7 +64,7 @@ export class IncrementalStudio {
     finally { this.#busy = false; this.#active = undefined; }
   }
 
-  async #context(id: string, mutation: boolean) {
+  async #context(id: string, mutation: boolean, own = new Map<string, string>()) {
     const root = this.#root(id);
     if (mutation && this.grant.gitWriting()) throw new Rejected('PROJECT_BUSY');
     const git = await this.grant.git(id);
@@ -76,9 +76,13 @@ export class IncrementalStudio {
     const source = await readSources(root);
     const protectedFiles = await Promise.all(protectedInputs.map(async (path) => [path, await inspectFile(root, path)] as const));
     if (this.#root(id) !== root || (mutation && this.grant.gitWriting())) throw new Rejected('INCREMENTAL_STALE');
+    for (const item of source.migrations) {
+      const digest = own.get('db/migrations/' + item.name);
+      if (digest && digest !== item.sha256) throw new Rejected('INCREMENTAL_STALE');
+    }
     const context = sha256(JSON.stringify([pathKey(root.path), root.identity, source.directory.identity, state.state,
-      gitIdentity, repo?.branch, repo?.head, repo?.operation, source.migrations.map(({ name, sha256 }) => [name, sha256]),
-      source.diagnostics, protectedFiles.map(([path, file]) => [path, hashFile(file)])]));
+      gitIdentity, repo?.branch, repo?.head, repo?.operation, source.migrations.filter(({ name }) => !own.has('db/migrations/' + name)).map(({ name, sha256 }) => [name, sha256]),
+      source.diagnostics, protectedFiles.filter(([path]) => !own.has(path)).map(([path, file]) => [path, hashFile(file)])]));
     return { root, repo, context, source, protectedFiles };
   }
 
@@ -127,7 +131,7 @@ export class IncrementalStudio {
       const sources = source.migrations.map(({ name, sha256 }) => ({ name, sha256, external: !ownership.has('db/migrations/' + name) }));
       return {
         revision: captured.revision, branch: repo?.branch ?? null, head: repo?.head ?? null,
-        profile: { stack: 'Node / PostgreSQL · v2', architecture: 'Layered Web · v1', engineering: 'Standard Engineering · v1',
+        profile: { stack: 'Node / PostgreSQL · v2', architecture: 'Layered Web · v1', engineering: project.config.library ? project.config.library.profile.name + ' · v' + project.config.library.profile.version : 'Standard Engineering · v1',
           modules: project.config.modules.map(({ id, version }) => id + ' · ' + version) },
         tables: eligibility(project, schema), files: inventory, sources, issues, history, recovery: pending?.preview ?? null,
       };
@@ -147,13 +151,28 @@ export class IncrementalStudio {
     if (captured.revision !== input.revision) throw new Rejected('INCREMENTAL_STALE');
     const id = randomUUID();
     const result = captured.issues.length ? { changes: [], issues: captured.issues, backend: [], frontend: [] }
-      : composeIncremental(captured.project, captured.files, captured.schema, captured.oldSchema, captured.source.migrations, input);
+      : input.modules?.length ? composeModuleInstall(captured.project, captured.files, captured.oldSchema, captured.source.migrations, input.modules)
+        : composeIncremental(captured.project, captured.files, captured.schema, captured.oldSchema, captured.source.migrations, input);
+    if (input.modules?.length && (input.backend.length || input.frontend.length)) result.issues.push('Review module installation and new CRUD layers separately.');
+    const plannedSql = result.changes.filter(isWrite).filter(({ path }) => path.startsWith('db/'));
+    if (plannedSql.length) {
+      const additions = plannedSql.map(({ path, after }) => ({ name: path.slice('db/migrations/'.length), sql: after, sha256: sha256(after) }));
+      if (modelSources([...captured.source.migrations, ...additions]).diagnostics.length) {
+        result.issues.push('The module migrations are incompatible with the declared source history.');
+      }
+      for (const { path } of plannedSql) {
+        if ((await inspectFile(captured.root, path)).state !== 'absent') result.issues.push('An append-only module migration path is occupied or unsafe.');
+      }
+    }
     const affected = new Set(result.changes.filter(isWrite).map(({ path }) => path));
     if (captured.repo?.changes.some(({ path, original, index }) => index !== '.' && index !== '?'
       && (affected.has(path) || (original && affected.has(original))))) result.issues.push('Unstage affected files before applying the reviewed generation.');
     const preview = { id, ...result, digest: previewDigest(input.revision, { id, ...result }) };
+    const outputs = new Map(preview.changes.filter(isWrite).filter(({ path }) => path.startsWith('db/') || path === '.factory/modules.json')
+      .map(({ path, after }) => [path, sha256(after)]));
+    const context = outputs.size ? (await this.#context(input.projectId, true, outputs)).context : captured.context;
     const record: RecordV1 = {
-      version: 1, context: captured.context, revision: captured.revision, preview,
+      version: 1, context, revision: captured.revision, preview,
       directories: preview.issues.length ? {} : await snapshotParents(captured.root, preview.changes.filter(isWrite)),
     };
     return { input, record, root: captured.root };
@@ -200,8 +219,10 @@ export class IncrementalStudio {
       const writes = record.preview.changes.filter(isWrite);
       if (!writes.length || record.preview.issues.length) return failure('INCREMENTAL_CONFLICT');
 
+      const outputs = new Map(writes.filter(({ path }) => path.startsWith('db/') || path === '.factory/modules.json')
+        .map(({ path, after }) => [path, sha256(after)]));
       const authorize = async () => {
-        const live = await this.#context(input.projectId, true);
+        const live = await this.#context(input.projectId, true, outputs);
         if (live.root !== root || live.context !== record.context || await this.grant.schemaPending(root.path)) {
           throw new Rejected('INCREMENTAL_STALE');
         }

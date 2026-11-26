@@ -69,14 +69,14 @@ it('rejects unavailable project types, planned modules, missing dependencies and
   for (const input of [
     { ...config, modules: [WELCOME_EXAMPLE, WELCOME_EXAMPLE] },
     { ...config, modules: [{ ...WELCOME_EXAMPLE, version: '2.0.0' }] },
-    { ...config, modules: [{ id: 'authentication', version: '1.0.0' }] },
+    { ...config, modules: [{ id: 'authentication', version: '9.0.0' }] },
     { ...config, modules: [{ id: 'custom', version: '1.0.0' }] },
     { ...config, modules: [{ ...WELCOME_EXAMPLE, source: '../template' }] },
     { ...config, appType: 'frontend-only' },
     { ...config, database: 'none' },
   ]) expect(isStarterConfig(input)).toBe(false);
   expect(moduleCompatibility('full-stack', 'postgresql', [{ id: 'rbac', version: '1.0.0' }])).toEqual([
-    'RBAC is planned.', 'RBAC requires authentication.', 'RBAC requires user-management.',
+    'RBAC requires authentication.', 'RBAC requires user-management.',
   ]);
   expect(moduleCompatibility('backend-only', 'none', [WELCOME_EXAMPLE])).toEqual([
     'Welcome example is incompatible with the selected application type or database.',

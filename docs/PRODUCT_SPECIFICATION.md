@@ -80,3 +80,8 @@ The module roadmap starts with authentication, user management, RBAC, audit logg
 ## Verified database-driven path
 
 Phase 05 connects the managed PostgreSQL workbench to optional schema and CRUD selection in a new Node starter. Database Studio inspects and edits supported declared schema, previews additive migrations, and separately reviews local development apply. CRUD selection is independent per table and layer within the supported configuration. Phase 06 extends the same engineering practices to projects with existing application code.
+
+
+## Phase 07 MVP scope
+
+The Engineering Library provides personal and built-in declarative definitions, portable JSON exchange, pinned profile context, and branded Business Workspace templates. Trusted identity modules include Authentication, User Management, RBAC and Audit Logging. Teams can share reviewed JSON through Git. Additional component and deployment libraries, third-party packages, role hierarchies, and visual layout editing remain planned.

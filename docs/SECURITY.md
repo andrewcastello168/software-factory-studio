@@ -54,3 +54,10 @@ Inspect using a native confirmation and a read-only PostgreSQL transaction. Main
 The renderer sends a project token, a read revision, table selections, and opaque approval or recovery IDs. It cannot submit paths or file content. Main restricts writable paths to the built-in adapter's outputs. Replacement requires explicit approval, exact pinned baseline bytes, and matching portable ownership. Generated changes, Git context, directory identities, and migration fingerprints are rechecked across consent and recovery. The native dialog defaults to cancel. In-progress and interrupted operations protect their worktree from Studio Git and database mutations.
 
 The transaction preserves verified originals in sibling backups until all reviewed outputs are readable and match. Conflicting workspace or recovery bytes are preserved for manual inspection. Linux uses the existing opened-directory binding. On Windows the canonical identity checks bracket path-based operations. Save editor buffers first. Concurrent same-account processes are outside the filesystem isolation boundary. Incremental commits never run project scripts or change a database.
+
+
+## Phase 07 identity and portable definitions
+
+The library accepts typed data and bounded advisory text. It rejects unknown fields, executable metadata, common credential patterns, and unsafe branding values. Portable exports and project context contain the selected definitions, never runtime environment values. Review authored free text before sharing.
+
+Generated applications use scrypt-derived password hashes and database-backed, expiring sessions with token digests at rest. Login and administration use parameterized queries. Unsafe requests require the configured exact Origin. HTTPS mode accepts direct TLS or a trusted loopback proxy that overwrites forwarded protocol and client address. Local loopback HTTP requires explicit opt-in. Critical administration endpoints enforce role and bootstrap administrator boundaries before database writes. Audit coverage is described in the generated identity guide.

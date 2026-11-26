@@ -4,9 +4,11 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from './Controls';
+import { libraryBridge } from './EngineeringLibrary';
+import type { LibraryPage } from './EngineeringLibrary';
 import type { ProjectView } from './Projects';
 
-export type Page = 'home' | 'projects' | 'recents' | 'settings';
+export type Page = 'home' | 'projects' | 'recents' | 'settings' | LibraryPage;
 const groups: { title: string; entries: { title: string; icon: LucideIcon; page?: Page }[] }[] = [
   {
     title: 'Workspace',
@@ -19,10 +21,11 @@ const groups: { title: string; entries: { title: string; icon: LucideIcon; page?
   {
     title: 'Factory Library',
     entries: [
-      { title: 'Technology Catalog', icon: Library },
-      { title: 'Architecture Library', icon: Layers3 },
-      { title: 'Template Studio', icon: Blocks },
-      { title: 'Module Library', icon: Package },
+      { title: 'Technology Catalog', icon: Library, ...(libraryBridge ? { page: 'technology' as const } : {}) },
+      { title: 'Architecture Library', icon: Layers3, ...(libraryBridge ? { page: 'architecture' as const } : {}) },
+      { title: 'Template Studio', icon: Blocks, ...(libraryBridge ? { page: 'templates' as const } : {}) },
+      { title: 'Module Library', icon: Package, ...(libraryBridge ? { page: 'modules' as const } : {}) },
+      ...(libraryBridge ? [{ title: 'AI Context', icon: BookOpen, page: 'context' as const }] : []),
       { title: 'Component Library', icon: Box },
       { title: 'Plugin Manager', icon: Waypoints },
     ],
@@ -31,7 +34,7 @@ const groups: { title: string; entries: { title: string; icon: LucideIcon; page?
     title: 'Organization',
     entries: [
       { title: 'Team Workspace', icon: Users },
-      { title: 'Engineering Standards', icon: BookOpen },
+      { title: 'Engineering Standards', icon: BookOpen, ...(libraryBridge ? { page: 'profiles' as const } : {}) },
       { title: 'Settings', icon: Settings2, page: 'settings' },
     ],
   },

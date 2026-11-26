@@ -1,10 +1,11 @@
 import {
-  GENERATOR_LIMITS, hasExactKeys, isGeneratorDigest, isGeneratorPath, isModuleSelection, isRecord, isSchemaName,
+  GENERATOR_LIMITS, AUTHENTICATION, IDENTITY_MODULES, MODULE_CATALOG, isLibrarySelection, moduleCompatibility, orderedModules, hasExactKeys, isGeneratorDigest, isGeneratorPath, isModuleSelection, isRecord, isSchemaName,
   isProjectId, isStarterName, isStarterPort, isStarterSlug, STARTER, WELCOME_EXAMPLE,
 } from '@factory/contracts';
-import type { DatabaseSchema, GeneratorFile, IncrementalChange, IncrementalOwnedFile, SchemaMigration, StarterConfig } from '@factory/contracts';
+import type { DatabaseSchema, GeneratorFile, IncrementalChange, IncrementalOwnedFile, ModuleSelection, SchemaMigration, StarterConfig } from '@factory/contracts';
 import { validateCrud } from '@factory/schema';
 import { CRUD_OWNER } from './crud';
+import { identityContributions, identityMigration, IDENTITY_PREFIX } from './identity';
 import { planProject, sha256 } from './index';
 
 const manifestPath = '.factory/generation-manifest.json';
@@ -23,9 +24,18 @@ const featurePaths = [
   'web/features/crud/Crud.tsx', 'web/features/crud/crud.css',
 ];
 const optionalContext = new Set(['AGENTS.md', 'README.md', 'docs/ARCHITECTURE.md', 'docs/CODING_STANDARDS.md', 'docs/REQUIREMENTS.md']);
-export const incrementalPaths = [descriptorPath, manifestPath, versionsPath, modulePath, '.env.example', ...foundationPaths, ...featurePaths];
+const libraryPath = '.factory/engineering.json';
+const identityFiles = [...new Set(identityContributions.flatMap(({ templates }) => templates.map(([path]) => path)))];
+identityFiles.push('docs/IDENTITY.md', 'web/features/identity/Management.tsx');
+const identityOwner = (path: string) => {
+  const suffix = /^db\/migrations\/(?:\d{4})_([a-z_]+)\.sql$/u.exec(path)?.[1];
+  return suffix && identityMigration(suffix) ? suffix.replaceAll('_', '-') : undefined;
+};
+export const incrementalPaths = [descriptorPath, manifestPath, versionsPath, modulePath, libraryPath, '.env.example',
+  'server/app.ts', ...foundationPaths, ...featurePaths, ...identityFiles];
+export const isModuleMigrationPath = (path: string) => Boolean(identityOwner(path));
 export function isIncrementalWritePath(path: string) {
-  return [...foundationPaths, ...featurePaths, versionsPath, manifestPath].includes(path);
+  return isModuleMigrationPath(path) || [...foundationPaths, ...featurePaths, ...identityFiles, versionsPath, manifestPath, modulePath].includes(path);
 }
 
 export type LocalFile = { state: 'absent' | 'unsafe' } | { state: 'text'; sha256: string; content: string };
@@ -66,7 +76,7 @@ export function manifestEntries(files: ReadonlyMap<string, LocalFile>) {
   for (const item of manifest.files as unknown[]) {
     if (!isRecord(item) || !hasExactKeys(item, ['path', 'sha256', 'owner', 'action']) || !isGeneratorPath(item.path)
       || item.path === manifestPath || !isGeneratorDigest(item.sha256) || item.action !== 'create'
-      || ![STARTER.stack, CRUD_OWNER, WELCOME_EXAMPLE.id].some((owner) => owner === item.owner)) return [];
+      || ![STARTER.stack, CRUD_OWNER, ...MODULE_CATALOG.filter(({ version }) => version).map(({ id }) => id)].some((owner) => owner === item.owner)) return [];
     entries.push({ path: item.path, sha256: item.sha256, owner: item.owner as string, action: item.action });
   }
   return new Set(entries.map(({ path }) => path.toLowerCase())).size === entries.length ? entries : [];
@@ -96,9 +106,13 @@ export function readIncrementalProject(files: ReadonlyMap<string, LocalFile>): V
     return module;
   });
   const portValue = Number(/^PORT=(\d+)$/mu.exec(text(files, '.env.example') ?? '')?.[1]);
+  const library = object(text(files, libraryPath));
+  if ((versions.library !== undefined || library !== undefined) && !isLibrarySelection(library)) {
+    throw new IncrementalUnsupported('The pinned engineering profile or template snapshot is missing or invalid.');
+  }
   const config: StarterConfig = {
     name, slug, port: isStarterPort(portValue) ? portValue : 3000, appType: STARTER.appType, stack: STARTER.stack,
-    architecture: STARTER.architecture, engineering: STARTER.engineering, modules, database: STARTER.database,
+    architecture: STARTER.architecture, engineering: STARTER.engineering, modules, database: STARTER.database, ...(isLibrarySelection(library) ? { library } : {}),
   };
   const pinned = keyed(planProject(config, id).files);
   const baseline = object(pinned.get(versionsPath)?.content)!;
@@ -106,7 +120,7 @@ export function readIncrementalProject(files: ReadonlyMap<string, LocalFile>): V
     sha256: pinned.get(manifestPath)!.sha256 }]])).map(({ path, owner }) => [path, owner]));
   if (filesOwned.some(({ path, owner }) => owner === CRUD_OWNER
     ? !featurePaths.includes(path) && path !== 'db/migrations/0002_schema.sql' && path !== 'db/migrations/0003_schema.sql'
-    : known.get(path) !== owner)) {
+    : known.get(path) !== owner && (identityOwner(path) !== owner || !modules.some(({ id }) => id === owner)))) {
     throw new IncrementalUnsupported('The manifest claims ownership of paths outside the pinned templates.');
   }
   const { schema: schemaLock, ...withoutSchema } = versions;
@@ -141,7 +155,7 @@ export function classifyOwned(path: string, local: LocalFile | undefined, owned:
 }
 
 export function withoutWelcome(schema: DatabaseSchema, project: VersionedProject) {
-  return { ...schema, tables: schema.tables.filter(({ name }) => name !== 'welcome_messages' || !project.config.modules.length) };
+  return { ...schema, tables: schema.tables.filter(({ name }) => !name.startsWith(IDENTITY_PREFIX) && (name !== 'welcome_messages' || !project.config.modules.some(({ id }) => id === WELCOME_EXAMPLE.id))) };
 }
 
 export function previousSources(project: VersionedProject, migrations: SchemaMigration[]) {
@@ -195,7 +209,7 @@ export function composeIncremental(
   const currentVersions = object(after.get(versionsPath)?.content)!;
   const { version, schema: featureVersion, ...stack } = currentVersions;
   const sources = migrations.map(({ name, sha256 }) => ({ name, sha256 }));
-  const originalMigration = config.modules.length ? 'db/migrations/0003_schema.sql' : 'db/migrations/0002_schema.sql';
+  const originalMigration = config.modules.some(({ id }) => id === WELCOME_EXAMPLE.id) ? 'db/migrations/0003_schema.sql' : 'db/migrations/0002_schema.sql';
   const sourceText = (items: typeof sources) => 'Declared migration history: ' + items.map(({ name }) => '`db/migrations/' + name + '`').join(', ') + '.';
   const sourceDoc = (content: string, items: typeof sources) =>
     content.replace('Authoritative SQL migration: `' + originalMigration + '`.', sourceText(items));
@@ -247,7 +261,8 @@ export function composeIncremental(
 
   const feature = { ...(featureVersion as Record<string, unknown>) };
   delete feature.migration;
-  const versions = { ...stack, schema: { ...feature, ...(previous?.migration ? { migration: previous.migration } : {}), sources } };
+  const { modules: installed, ...stackBase } = stack;
+  const versions = { ...stackBase, schema: { ...feature, ...(previous?.migration ? { migration: previous.migration } : {}), sources }, modules: installed };
   const versionBytes = json({ version, ...versions });
   recorded.set(versionsPath, { path: versionsPath, sha256: sha256(versionBytes), owner: STARTER.stack, action: 'create' });
   const inputsSha256 = sha256(json({ projectId, sources, backend, frontend, versions }));
@@ -264,4 +279,119 @@ export function composeIncremental(
       after: desired === previousText ? null : desired, reason: 'Record reviewed source references, feature selections and exact output fingerprints.' });
   }
   return { changes, issues, backend, frontend };
+}
+
+export function composeModuleInstall(
+  project: VersionedProject, files: ReadonlyMap<string, LocalFile>, oldSchema: DatabaseSchema,
+  migrations: SchemaMigration[], requested: ModuleSelection[],
+) {
+  const { config, projectId, previous } = project;
+  const backend = previous?.backend ?? [];
+  const frontend = previous?.frontend ?? [];
+  const modules = [...config.modules];
+  const changes: IncrementalChange[] = [];
+  const issues: string[] = [];
+  const result = { changes, issues, backend, frontend, modules };
+  if (new Set(requested.map(({ id }) => id)).size !== requested.length) {
+    issues.push('Choose each module once.');
+    return result;
+  }
+  for (const pin of requested) {
+    const existing = modules.find(({ id }) => id === pin.id);
+    if (!IDENTITY_MODULES.some(({ id, version }) => id === pin.id && version === pin.version)
+      || (existing && existing.version !== pin.version)) {
+      issues.push('The requested module release or upgrade is unsupported.');
+      return result;
+    }
+    if (!existing) modules.push(pin);
+  }
+  issues.push(...moduleCompatibility(config.appType, config.database, modules));
+  for (const entry of project.files.filter(({ path }) => isModuleMigrationPath(path))) {
+    if (migrations.find(({ name }) => 'db/migrations/' + name === entry.path)?.sha256 !== entry.sha256) {
+      issues.push('An installed module migration was changed or removed.');
+    }
+  }
+  if (issues.length || modules.length === config.modules.length) return result;
+  modules.splice(0, modules.length, ...orderedModules(modules));
+  const oldConfig: StarterConfig = {
+    ...config, ...(previous ? { crud: { schema: withoutWelcome(oldSchema, project), migrations: true, backend, frontend } } : {}),
+  };
+  const before = keyed(planProject(oldConfig, projectId).files);
+  const after = keyed(planProject({ ...oldConfig, modules }, projectId).files);
+  const proposedManifest = after.get(manifestPath)!;
+  const proposedOwners = new Map(manifestEntries(new Map([[manifestPath, {
+    state: 'text', content: proposedManifest.content, sha256: proposedManifest.sha256,
+  }]])).map(({ path, owner }) => [path, owner]));
+  const recorded = new Map(project.files.map((item) => [item.path, item]));
+  const integration = new Set(['server/app.ts', 'server/routes.ts', 'web/main.tsx']);
+  if (config.modules.some(({ id }) => id === AUTHENTICATION.id)) {
+    integration.add('server/features/identity/register.ts');
+    integration.add('server/features/identity/authentication.ts');
+    integration.add('server/features/identity/shared.ts');
+  }
+  for (const path of integration) {
+    const installed = files.get(path);
+    if (installed?.state !== 'text' || installed.sha256 !== before.get(path)?.sha256
+      || recorded.get(path)?.sha256 !== installed.sha256) {
+      changes.push({ path, action: 'conflict', before: null, after: null,
+        reason: 'This security integration must match the reviewed starter before installing the module.' });
+    }
+  }
+  const conflicts = new Set(changes.map(({ path }) => path));
+  for (const path of [...foundationPaths, ...featurePaths.filter((path) => path !== 'docs/DATABASE_SCHEMA.md'), ...identityFiles]) {
+    const next = after.get(path);
+    if (!next || conflicts.has(path) || before.get(path)?.sha256 === next.sha256) continue;
+    const prior = before.get(path);
+    const local = files.get(path);
+    const owner = proposedOwners.get(path) ?? STARTER.stack;
+    const known = recorded.get(path);
+    const vacant = !prior && !known && local?.state === 'absent';
+    // Shared identity integrations may change when a dependency is added. Their original
+    // bytes and ownership must still match the previously rendered stack.
+    const trusted = Boolean(prior && known && local?.state === 'text' && local.sha256 === prior.sha256 && known.sha256 === local.sha256);
+    if (!vacant && !trusted) {
+      changes.push({ path, action: optionalContext.has(path) ? 'protected' : 'conflict', before: null, after: null,
+        reason: optionalContext.has(path) ? 'Custom instructions are preserved. See the generated identity guide.' : 'The required integration is customized, unowned, missing or unsafe.' });
+      continue;
+    }
+    changes.push({ path, action: vacant ? 'create' : 'modify', before: vacant ? null : text(files, path)!, after: next.content,
+      reason: 'Integrate the exact reviewed module release.' });
+    recorded.set(path, { path, owner, action: 'create', sha256: next.sha256 });
+  }
+
+  let ordinal = Number(migrations.at(-1)?.name.slice(0, 4) ?? 0);
+  for (const next of after.values()) {
+    const owner = identityOwner(next.path);
+    if (!owner || config.modules.some(({ id }) => owner === id)) continue;
+    const suffix = next.path.slice('db/migrations/0000_'.length);
+    const path = 'db/migrations/' + String(++ordinal).padStart(4, '0') + '_' + suffix;
+    if (ordinal > 9999 || recorded.has(path) || files.has(path)) {
+      issues.push('A new module migration cannot be appended safely.');
+      break;
+    }
+    changes.push({ path, action: 'create', before: null, after: next.content, reason: 'Append a module migration without changing the database or previous SQL.' });
+    recorded.set(path, { path, owner, action: 'create', sha256: next.sha256 });
+  }
+  if (changes.some(({ action }) => action === 'conflict')) issues.push('Resolve the marked integration conflicts before installing.');
+  if (issues.length) return result;
+  const next = object(after.get(versionsPath)?.content)!;
+  const { version, schema: _schema, modules: pinned, ...stack } = next;
+  void _schema;
+  const versions = { ...stack, ...(project.versions.schema ? { schema: project.versions.schema } : {}), modules: pinned };
+  const stackBytes = json({ version, ...versions });
+  const moduleBytes = after.get(modulePath)!.content;
+  for (const [path, data] of [[versionsPath, stackBytes], [modulePath, moduleBytes]] as const) {
+    const current = text(files, path);
+    if (!current || recorded.get(path)?.sha256 !== sha256(current)) {
+      issues.push('The project version or module lock was edited.');
+      return result;
+    }
+    changes.push({ path, action: 'modify', before: current, after: data, reason: 'Pin exact module versions and dependency fingerprints.' });
+    recorded.set(path, { path, owner: STARTER.stack, action: 'create', sha256: sha256(data) });
+  }
+  const manifest = json({ version: 2, projectId, inputsSha256: sha256(json({ projectId, versions })), versions, files: [...recorded.values()] });
+  changes.push({ path: manifestPath, action: 'modify', before: text(files, manifestPath)!, after: manifest, reason: 'Record ownership and fingerprints of the reviewed module output.' });
+  if (recorded.size > GENERATOR_LIMITS.files) issues.push('This installation exceeds the supported manifest size.');
+  if (!modules.some(({ id }) => id === AUTHENTICATION.id)) issues.push('The authentication dependency is required.');
+  return result;
 }

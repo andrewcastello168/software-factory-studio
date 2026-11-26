@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import {
+  LIBRARY_CHANNEL, isLibraryAsset, isLibraryAssets,
   INCREMENTAL_CHANNEL, isIncrementalApproval, isIncrementalInspection, isIncrementalPreview, isIncrementalSelection,
   isNullableIncrementalInspection,
   SCHEMA_CHANNEL, isMigrationPreview, isNullableSchemaSnapshot, isSchemaConnection, isSchemaEdit,
@@ -32,6 +33,10 @@ function checkedInvoke<T>(
 }
 
 const studio: StudioBridge = {
+  library: {
+    list: () => invoke(LIBRARY_CHANNEL.list, isLibraryAssets),
+    publish: (asset) => checkedInvoke(LIBRARY_CHANNEL.publish, asset, isLibraryAsset, isLibraryAsset),
+  },
   incremental: {
     inspect: (id) => invokeProject(INCREMENTAL_CHANNEL.inspect, isIncrementalInspection, id),
     preview: (input) => checkedInvoke(INCREMENTAL_CHANNEL.preview, input, isIncrementalSelection, isIncrementalPreview),

@@ -26,6 +26,16 @@ Phase 07 is the first complete factory workflow. A developer opens a real reposi
 
 Phases 08–12 retain the approved multi-stack, advanced Git, design, development, quality, collaboration, deployment, and distribution requirements. Prioritize interoperability and external editor handoff ahead of full IDE duplication and complex page authoring. Verify extended capability claims individually. Phase 04 begins after Phase 03 approval and merge.
 
+## Phase 07 acceptance criteria
+
+| ID | Gate | Observable pass criteria |
+| --- | --- | --- |
+| P07-01 | Engineering library | Browse the verified stack, architecture, profiles, templates and modules. Duplicate or create a personal asset, preview and publish an immutable version, exchange validated portable JSON and select an exact release in the wizard. |
+| P07-02 | Independent project and template | Generate projects sharing one profile with different branding, schemas and module selections. Validate locks, advisories, client requirements, unauthenticated generation, generated documentation and standalone builds. |
+| P07-03 | Application identity | Verify opt-in authentication, bootstrap, server authorization, user and role administration, protected React UI, audit inspection and privacy. Exercise session expiry and revocation, cross-origin rejection, throttling, and invalid privilege assignments against disposable PostgreSQL. |
+| P07-04 | Incremental installation | Install a reviewed supported identity release into an existing starter, verify ordered dependency decisions and source provenance, preserve custom code, reject unsafe integrations, and prove interrupted installation resumes without duplicate migrations. |
+| P07-05 | Delivery | Pass applicable Studio and generated application checks on Linux and Windows x64. Capture the wizard and library in the built app, audit dependencies and document working capabilities and limitations. |
+
 ## Phase 06 acceptance criteria
 
 | ID | Gate | Observable pass criteria |

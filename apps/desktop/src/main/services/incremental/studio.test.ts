@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } fro
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, expect, it } from 'vitest';
-import { STARTER } from '@factory/contracts';
+import { AUTHENTICATION, RBAC, STARTER } from '@factory/contracts';
 import type { IncrementalSelection, Result } from '@factory/contracts';
 import { planProject } from '@factory/generator';
 import { parseSql } from '@factory/schema';
@@ -203,4 +203,31 @@ it('hands off interrupted recovery without touching bytes in the workspace', asy
   expect(await readdir(join(root.path, 'server'))).toEqual(paths);
   expect(await get('server/' + backup)).toBe(route);
   expect(await studio.protectsGit(root.path)).toBe(false);
+}, 40_000);
+
+it('installs a pinned module through explicit review and resumes after its SQL was published', async () => {
+  await fixtureProject(false);
+  const customer = '// Preserve client workflow.\nexport const inventoryApproval = true;\n';
+  await put('server/client-workflow.ts', customer);
+  const state = value(await studio.inspect(projectId));
+  const input = { projectId, revision: state.revision, backend: [], frontend: [], modules: [AUTHENTICATION] };
+  const bad = value(await studio.preview({ ...input, modules: [RBAC] }));
+  expect(bad.issues).toContain('RBAC requires user-management.');
+  const plan = value(await studio.preview(input));
+  expect(plan.issues).toEqual([]);
+  expect(plan.modules).toContainEqual(AUTHENTICATION);
+  const sql = plan.changes.find(({ path }) => path.endsWith('_authentication.sql'))!;
+  expect(sql.action).toBe('create');
+  schemaPending = async () => (await readdir(join(root.path, 'db/migrations'))).some((name) => name.endsWith('_authentication.sql'));
+  expect(await studio.action({ projectId, id: plan.id }, 'apply')).toEqual({ ok: false, error: 'GENERATOR_RECOVERY' });
+  expect(await get(sql.path)).toBe(sql.after);
+  studio.dispose();
+  studio = makeStudio();
+  schemaPending = async () => false;
+  expect(value(await studio.inspect(projectId)).recovery?.digest).toBe(plan.digest);
+  const recovered = value(await studio.action({ projectId, id: plan.id }, 'resume'))!;
+  expect(recovered.recovery).toBeNull();
+  expect(recovered.profile?.modules).toContain('authentication · 1.0.0');
+  expect(await get('server/client-workflow.ts')).toBe(customer);
+  expect(value(await studio.preview({ ...input, revision: recovered.revision })).changes).toEqual([]);
 }, 40_000);

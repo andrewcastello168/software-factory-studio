@@ -126,3 +126,10 @@ A closed DDL grammar handles a focused model and reports unsupported syntax; Stu
 Use exact prior template bytes plus manifest ownership for the first incremental adapter. This supports deterministic updates to modular starter integrations and contracts while guarding customized entrypoints. Projects with changed integration code need a separate design for scoped transformations. The planner preserves client instructions and unrelated feature edits. Lock the ordered source history for each incremental application instead of generating duplicate migrations.
 
 Use same-directory backups with an app-data journal for verified replacements. The platform does not expose a portable atomic compare-and-swap operation for an existing pathname. Moving the original aside and publishing exclusively preserves competing bytes and supports resume or manual handoff at the cost of a recoverable intermediate state. Keep receipt history separate from Git and PostgreSQL.
+
+
+## Phase 07 decisions
+
+- Store profile and template definitions as declarative snapshots. Profile instructions are advisory. The trusted Node adapter controls executable behavior. Export reviewed definitions as portable JSON. Project locks embed values and selected revisions so later library updates leave client projects independent.
+- Use scrypt from Node, opaque database-backed sessions, exact same-origin checks and a host-prefixed secure cookie in HTTPS mode. Provision the first administrator explicitly from stdin. Separate administration writes from delegated read access. Authorize role assignment only through the bootstrap administrator. A trusted loopback TLS proxy is the production boundary for forwarded headers.
+- Compose optional identity modules from bundled, versioned artifacts. Reuse Phase 06 recovery for reviewed source updates and appended SQL. Existing applied migrations remain immutable. Enable project-specific color, themes and approved text marks through the Business Workspace template. General-purpose visual editing and executable imports remain later capabilities.

@@ -176,3 +176,17 @@ Database apply is confined to a separately approved development target. The UI s
 | P06-05 | Debian 13 x64 passed frozen install, lint, typecheck, 76 Vitest checks with a PostgreSQL 17 fixture, 11 renderer checks, six sandboxed Electron checks, and a production build. The standalone verifier passed the foundation, Welcome, original inventory and expanded inventory with PostgreSQL. Windows CI opts into the public HTTPS Git smoke. Delivery links the CI runs and screenshots from the pull request. |
 
 Supported scope is the deterministic modular v2 layout, approved CRUD types, existing supported migration sources and untouched required integration files. Editable application extension points and optional module installation remain future work. Resume and handoff are explicit filesystem recovery operations independent of database and Git history.
+
+## Phase 07 · Engineering Library and AI Context Studio
+
+The isolated `work` branch started from `main` at `262f134`, after the merge of Phase 06 PR #9. The verified stack remains Node/TypeScript, Express, React/Vite, and PostgreSQL with Layered Web. The [MVP guide](MVP_GETTING_STARTED.md) describes project creation, safe installation, and deployment prerequisites.
+
+| Gate | Verification |
+| --- | --- |
+| P07-01 | Sandboxed Electron published a personal profile, selected the exact version and Business Workspace template, and captured a branded project preview. Library tests cover immutable releases, stale edits, validation, unsafe storage paths, and keeping existing releases readable when a publication exceeds the UTF-8 storage limit. |
+| P07-02 | The standalone verifier exercised a no-login inventory and two clients sharing a personal profile with separate IDs, metadata, branding, schemas, module pins, and disposable databases. Matching context and independent runtime builds passed. |
+| P07-03 | The authenticated inventory passed PostgreSQL 17, browser and HTTP checks for login, logout, bootstrap replay, session expiry and revocation, throttling, origin protection, secure-cookie settings, user and role administration, direct authorization checks, and scoped audit events. |
+| P07-04 | Sandboxed Electron reviewed an unsatisfied dependency and applied Authentication and User Management after approval, preserving custom source and the manual supplier migration. Disposable fixtures also verify stale plans, protected integration files, and recovery after interruption during SQL file publication with no duplicate migration. Database apply remains separately authorized. |
+| P07-05 | Local Linux x64 passed frozen installation, lint, type checks, the production build, 80 Vitest cases, 11 renderer cases, and seven sandboxed Electron cases. The optional public Git HTTPS smoke runs in Windows CI. All six generated application variants passed independent verification with PostgreSQL. The Studio and generated production dependency audits found no known vulnerabilities. The delivery pull request records platform CI and the screenshot artifact. |
+
+Business Workspace v1 supports a text mark, primary color, and theme. Personal profiles publish advisory guidance, with the built-in generator enforcing the versioned stack and integration contract. Executable imports, arbitrary upgrades or removals, additional stacks, and a visual editor remain unavailable.

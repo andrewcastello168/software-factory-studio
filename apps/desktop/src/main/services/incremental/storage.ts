@@ -3,7 +3,7 @@ import { link, open, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { INCREMENTAL_LIMITS, isGeneratorDigest, isGeneratorPath, isIncrementalHistory, isIncrementalPreview, isRecord } from '@factory/contracts';
 import type { IncrementalHistory, IncrementalPreview } from '@factory/contracts';
-import { isIncrementalWritePath, sha256 } from '@factory/generator';
+import { isIncrementalWritePath, isModuleMigrationPath, sha256 } from '@factory/generator';
 import { optionalStat, syncDirectory } from '../generation/journal';
 import { admitRoot, readBoundedFile, withDirectory } from '../projects/filesystem';
 import type { ProjectRoot } from '../projects/filesystem';
@@ -19,7 +19,7 @@ export interface RecordV1 {
 }
 
 export function previewDigest(revision: string, preview: Omit<IncrementalPreview, 'digest'>) {
-  return sha256(JSON.stringify([revision, preview.backend, preview.frontend, preview.changes.map(({ path, action, before, after }) =>
+  return sha256(JSON.stringify([revision, preview.backend, preview.frontend, ...(preview.modules ? [preview.modules] : []), preview.changes.map(({ path, action, before, after }) =>
     [path, action, before === null ? null : sha256(before), after === null ? null : sha256(after)])]));
 }
 
@@ -30,7 +30,7 @@ function isPending(x: unknown): x is RecordV1 {
   const expected = parents(writes);
   return x.preview.digest === previewDigest(x.revision, x.preview) && !x.preview.issues.length && writes.length > 0
     && new Set(writes.map(({ path }) => path)).size === writes.length
-    && writes.every(({ path, action, before }) => isIncrementalWritePath(path)
+    && writes.every(({ path, action, before }) => isIncrementalWritePath(path) && (!isModuleMigrationPath(path) || action === 'create')
       && (action === 'create' ? before === null : before !== null))
     && Object.keys(x.directories).length === expected.length && expected.every((name) => Object.hasOwn(x.directories as object, name))
     && Object.entries(x.directories).every(([path, value]) => isGeneratorPath(path)

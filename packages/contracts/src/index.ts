@@ -1,3 +1,4 @@
+import type { LibraryBridge } from './library';
 import { hasExactKeys, isRecord } from './validation';
 import type { ProjectBridge } from './projects';
 import type { GitBridge } from './git';
@@ -12,6 +13,7 @@ export * from './generator';
 export * from './generator-modules';
 export * from './schema';
 export * from './incremental';
+export * from './library';
 
 export const CHANNEL = {
   appInfo: 'factory:app-info',
@@ -73,6 +75,7 @@ const errorCodes = [
   'INCREMENTAL_STALE',
   'INCREMENTAL_UNSUPPORTED',
   'INCREMENTAL_CONFLICT',
+  'LIBRARY_CONFLICT',
 ] as const;
 
 export type ErrorCode = typeof errorCodes[number];
@@ -85,6 +88,7 @@ export interface StudioBridge {
   generator: GeneratorBridge;
   schema: SchemaBridge;
   incremental: IncrementalBridge;
+  library: LibraryBridge;
   getAppInfo(): Promise<Result<AppInfo>>;
   readPreferences(): Promise<Result<PreferenceSnapshot>>;
   writePreferences(request: PreferenceWrite): Promise<Result<Preferences>>;
