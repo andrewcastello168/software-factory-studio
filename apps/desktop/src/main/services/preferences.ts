@@ -8,6 +8,12 @@ const VERSION = 1;
 const MAX_BYTES = 4096;
 type StoredPreferences = Omit<PreferenceSnapshot, 'systemTheme'>;
 
+function comparableDeviceId(device: bigint): bigint {
+  // Windows path stats and open-handle stats can report different widths for
+  // the volume serial number. Compare the 32 bits provided by both APIs.
+  return process.platform === 'win32' ? BigInt.asUintN(32, device) : device;
+}
+
 function defaults(storage: StoredPreferences['storage']): StoredPreferences {
   return { preferences: { ...defaultPreferences }, storage };
 }
@@ -42,13 +48,14 @@ export class PreferenceStore {
 
   async #read(): Promise<Result<StoredPreferences>> {
     try {
-      const info = await lstat(this.file);
+      const info = await lstat(this.file, { bigint: true });
       if (!info.isFile()) return failure('PREFERENCES_READ_FAILED');
       if (info.size > MAX_BYTES) return failure('PREFERENCES_READ_FAILED');
       const handle = await open(this.file, 'r');
       try {
-        const opened = await handle.stat();
-        if (!opened.isFile() || opened.dev !== info.dev || opened.ino !== info.ino) {
+        const opened = await handle.stat({ bigint: true });
+        if (!opened.isFile() || opened.ino !== info.ino
+          || comparableDeviceId(opened.dev) !== comparableDeviceId(info.dev)) {
           return failure('PREFERENCES_READ_FAILED');
         }
         const buffer = Buffer.alloc(MAX_BYTES + 1);
