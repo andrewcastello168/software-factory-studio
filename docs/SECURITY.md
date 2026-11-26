@@ -67,3 +67,9 @@ Generated applications use scrypt-derived password hashes and database-backed, e
 Only the versioned built-in registry can dispatch a planner. Go does not accept Node executable module releases, untrusted commands or arbitrary output paths. Existing workspace, Git, link, junction, digest and recovery checks protect Go the same way as Node. Template generation and inspection execute no external tools. The verification runner executes generated fixtures separately under a pinned toolchain.
 
 The generated Go service defaults to loopback and no login. It uses bounded requests and deadlines, parameterized pgx queries, sanitized errors, and structured logs without credentials or request contents. Its migration command is separate and explicit. Set up appropriate TLS and access controls for nonlocal production deployment.
+
+## Phase 09 linked Git checkouts
+
+An admitted worktree grants access to verified reciprocal common metadata. Peer worktree access requires native selection of the exact registered directory. Renderer inputs cannot supply native Git argv, a subprocess environment, or a recovery receipt. Main handles bounded review tokens and typed source and target choices. The file-manager reveal command uses a verified current conflict path.
+
+History rewrites require native confirmation and a clean checkout. Studio verifies the native recovery receipt and blocks unsupported attributes or sequencer instructions. The writer lock coordinates Studio. Native Git locks and user review remain necessary across separate processes.

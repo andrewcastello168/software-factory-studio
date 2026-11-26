@@ -299,7 +299,10 @@ export function App() {
               </div></div>
             )}
             <section role="tabpanel" id="workspace-panel" aria-labelledby={`workspace-tab-${active ?? 'global'}`}>
-              {activeProject && view === 'git' ? <GitPanel key={activeProject.id} project={activeProject} git={git} />
+              {activeProject && view === 'git' ? <GitPanel key={activeProject.id} project={activeProject} git={git} opened={(selection) => {
+                  workspace.applySelection(selection);
+                  setActiveId(selection.projectId);
+                }} />
                 : activeProject && view === 'generation' && generation ? <GenerationReview key={activeProject.id} project={activeProject}
                   signal={JSON.stringify([repo?.branch, repo?.head, repo?.operation, repo?.revision,
                     activeProject.entries.filter(({ path }) => path.startsWith('db/migrations/') || path.startsWith('.factory/'))])} />

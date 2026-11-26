@@ -3,8 +3,8 @@ import { mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } fro
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, expect, it } from 'vitest';
-import { AUTHENTICATION, RBAC, STARTER } from '@factory/contracts';
-import type { IncrementalSelection, Result } from '@factory/contracts';
+import { AUTHENTICATION, GO_STACK, RBAC, STACKS, STARTER } from '@factory/contracts';
+import type { IncrementalSelection, Result, StackId } from '@factory/contracts';
 import { planProject } from '@factory/generator';
 import { parseSql } from '@factory/schema';
 import { admitRoot } from '../projects/filesystem';
@@ -13,11 +13,13 @@ import { GitStudio } from '../git/studio';
 import { IncrementalStudio } from './studio';
 import { IncrementalStore } from './storage';
 
+const linkedId = '5b9e7ba8-e43f-4d82-bb7a-a956af0522b1';
 const projectId = '45fefba2-ce17-4da2-a740-8aa30cef4fd8';
 const ddl = await readFile(new URL('../../../../../../tests/fixtures/suppliers.sql', import.meta.url), 'utf8');
 const inventory = parseSql('CREATE TABLE products (id integer PRIMARY KEY, name text NOT NULL);').schema;
 let fixture: string;
 let root: ProjectRoot;
+let linkedRoot: ProjectRoot | undefined;
 let profile: string;
 let git: GitStudio;
 let studio: IncrementalStudio;
@@ -25,11 +27,13 @@ let active: boolean;
 let confirm: () => Promise<boolean>;
 let schemaPending: () => Promise<boolean>;
 
+const grantRoot = (id: string) => active ? id === projectId ? root : id === linkedId ? linkedRoot : undefined : undefined;
+
 function makeStudio() {
   return new IncrementalStudio(new IncrementalStore(profile), {
-    root: (id) => active && id === projectId ? root : undefined,
+    root: grantRoot,
     project: async () => undefined,
-    git: (id) => git.status(id), gitWriting: () => false, schemaPending: () => schemaPending(),
+    git: (id) => git.status(id), gitWriting: () => git.isWriting(), schemaPending: () => schemaPending(),
     refresh: async () => undefined,
   }, { confirm: () => confirm() });
 }
@@ -46,10 +50,10 @@ const get = (path: string) => readFile(join(root.path, path), 'utf8');
 const request = (revision: string): IncrementalSelection => ({ projectId, revision, backend: ['suppliers'], frontend: ['suppliers'] });
 const nativeGit = (...args: string[]) => execFileSync('git', args, { cwd: root.path, stdio: 'ignore' });
 
-async function fixtureProject(withCrud = true) {
+async function fixtureProject(withCrud = true, stack: StackId = STARTER.stack) {
   const plan = planProject({
     name: 'Inventory reference', slug: 'inventory-reference', port: 4202, appType: STARTER.appType,
-    stack: STARTER.stack, architecture: STARTER.architecture, engineering: STARTER.engineering, database: STARTER.database,
+    stack, architecture: STACKS[stack].architecture, engineering: STARTER.engineering, database: STARTER.database,
     modules: [],
     ...(withCrud ? { crud: { schema: inventory, migrations: true, backend: ['products'], frontend: ['products'] } } : {}),
   }, projectId);
@@ -65,10 +69,11 @@ beforeEach(async () => {
   await Promise.all([mkdir(project), mkdir(profile)]);
   root = await admitRoot(project);
   active = true;
+  linkedRoot = undefined;
   confirm = async () => true;
   schemaPending = async () => false;
   git = new GitStudio({
-    root: (id) => active && id === projectId ? root : undefined,
+    root: grantRoot,
     canOpen: () => false, allowsAuxiliaryPath: () => true, adopt: async () => { throw new Error('Unexpected adoption.'); },
     refresh: async () => undefined, generationPending: (path) => studio.protectsGit(path),
   }, { chooseDirectory: async () => null, confirm: async () => true });
@@ -231,3 +236,41 @@ it('installs a pinned module through explicit review and resumes after its SQL w
   expect(await get('server/client-workflow.ts')).toBe(customer);
   expect(value(await studio.preview({ ...input, revision: recovered.revision })).changes).toEqual([]);
 }, 40_000);
+
+
+it.each([STARTER.stack, GO_STACK] as const)('binds %s generation and source migrations to one linked worktree', { timeout: 60_000 }, async (stack) => {
+  await fixtureProject(false, stack);
+  nativeGit('init', '-b', 'main');
+  nativeGit('add', '.');
+  nativeGit('-c', 'user.name=Factory Tests', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'Fixture');
+  const linked = join(fixture, 'Separate café');
+  nativeGit('worktree', 'add', '-b', 'feature', linked, 'main');
+  linkedRoot = await admitRoot(linked);
+  const primaryLocks = await get('.factory/versions.lock.json');
+  const source = 'db/migrations/0003_suppliers.sql';
+  await writeFile(join(linked, source), ddl);
+  const linkedInspection = value(await studio.inspect(linkedId));
+  expect(linkedInspection).toMatchObject({ branch: 'feature', issues: [] });
+  expect(linkedInspection.sources.map(({ name }) => name)).toContain('0003_suppliers.sql');
+  expect(value(await studio.inspect(projectId)).sources.map(({ name }) => name)).not.toContain('0003_suppliers.sql');
+
+  const select = { ...request(linkedInspection.revision), projectId: linkedId };
+  let plan = value(await studio.preview(select));
+  expect(plan.issues).toEqual([]);
+  expect(await studio.action({ projectId, id: plan.id }, 'apply')).toEqual({ ok: false, error: 'INCREMENTAL_STALE' });
+  confirm = async () => {
+    execFileSync('git', ['switch', '-c', 'other-feature'], { cwd: linked, stdio: 'ignore' });
+    return true;
+  };
+  expect(await studio.action({ projectId: linkedId, id: plan.id }, 'apply')).toEqual({ ok: false, error: 'INCREMENTAL_STALE' });
+  confirm = async () => true;
+  plan = value(await studio.preview({ ...select, revision: value(await studio.inspect(linkedId)).revision }));
+  const applied = value(await studio.action({ projectId: linkedId, id: plan.id }, 'apply'));
+  expect(applied?.history[0]?.outcome).toBe('applied');
+  expect(await readFile(join(linked, source), 'utf8')).toBe(ddl);
+  expect(await get('.factory/versions.lock.json')).toBe(primaryLocks);
+  expect(await get(source).catch(() => null)).toBeNull();
+  const generated = stack === GO_STACK ? 'internal/records/tables.go' : 'server/features/crud/contracts.ts';
+  expect(await readFile(join(linked, generated), 'utf8')).toContain('suppliers');
+  expect(await get(generated).catch(() => null)).toBeNull();
+});

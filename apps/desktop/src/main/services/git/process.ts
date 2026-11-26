@@ -59,6 +59,7 @@ interface RunOptions {
   limit?: number;
   patch?: boolean;
   accept?: number[];
+  nativePathspecs?: boolean;
 }
 
 type Output = { bytes: Buffer; truncated: boolean; code: number };
@@ -113,6 +114,8 @@ export class NativeGit {
       GIT_CONFIG_SYSTEM: empty,
       GIT_ATTR_NOSYSTEM: '1',
       GIT_TERMINAL_PROMPT: '0',
+      GIT_EDITOR: ':',
+      GIT_SEQUENCE_EDITOR: ':',
       GIT_NO_REPLACE_OBJECTS: '1',
       GIT_NO_LAZY_FETCH: '1',
       GIT_OPTIONAL_LOCKS: options.readOnly ? '0' : '1',
@@ -125,7 +128,8 @@ export class NativeGit {
       ['init.templateDir', this.scratch], ['credential.helper', ''], ['http.followRedirects', 'false'],
       ['http.sslVerify', 'true'], ['submodule.recurse', 'false'], ['commit.gpgSign', 'false'],
       ['push.gpgSign', 'false'], ['gc.auto', '0'], ['maintenance.auto', 'false'], ['fetch.writeCommitGraph', 'false'],
-      ['merge.autoStash', 'false'], ['push.followTags', 'false'], ['fetch.prune', 'false'],
+      ['merge.autoStash', 'false'], ['merge.renormalize', 'false'], ['rerere.enabled', 'false'],
+      ['rebase.autoStash', 'false'], ['rebase.updateRefs', 'false'], ['rebase.rebaseMerges', 'false'], ['push.followTags', 'false'], ['fetch.prune', 'false'],
       ['receive.autogc', 'false'], ['transfer.fsckObjects', 'true'],
     ];
     if (windows) config.push(['http.sslBackend', 'schannel']);
@@ -137,7 +141,7 @@ export class NativeGit {
     }
     const limit = options.limit ?? 2_000_000;
     return new Promise((resolve, reject) => {
-      const child = spawn(this.executable, ['--literal-pathspecs', '--no-pager', ...args], {
+      const child = spawn(this.executable, [...(options.nativePathspecs ? [] : ['--literal-pathspecs']), '--no-pager', ...args], {
         cwd, env, shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
       });
       const stdout: Buffer[] = [];

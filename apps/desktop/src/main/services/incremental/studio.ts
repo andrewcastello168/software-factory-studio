@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { isAbsolute, relative, sep } from 'node:path';
+import { isAbsolute, join, relative, sep } from 'node:path';
 import { GO_STACK, failure, INCREMENTAL_LIMITS, success } from '@factory/contracts';
 import type {
   ErrorCode, GitState, IncrementalApproval, IncrementalInspection, IncrementalPreview, IncrementalSelection, OpenProject, Result,
@@ -71,7 +71,10 @@ export class IncrementalStudio {
     const state = git.ok ? git.value : { state: 'failed' as const };
     const repo = state.state === 'repository' ? state : null;
     if (mutation && (repo ? repo.operation !== null : state.state !== 'not-repository')) throw new Rejected('INCREMENTAL_CONFLICT');
-    const gitIdentity = repo ? (await readDirectory(root, '.git'))?.identity ?? null : null;
+    const linked = repo?.commonDirectory && pathKey(repo.commonDirectory) !== pathKey(join(root.path, '.git'));
+    const gitIdentity = repo ? linked
+      ? (repo.worktreeId && repo.repositoryId ? [repo.worktreeId, repo.repositoryId] : null)
+      : (await readDirectory(root, '.git'))?.identity ?? null : null;
     if (repo && !gitIdentity) throw new Rejected('INCREMENTAL_CONFLICT');
     const source = await readSources(root);
     const protectedFiles = await Promise.all(protectedInputs.map(async (path) => [path, await inspectFile(root, path)] as const));

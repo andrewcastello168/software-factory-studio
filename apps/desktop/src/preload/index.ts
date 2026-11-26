@@ -1,3 +1,5 @@
+import { GIT_ADVANCED_CHANNEL, isGitAdvancedOutcome, isGitApproved, isGitReview, isGitReviewInput, isGitScope,
+  isGitWorkspaceDetails } from '@factory/contracts';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   LIBRARY_CHANNEL, isLibraryAsset, isLibraryAssets,
@@ -72,6 +74,11 @@ const studio: StudioBridge = {
     },
   },
   git: {
+    advanced: {
+      details: (scope) => checkedInvoke(GIT_ADVANCED_CHANNEL.details, scope, isGitScope, isGitWorkspaceDetails),
+      review: (input) => checkedInvoke(GIT_ADVANCED_CHANNEL.review, input, isGitReviewInput, isGitReview),
+      apply: (approval) => checkedInvoke(GIT_ADVANCED_CHANNEL.apply, approval, isGitApproved, isGitAdvancedOutcome),
+    },
     status: (id) => invokeProject(GIT_CHANNEL.status, isGitState, id),
     diff: (request) => isGitDiffRequest(request) ? invoke(GIT_CHANNEL.diff, isGitDiff, request) : Promise.resolve(failure('INVALID_REQUEST')),
     compare: (request) => isGitCompareRequest(request) ? invoke(GIT_CHANNEL.compare, isGitDiff, request) : Promise.resolve(failure('INVALID_REQUEST')),

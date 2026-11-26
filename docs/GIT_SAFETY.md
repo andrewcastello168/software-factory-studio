@@ -55,3 +55,19 @@ A Studio lock serializes its own writes. External editors and Git clients can st
 ## Phase 06 generation coordination
 
 Incremental generation binds review to the admitted worktree, repository directory identity, ref and HEAD, and rejects staged affected paths and in-progress Git operations. It permits unrelated dirty files. A pending transaction blocks Studio Git mutations and source migration publication on that workspace. Resume rechecks the exact Git and schema context and the observed before/after bytes. Handoff preserves workspace and backup files for independent recovery.
+
+## Phase 09 worktree and advanced operation policy
+
+Each worktree has its own directory grant and checkout identity. It contributes a separately verified common-directory identity. A linked gitfile must point at a canonical, locally registered entry whose backlink matches the selected marker and whose common pointer is the expected two-parent path. Studio verifies peer marker formats. Arbitrary pointers, worktree-specific configuration, links, junctions, config includes, object alternates, external hooks, filters and submodule metadata remain blocked.
+
+Studio serializes its Git writers across open workspaces. Native Git locks still coordinate external processes. Each renderer review produces an opaque worktree-scoped ticket. Main revalidates refs, file and metadata identities, selected entries, and any generation or migration recovery before and after native confirmation. Save editor buffers and coordinate external writes to the same checkout.
+
+The checkout preview shows the current and target refs and commits, staged/unstaged state, untracked files, and occupancy in other worktrees. A dirty checkout can be committed, stashed, or left for another worktree through separate approvals. Branch deletion is limited to inactive merged branches outside main and master. File replacement produces an unstaged change in one reviewed tracked file.
+
+A reviewed stash push saves data before restoring the working tree. Including untracked explicitly permits Git to remove the saved untracked files. Common credential paths and ignored overlaps block the relevant cleanup. Studio does not call reset or clean independently. Apply keeps the entry. Pop restores the staged state first and drops the entry only after success and unchanged shared history. Failure and conflicts preserve the stash.
+
+Merge supports fast-forward-only and merge commits. Rebase accepts at most 24 linear commits and blocks ranges reachable from fetched remote refs. Fetch before reviewing shared history. Cherry-pick accepts a single full non-merge commit ID with a common ancestor. Preview reports changed paths and a source patch, while native Git determines the final conflict state. Supported text attributes are allowed and automatic rerere and external Git editors remain inactive.
+
+Studio writes a bounded local recovery receipt before approved history commands. Continue and Abort bind that receipt to the checkout, current markers, relevant file bytes and allowed native sequence. Conflict content remains editable in external tools. Studio can display stage blobs, reveal the working file and stage reviewed resolution bytes. Stash conflicts preserve their entry and use the index resolution workflow. External operations recover through their original Git client. None of these operations apply database migrations.
+
+See [Parallel development](PARALLEL_DEVELOPMENT.md).

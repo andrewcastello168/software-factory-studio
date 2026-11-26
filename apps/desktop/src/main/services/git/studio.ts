@@ -1,7 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { failure, GIT_LIMIT, isGitOid, success } from '@factory/contracts';
+import { failure, isGitOid, success } from '@factory/contracts';
 import type {
   GitAction, GitCloneRequest, GitCloneResult, GitCompareRequest, GitDiff, GitDiffRequest, GitOutcome,
   GitState, ProjectSelection, Result,
@@ -15,10 +15,14 @@ import {
   RestrictedRepository,
 } from './repository';
 import type { RemoteConfig, RepositorySnapshot } from './repository';
+import { AdvancedGit } from './advanced';
+import { GitRecoveryStore } from './recovery';
+import { patchArgs, patchOptions, patchResult } from './presentation';
 
 interface GitDialogs {
   confirm(title: string, detail: string, action: string): Promise<boolean>;
   chooseDirectory(title: string, defaultPath?: string): Promise<string | null>;
+  reveal?(path: string): void;
 }
 
 interface GitWorkspace {
@@ -38,22 +42,9 @@ class StaleRepository extends GitFailure {
 }
 
 const conflictMessage = 'Finish or abort the in-progress Git operation in your Git client before retrying.';
-const patchArgs = ['--no-ext-diff', '--no-textconv', '--no-color', '--ignore-submodules=all'];
-const patchOptions = { readOnly: true, limit: GIT_LIMIT.patch, patch: true };
-
 const stateOf = (value: Inspected): GitState => 'config' in value ? value.state : value;
 const repository = (value: Inspected): value is RepositorySnapshot => 'config' in value;
 const errorMessage = (error: unknown) => error instanceof GitFailure ? error.message : 'Studio could not safely complete the Git operation.';
-function patchResult({ bytes, truncated }: { bytes: Buffer; truncated: boolean }): GitDiff {
-  const sanitized = bytes.toString('utf8').replace(/(?![\t\n])[\p{Cc}\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu,
-    (character) => character === '\r' ? '' : `\\u${character.codePointAt(0)!.toString(16).padStart(4, '0')}`);
-  const lines = sanitized.split('\n', 3001);
-  return {
-    text: lines.slice(0, 3000).join('\n').slice(0, GIT_LIMIT.patch),
-    truncated: truncated || sanitized.length > GIT_LIMIT.patch || lines.length > 3000,
-  };
-}
-
 interface ApprovedRemote {
   address: string;
   kind: Transport;
@@ -68,7 +59,27 @@ export class GitStudio {
   #job: Promise<unknown> = Promise.resolve();
   #reading = new Map<string, Promise<Result<GitState>>>();
 
-  constructor(private readonly workspace: GitWorkspace, private readonly dialogs: GitDialogs) {}
+  readonly advanced: AdvancedGit;
+
+  constructor(private readonly workspace: GitWorkspace, private readonly dialogs: GitDialogs, userData?: string) {
+    this.advanced = new AdvancedGit({
+      git: () => this.#git(),
+      root: (id) => this.workspace.root(id),
+      expect: (git, scope) => this.#expect(git, scope.id, scope.revision),
+      assertGrant: (id, root) => this.#assertGrant(id, root),
+      noPending: (path) => this.#assertNoGeneration(path),
+      choose: (title, path) => this.dialogs.chooseDirectory(title, path),
+      confirm: (title, detail, action) => this.dialogs.confirm(title, detail, action),
+      write: (job) => this.#write(job),
+      status: async (git, id) => stateOf(await this.#inspect(git, id)),
+      refresh: (id) => this.workspace.refresh(id),
+      canOpen: () => this.workspace.canOpen(),
+      auxiliary: (path) => this.workspace.allowsAuxiliaryPath(path),
+      adopt: (root) => this.workspace.adopt(root),
+      stale: (error) => error instanceof StaleRepository,
+      ...(this.dialogs.reveal ? { reveal: this.dialogs.reveal } : {}),
+    }, new GitRecoveryStore(userData));
+  }
 
   async #git() {
     this.#native ??= NativeGit.open((path) => this.workspace.allowsAuxiliaryPath(path)).catch((error: unknown) => {
