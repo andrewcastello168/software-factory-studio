@@ -4,7 +4,53 @@ Software Factory Studio is a planned local-first, Git-native desktop engineering
 
 ## Repository status
 
-Phase 00 establishes the product and engineering specifications. This checkout contains documentation and repository-local Codex skills. Application setup, launch, and test commands begin in Phase 01. Windows is the first desktop target. The recorded Cloud inspection used Linux. See [Progress](docs/PROGRESS.md) for actual verification and remaining gates.
+Phase 01 delivers the Electron desktop foundation with Home, Settings, a command palette, resizable navigation, and local appearance preferences. Planned project and library views are identified in the workspace. Windows x64 is the first desktop target. See [Progress](docs/PROGRESS.md) for platform-specific evidence and remaining gates.
+
+## Development setup
+
+Use Node.js **22.16.0** and pnpm **10.13.1**. The application has no service or credential setup. Install the binary explicitly before running the desktop app. These commands work from PowerShell after installing the pinned Windows x64 Node release.
+
+```powershell
+node --version
+npm install --global pnpm@10.13.1
+pnpm --version
+pnpm install --frozen-lockfile
+pnpm --filter @factory/desktop exec install-electron
+pnpm dev
+```
+
+`pnpm dev` starts Vite on the fixed Electron development origin and launches the native application from source. Renderer edits use HMR. A successful main or preload rebuild restarts the native process. The terminal reports bundle errors, native startup failures, and process exit. Close the app or interrupt the terminal to stop the session.
+
+Use `pnpm dev:web` for a separate Vite renderer preview at `http://127.0.0.1:4482/`. The command opens the default browser. Theme and sidebar changes in this mode last for the session. The status bar reports that desktop preferences are unavailable.
+
+## Quality commands
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm dev` | Electron development at the fixed loopback development origin |
+| `pnpm dev:web` | Browser development and visual inspection |
+| `pnpm lint` | ESLint including Electron process import restrictions |
+| `pnpm typecheck` | Strict TypeScript checks for contracts, main, preload, renderer, and test/build tooling |
+| `pnpm test` | Vitest contract, policy, and disposable-filesystem integration tests |
+| `pnpm build` | Production renderer, main, and preload bundles under `apps/desktop/dist/` |
+| `pnpm start` | Run the built desktop app through its production renderer origin |
+| `pnpm test:renderer` | Playwright tests against the built renderer with a test-only bridge and the browser development mode |
+| `pnpm test:electron` | Playwright smoke test of the built app with sandboxing and a disposable profile |
+
+For both end-to-end suites and a manual production smoke test on Windows x64:
+
+```powershell
+pnpm --filter @factory/desktop exec playwright install chromium
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm test:renderer
+pnpm test:electron
+pnpm start
+```
+
+Close other Studio instances before the manual smoke test. In the built app, switch among System, Dark, and Light in Settings. With System selected, change the Windows appearance setting and confirm Studio follows it. Check both 1280×800 and 1024×768 workbench sizes, keyboard and pointer resize, `Ctrl+K`, Escape focus restoration, and the 200% zoom layout. Restart and verify the saved theme and expanded sidebar width. Record Windows version, architecture, display scaling, and results in [Progress](docs/PROGRESS.md). Installer creation is scheduled for Phase 12.
 
 ## Working on this repository
 

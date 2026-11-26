@@ -53,3 +53,17 @@ Keep the native window frame for Phase 01. Build the original workbench within i
 **Status** Accepted in the Phase 00 final review.
 
 Phase 05 can add a reviewed migration to an existing project through the journaled create path introduced in Phase 04. This extends file creation and leaves historical migrations and existing application files intact. Phase 06 adds ownership-aware application edits and derives missing components from a saved migration without duplicating it. The split limits the Phase 05 write surface while delivering a complete source schema authoring path.
+
+## 0010 · Pin the Windows host toolchain and separate two development origins
+
+**Status** Implemented in Phase 01.
+
+Pin Node.js 22.16.0 and pnpm 10.13.1 for the workspace. Use the same versions in Cloud alongside its preinstalled toolchain. Electron 45.5.0 embeds Node.js 24.22.3 and Chromium 156.0.8078.109. The compiler targets JavaScript supported by the pinned host and Electron entry points. A direct esbuild bundle creates the independent main and sandboxed preload CommonJS entry points. React, Vite, and Tailwind build the renderer. The lockfile keeps platform-specific binary resolution reproducible. esbuild's optional platform package supplies the binary without running its install script. Electron binary setup is a separate explicit command.
+
+Desktop development enables the exact Vite loopback URL only from the Electron development launcher. Browser development has its own port and session-only preview preferences. Both receive CSP headers and Vite HMR. Production loads local assets through `studio://app/`. The renderer has no external link-opening capability in this phase. Adding one later requires an explicit URL policy and a reviewed capability. Electron Builder remains scheduled for Phase 12.
+
+## 0011 · Keep Phase 01 preferences narrow and versioned
+
+**Status** Implemented in Phase 01.
+
+Store a small settings file at a fixed Electron user-data path. Serialize reads and changes, then sync and replace via a fresh same-directory file. IPC exposes application metadata, validated theme and sidebar preference changes, and native theme events. Unknown future versions remain intact. A corrupted known record uses safe defaults and an explicit repair confirmation. I/O failure preserves the last supported state and provides a reload path. This keeps local settings usable while avoiding a database or broader user-data bridge.

@@ -42,4 +42,39 @@ Phase 00 is prepared for human review. The base checkout contained only `README.
 
 Reviewed the Phase 00 change set against the master assignment. The final specifications clarify append-only schema authoring in Phase 05, external Git race handling, unsupported preference versions, application origin validation, and the remaining milestone gates. The delivery scope is the 17 required Markdown files. Final checks cover the complete diff, local references, skill metadata, roadmap and Phase 01 gates, theme token contrast, and common secret patterns. Application checks remain outside this documentation milestone.
 
-The next assignment is [Phase 01](ROADMAP.md#phase-01-acceptance-criteria). Start by validating the dependency matrix and selecting a sandbox-capable browser/Electron runner plus a Windows x64 evidence path.
+Phase 00 handed off to [Phase 01](ROADMAP.md#phase-01-acceptance-criteria) with dependency, sandbox-capable runner, and Windows verification gates.
+
+## Phase 01 · Desktop foundation
+
+The isolated `work` branch was fast-forwarded to approved `origin/main` at `99cf46f7c3a45790acc936e1bee7b8de4b1d45fc` before implementation. The workbench delivers Home, Settings, planned navigation labels, a command palette, a collapsible and resizable sidebar, and separate desktop and browser development commands. The production build uses independent Electron main and preload entries, a local renderer protocol, and versioned preferences. Project admission, Git operations, generators, database features, and installer packaging remain scheduled for later phases.
+
+| Layer | Pinned versions or verified evidence |
+| --- | --- |
+| Host | Node.js 22.16.0 and pnpm 10.13.1 on Cloud Linux x64, matching the Windows development target |
+| Desktop | Electron 45.5.0, embedded Node.js 24.22.3, Chromium 156.0.8078.109 |
+| Renderer | React and React DOM 19.3.1, Vite 8.3.8, React plugin 6.3.0, Tailwind CSS and Vite plugin 4.3.5, Lucide React 1.80.0 |
+| Build and verification | TypeScript 6.0.3, esbuild 0.28.2, ESLint 10.15.0, typescript-eslint 8.74.0, Vitest 5.1.2, Playwright 1.65.1 |
+| Dependency setup | Registry engines and peers match the selected host. Lockfile retains Windows and Linux native package selections. Initial and clean frozen installs passed on Linux. esbuild's lifecycle script is excluded. Electron binary setup runs explicitly via `install-electron`. |
+
+## Phase 01 verification
+
+| Gate | Result and scope |
+| --- | --- |
+| P01-01 | Passed in Cloud Linux. Clean frozen install, strict typecheck, ESLint, Vitest, and production build succeeded. |
+| P01-02 | Passed on Linux. Built Electron loaded the local origin with sandboxing on. The smoke checked Node and raw IPC isolation, CSP, denial of extra windows and outside navigation, a denied permission check, and unavailable resources. |
+| P01-03 | Passed on Linux. Contract tests cover invalid input and replies, and frame tests exercise untrusted origins and subframes. The native smoke exercised the real bridge and denied a write from a second window on the same origin. |
+| P01-04 | Passed on Linux. Playwright verified 1280×800, 1024×768, and 640×400 in the renderer. Pointer and keyboard resizing and the 180–320 px limits passed. Native Electron verified the shell at 200% zoom with no document-level horizontal overflow. |
+| P01-05 | Passed on Linux. File integration tested serialized writes, corruption, explicit restore, future-version preservation, and controlled filesystem failure. Native Electron followed a System theme change and restored the saved theme and width after a clean relaunch with a disposable profile. |
+| P01-06 | Passed in Playwright and manually inspected in Cloud Chrome. Checked `Ctrl+K`, filtering, empty results, keyboard command execution, and Escape focus restoration. |
+| P01-07 | Linux renderer and built Electron suites passed. Windows x64 native verification remains pending. |
+| P01-08 | README documents all root commands, exact Windows setup and smoke checks, and runtime boundaries. Security review and dependency audit completed for Phase 01. |
+
+`pnpm test` passed 21 tests across three Vitest suites. `pnpm test:renderer` passed seven Playwright cases with system Chromium and Chromium sandboxing enabled. The default Chromium download endpoint was denied by the Cloud allowlist. The preinstalled Chromium worked on the host runner with its sandbox intact. `pnpm audit --audit-level high` reported no known vulnerabilities.
+
+The sandboxed Electron smoke passed on an isolated Xvfb display on the Cloud host. The ordinary command sandbox prevented Chromium sandbox initialization, and the managed desktop X11 display rejected the test process. The final test used an isolated display and temporary Electron user-data directory with Chromium sandboxing enabled. The native development launcher also started with the fixed Vite origin and build watcher.
+
+Cloud Chrome visual review covered Home in Light, Settings in Dark, the collapsed sidebar, and a filtered command palette. The screenshots prompted two changes. The Factory Library group got one availability label, and Settings gained a functional navigation row with the expanded width. Browser preview evidence covers rendering and local interactions, including the explicit notice that desktop preferences are unavailable.
+
+## Windows x64 verification
+
+Run the exact PowerShell commands in [README](../README.md#development-setup) after installing the pinned Node release. Run the two Playwright suites and perform the documented native smoke checks at the actual Windows display scaling. Record OS and Electron versions, theme changes through System mode, resize and 200% zoom, restart persistence, and test outcomes. Windows installer, upgrade, uninstall, and signing checks remain Phase 12.
