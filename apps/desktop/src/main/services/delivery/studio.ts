@@ -162,7 +162,7 @@ export class DeliveryStudio {
         const platform = go ? process.platform + '-' + process.arch : 'Node.js 22.16.0';
         const docs = '# Client release\n\nRuntime: ' + platform + '\n\n'
           + (go ? 'Run the included dist/factory-server executable from the extracted root. On Windows use the .exe suffix.\n'
-            : 'Run pnpm 10.13.1 install --prod --frozen-lockfile, then node dist/server/server.js from the extracted root.\n')
+            : 'Run pnpm 10.13.1 install --prod --frozen-lockfile --ignore-scripts, then node dist/server/server.js from the extracted root.\n')
           + '\nProvide a reviewed DATABASE_URL, HOST and PORT. Check /api/health and /api/ready. Run the included migration entry separately after reviewing the destination.\n';
         const proof = {
           version: input.version, project: planned.app.project!.projectId, stack: planned.app.stack!.id, revision: planned.head, platform, locks: planned.locks,

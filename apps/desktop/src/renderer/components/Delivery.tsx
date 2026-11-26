@@ -145,14 +145,21 @@ export function DeliveryWorkspace({ project, signal, openSource, openRecovery }:
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const lock = useRef(false);
+  const observation = useRef<Promise<void> | undefined>(undefined);
   const id = project.id;
-  const refresh = useCallback(async () => {
-    if (!bridge) return;
-    const outcome = await bridge.inspect(id);
-    if (outcome.ok) setInspection(outcome.value);
-    else if (outcome.error !== 'PROJECT_BUSY') setError(errors[outcome.error] ?? 'Inspection failed.');
-    const result = await incrementalBridge?.inspect(id);
-    if (result?.ok) setGenerated(result.value);
+  const refresh = useCallback(async (force = false) => {
+    if (!bridge || (lock.current && !force)) return;
+    if (observation.current) return observation.current;
+    const task = (async () => {
+      const outcome = await bridge.inspect(id);
+      if (outcome.ok) setInspection(outcome.value);
+      else if (outcome.error !== 'PROJECT_BUSY') setError(errors[outcome.error] ?? 'Inspection failed.');
+      const result = await incrementalBridge?.inspect(id);
+      if (result?.ok) setGenerated(result.value);
+    })();
+    observation.current = task;
+    try { await task; }
+    finally { if (observation.current === task) observation.current = undefined; }
   }, [bridge, id]);
   useEffect(() => {
     if (project.availability !== 'ready') return;
@@ -182,6 +189,7 @@ export function DeliveryWorkspace({ project, signal, openSource, openRecovery }:
     if (lock.current) return;
     lock.current = true; setBusy(label); setError(''); setNotice('');
     try {
+      await observation.current;
       const result = await action();
       if (result.ok) done?.(result.value);
       else { setError(errors[result.error] ?? 'Studio could not complete this action.'); onBlocked?.(result.error); }
@@ -286,7 +294,7 @@ export function DeliveryWorkspace({ project, signal, openSource, openRecovery }:
         <Button className="primary-button" disabled={Boolean(busy) || !plan.changes.length || Boolean(plan.issues.length)} onClick={() => {
           const generator = incrementalBridge;
           if (generator) void run('Waiting for native approval…', () => generator.apply({ projectId: id, id: plan.id }),
-            (result) => { if (result) { setPlan(undefined); setNotice('Reviewed delivery files written.'); void refresh(); } });
+            (result) => { if (result) { setPlan(undefined); setNotice('Reviewed delivery files written.'); void refresh(true); } });
         }}>Approve and Apply</Button>
       </>}
     </section>}
@@ -304,7 +312,7 @@ export function DeliveryWorkspace({ project, signal, openSource, openRecovery }:
           const input = { projectId: id, version, notes, source: inspection?.source };
           if (!isPackageRequest(input)) { setError('Enter a valid version and keep credentials out of release notes.'); return; }
           void run('Reviewing package…', () => bridge.package(input), (result) => {
-            if (result) { setNotice('Release verified · ' + result.sha256.slice(0, 12)); void refresh(); }
+            if (result) { setNotice('Release verified · ' + result.sha256.slice(0, 12)); void refresh(true); }
           });
         }}><Download size={14}/>Review Release Archive</Button>
       </div>
