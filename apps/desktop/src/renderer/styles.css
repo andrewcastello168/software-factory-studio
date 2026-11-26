@@ -625,6 +625,7 @@ kbd {
 .git-form label { display: grid; gap: 4px; }
 .git-commit textarea { width: 100%; resize: vertical; font: inherit; }
 .git-commit .button { justify-self: start; }
+.git-commit .button:disabled { background: var(--rail); border-color: var(--line); color: var(--muted); }
 .git-diff pre { max-height: min(56vh, 720px); overflow: auto; margin: 0; padding: 8px 0; tab-size: 4; }
 .git-diff pre span {
   display: block;

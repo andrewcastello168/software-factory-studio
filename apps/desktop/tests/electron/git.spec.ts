@@ -73,6 +73,9 @@ test('Git Studio clones, commits and switches real native workspaces with read-o
     const studio = page.getByRole('tab', { name: 'Studio clone' });
     const id = (await studio.getAttribute('id'))?.replace('workspace-tab-', '');
     if (!id) throw new Error('Missing project tab identifier.');
+    expect(await page.evaluate((token) => Reflect.apply(window.studio!.git.action, null, [
+      { id: token, operation: 'init', revision: null, cwd: '../Unrelated folder' },
+    ]), id)).toEqual({ ok: false, error: 'INVALID_REQUEST' });
     expect(await readFile(join(clone, 'service.txt'), 'utf8')).toBe('export mode=standard\n');
     git(clone, 'config', 'user.name', 'Test User');
     git(clone, 'config', 'user.email', 'test@example.test');
@@ -83,6 +86,7 @@ test('Git Studio clones, commits and switches real native workspaces with read-o
     await expect(page.getByLabel('Git patch')).toContainText('+export mode=reviewed');
     await page.screenshot({ path: test.info().outputPath('git-studio-light.png') });
     await page.getByRole('button', { name: 'Stage service.txt', exact: true }).click();
+    await expect(page.getByText('Selected change staged.', { exact: true })).toBeVisible();
     const staged = page.getByRole('region', { name: 'Staged changes' });
     await expect(staged).toContainText('service.txt');
     await page.getByRole('textbox', { name: 'Commit message' }).fill('Update project mode');
@@ -120,5 +124,39 @@ test('Git Studio clones, commits and switches real native workspaces with read-o
   } finally {
     await instance?.close();
     await rm(profile, { recursive: true, force: true, maxRetries: 4 });
+  }
+});
+
+test('Git Studio clones an anonymous public HTTPS repository with verified TLS', async () => {
+  test.skip(process.env.FACTORY_TEST_PUBLIC_HTTPS !== '1', 'Requires direct outbound HTTPS to GitHub.');
+  test.setTimeout(45_000);
+  const fixture = await realpath(await mkdtemp(join(tmpdir(), 'factory-native-https-')));
+  const profile = join(fixture, 'profile');
+  const destination = join(fixture, 'projects');
+  let instance: ElectronApplication | undefined;
+  try {
+    await Promise.all([mkdir(profile), mkdir(destination)]);
+    instance = await _electron.launch({
+      executablePath,
+      args: [resolve('.'), `--user-data-dir=${profile}`],
+      env: { ...process.env, FACTORY_DESKTOP_DEV: '0' },
+      chromiumSandbox: true,
+    });
+    await instance.evaluate(({ dialog }, path) => {
+      Object.assign(dialog, {
+        showOpenDialog: async () => ({ canceled: false, filePaths: [path] }),
+        showMessageBox: async () => ({ response: 1 }),
+      });
+    }, destination);
+    const page = await instance.firstWindow();
+    const result = await page.evaluate(() => window.studio!.git.clone({
+      source: 'https', url: 'https://github.com/octocat/Hello-World.git', name: 'Public HTTPS fixture',
+    }));
+    expect(result).toMatchObject({ ok: true, value: { level: 'success', selection: { projectId: expect.any(String) } } });
+    const file = await readFile(join(destination, 'Public HTTPS fixture', 'README'), 'utf8');
+    expect(file).toMatch(/hello world/iu);
+  } finally {
+    await instance?.close();
+    await rm(fixture, { recursive: true, force: true, maxRetries: 4 });
   }
 });

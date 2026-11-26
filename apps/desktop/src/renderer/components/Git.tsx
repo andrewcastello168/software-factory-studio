@@ -83,15 +83,16 @@ function Changes({ repository, area, selected, choose, busy, request }: {
     <h2>{staged ? 'Staged changes' : 'Working changes'}<span>{entries.length}</span></h2>
     {entries.length ? <ul>{entries.map(({ change, row, code }) => {
       const label = change.original ? `${change.original} → ${change.path}` : change.path;
+      const actionName = `${staged ? 'Unstage' : 'Stage'} ${change.path}`;
       return <li className="git-change" key={row}>
         <Button className="git-file" title={label} aria-pressed={selected === `${area}-${row}`} onClick={() => choose(row, area)} disabled={busy}>
           <span className={`git-change-code git-change-code--${code}`} title={changeNames[code]} aria-label={changeNames[code]}>{code}</span>
           <bdi>{label}</bdi>
         </Button>
-        <IconButton label={`${staged ? 'Unstage' : 'Stage'} ${change.path}`} disabled={busy || !change.actionable || Boolean(repository.operation)}
+        <Button variant="icon" aria-label={actionName} title={actionName} disabled={busy || !change.actionable || Boolean(repository.operation)}
           onClick={() => request({ operation: staged ? 'unstage' : 'stage', row })}>
           {staged ? <Minus size={15} aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}
-        </IconButton>
+        </Button>
       </li>;
     })}</ul> : <p className="git-empty">{staged ? 'Nothing staged.' : 'No working changes.'}</p>}
   </section>;
@@ -119,7 +120,11 @@ export function GitPanel({ project, git }: { project: OpenProject; git: ReturnTy
 
   async function request(input: GitActionInput) {
     const action = { ...input, id: project.id, revision };
-    if (busy || !isGitAction(action)) return;
+    if (busy) return;
+    if (!isGitAction(action)) {
+      setResult({ level: 'error', message: 'This action is no longer available. Refresh Git Studio and try again.' });
+      return;
+    }
     setPending(input.operation);
     setResult(null);
     try {

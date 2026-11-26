@@ -128,6 +128,7 @@ export class NativeGit {
       ['merge.autoStash', 'false'], ['push.followTags', 'false'], ['fetch.prune', 'false'],
       ['receive.autogc', 'false'], ['transfer.fsckObjects', 'true'],
     ];
+    if (windows) config.push(['http.sslBackend', 'schannel']);
     // Supplying an empty template via --template= avoids copying the scratch files.
     env.GIT_CONFIG_COUNT = String(config.length);
     for (const [index, [key, value]] of config.entries()) {
