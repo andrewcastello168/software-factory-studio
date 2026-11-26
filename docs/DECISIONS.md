@@ -104,3 +104,18 @@ Linux and macOS use nonrecursive watchers for a bounded set of inspected directo
 | Generate a foundation without domain features by default | PostgreSQL readiness and migration tooling remain real and reusable. The opt-in Welcome example shows how a module contributes a route, component, migration, test, and documentation without defining the client's requirements. |
 | Plan from trusted, versioned contributions | Exact module pins, a compatibility catalog, and provenance keep the preview reproducible. Existing dependencies are reused. Installing modules after generation, authoring custom modules, and resolving full dependency graphs remain Phase 06–07 work. |
 | Retain the released v1 renderer for recovery | Preserve approval hashes for interrupted jobs and avoid rewriting deployed projects. The wizard uses the modular v2 contract for new plans. |
+
+
+## Phase 05 decisions
+
+### Share safe primitives for project creation and schema publication
+
+**Status** · Accepted for Phase 05.
+
+Treat durable SQL files as schema authority and keep ERD coordinates in local app data. File generation remains deterministic. Database Studio writes only new additive migrations through the existing exclusive publisher, names an active migration journal, and requires native approval. CRUD is composed at scaffold time because the full new directory can be reviewed and replayed. Adding CRUD to an existing app and updating generated code remain ownership-aware Phase 06 operations. This delivers independently runnable CRUD and avoids undeclared file replacements.
+
+### Use a bounded PostgreSQL grammar and separate development apply
+
+**Status** · Accepted for Phase 05.
+
+A closed DDL grammar handles a focused model and reports unsupported syntax; Studio does not execute SQL to discover its structure. Main uses the already-established pure JavaScript pg dependency for catalog queries and eligible development migrations. The catalog snapshot, source history, and ledger are separate views. Apply requires a dedicated loopback target, a native confirmation and a matching ledger and schema under lock. The stricter apply surface leaves unsupported and destructive operations with a separately reviewed database workflow.

@@ -151,3 +151,16 @@ PR #6 was already merged. The isolated Cloud work branch advanced to main at 946
 | P04-07 | Cloud Linux passed 62 unit and integration tests, 10 Chromium renderer tests, four Electron tests, and the production build. The optional public Git HTTPS regression runs on Windows. [PR checks](https://github.com/andrewcastello168/software-factory-studio/pull/7/checks) cover both platform workflows. |
 
 No application dependencies changed. Foundation and example share the frozen dependency graph. Startup, credential handling, filesystem authority, and recovery remain within the Phase 04 boundaries. The reusable module installer and Database Studio are later milestones.
+
+## Phase 05 · Database-driven Software Factory
+
+| Gate | Verification |
+| --- | --- |
+| P05-01 | Model, designer and ERD exercised in the built desktop UI. The inventory fixture shows five tables and four foreign keys, keyboard movement, persisted coordinates and both themes. PostgreSQL 17 verified literal and typed defaults across the documented model. |
+| P05-02 | Tests cover deterministic ordering, composite and cyclic keys, unsupported DDL, stale file and Git state, protected symlinks and junctions, interrupted publication and restart recovery. Native UI verification approves and publishes one additive file. Historical bytes remain intact. |
+| P05-03 | PostgreSQL 17 catalog and ledger checks use a disposable loopback database. Verified read-only inspection, reviewed apply and schema parity, checksum divergence, and rollback of both DDL and ledger on a failed constraint. Git integration regression checks use disposable workspaces. |
+| P05-04 | Migration-only, backend-only, and API plus React selections are covered by generator tests. Reviewed native preview, manifest ownership, configuration-specific documentation, optional features, and old Phase 04 workflows remain available. |
+| P05-05 | Standalone inventory, foundation and Welcome projects each install from their generated frozen lock, lint, typecheck, test, build and run. Inventory verifies API and sandboxed Chromium CRUD, filtering, pagination, request errors, unique and check constraints, foreign-key rejection, and SET NULL against PostgreSQL 17. |
+| P05-06 | Local Debian 13 Linux x64 passed frozen install, lint, typecheck, production build, 71 Vitest checks, 11 Playwright renderer checks, and five built Electron checks. The public HTTPS Git smoke requires the Windows workflow's explicit opt-in. GitHub Actions reuses Linux x64 and Windows Server 2025 x64 workflows, and the delivery pull request records the job links and screenshot artifact. |
+
+Database apply is confined to a separately approved development target. The UI support matrix and manual native dialog, remote trust store and installer checks are documented in [Database engine](DATABASE_ENGINE.md), [Testing strategy](TESTING_STRATEGY.md) and the [README](../README.md). CRUD composition is create-only in this phase. Phase 06 will extend application writes using ownership, conflict and recovery rules.

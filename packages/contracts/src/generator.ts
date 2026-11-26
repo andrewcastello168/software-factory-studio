@@ -1,6 +1,8 @@
 import type { ProjectSelection, Result } from './index';
 import { isProjectId, isProjectSegment, isProjectSelection, PROJECT_LIMITS } from './projects';
 import { hasControlCharacters, hasExactKeys, isRecord } from './validation';
+import { isCrudSelection } from './schema';
+import type { CrudSelection } from './schema';
 import { isModuleSelection, moduleCompatibility, MODULE_CATALOG } from './generator-modules';
 import type { ApplicationType, DatabaseChoice, ModuleSelection } from './generator-modules';
 
@@ -42,6 +44,7 @@ export interface StarterConfig extends Omit<LegacyStarterConfig, 'appType'> {
   appType: ApplicationType;
   database: DatabaseChoice;
   modules: ModuleSelection[];
+  crud?: CrudSelection;
 }
 
 export interface GeneratorParent {
@@ -117,7 +120,8 @@ export function isLegacyStarterConfig(value: unknown): value is LegacyStarterCon
 }
 
 export function isStarterConfig(value: unknown): value is StarterConfig {
-  return isRecord(value) && hasExactKeys(value, [...coreKeys, 'database', 'modules']) && hasSupportedCore(value)
+  return isRecord(value) && hasExactKeys(value, [...coreKeys, 'database', 'modules', ...(Object.hasOwn(value, 'crud') ? ['crud'] : [])]) && hasSupportedCore(value)
+    && (!Object.hasOwn(value, 'crud') || isCrudSelection(value.crud))
     && value.database === STARTER.database && Array.isArray(value.modules)
     && value.modules.length <= MODULE_CATALOG.length && value.modules.every(isModuleSelection)
     && moduleCompatibility(STARTER.appType, STARTER.database, value.modules).length === 0;

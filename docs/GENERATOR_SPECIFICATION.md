@@ -4,7 +4,7 @@
 
 A stack adapter receives a normalized project snapshot, versioned inputs, and explicit capabilities. It emits deterministic planned file operations and diagnostics. The pure planner is reusable by Electron and a future CLI. Main-owned filesystem and Git adapters take snapshots and apply approved plans. Templates are data in a restricted deterministic renderer. Pin the engine, stack adapter, templates, module graph, and schema input versions.
 
-The first delivered generator scaffolds a clean repository using the Node.js, TypeScript, Express, React, Vite, and PostgreSQL combination. Workspaces with existing files remain inspectable. Phase 05 adds append-only source migration creation through the journal. Incremental application source generation arrives in Phase 06. The second stack uses idiomatic Go and Gin structure and validates the same lifecycle in Phase 08.
+The first delivered generator scaffolds a clean repository using the Node.js, TypeScript, Express, React, Vite, and PostgreSQL combination. Workspaces with existing files remain inspectable. Phase 05 adds append-only source migration creation through a journal and optional CRUD in a new project. Incremental application source generation arrives in Phase 06. The second stack uses idiomatic Go and Gin structure and validates the same lifecycle in Phase 08.
 
 ## Lifecycle and evidence
 
@@ -34,7 +34,7 @@ If apply fails or startup detects an incomplete record, mark the workspace recov
 
 ## Generated application boundaries
 
-Initial outputs include normal application source, build scripts, lockfiles, environment variable documentation, tests, and a PostgreSQL migration workflow. Phase 04 verifies a working PostgreSQL-backed feature using an isolated database. Phase 05 owns schema reconciliation. Phase 06 adds reviewed generation for supported migrations, models, repositories, services, controllers or handlers, API routes, validation, forms, CRUD pages, tables, tests, and docs. Templates and module dependencies expand in Phase 07. Deployment artifacts join a reviewed release workflow in Phase 11. The [SDK](STACK_PLUGIN_SDK.md) describes stack ownership and compatibility.
+Initial outputs include normal application source, build scripts, lockfiles, environment variable documentation, tests, and a PostgreSQL migration workflow. Phase 04 verifies a working PostgreSQL-backed feature using an isolated database. Phase 05 owns schema reconciliation. Phase 06 extends reviewed CRUD generation to eligible files in existing projects, including ownership-aware application source edits and conflict handling. Templates and module dependencies expand in Phase 07. Deployment artifacts join a reviewed release workflow in Phase 11. The [SDK](STACK_PLUGIN_SDK.md) describes stack ownership and compatibility.
 
 ## Phase 04 project instructions
 
@@ -62,4 +62,11 @@ The default foundation owns liveness, PostgreSQL readiness, the checksummed migr
 
 The v1 template inventory and hash layout remain available for previously approved recovery records. They cannot be requested by new previews. Existing generated repositories remain standalone and receive no automatic conversion.
 
-Backend-only, frontend-only and database-free shapes are represented as future choices and remain unavailable. Authentication, user management, RBAC, CRUD, audit logging, reporting, Excel, files, notifications, scheduling, and payments are planned. The planned auth dependency relationship is authentication requiring user management, with RBAC requiring both. The Phase 06–07 library owns installation into existing projects, version resolution beyond the initial exact pins, and full graph validation.
+Backend-only, frontend-only and database-free shapes are represented as future choices and remain unavailable. Authentication, user management, RBAC, audit logging, reporting, Excel, files, notifications, scheduling, and payments are planned. The planned auth dependency relationship is authentication requiring user management, with RBAC requiring both. The Phase 06–07 library owns installation into existing projects, version resolution beyond the initial exact pins, and full graph validation.
+
+
+## Phase 05 create-only configuration
+
+The Node starter accepts an optional version 1 PostgreSQL schema and two explicit table selections for backend and frontend. Every selected frontend table requires a selected backend table. The new project includes its schema migration; select no CRUD tables to generate the migration and schema documentation alone. Backend CRUD supports a single primary key of smallint, integer, text or UUID with compatible columns (smallint, integer, text, UUID, boolean and date). Composite keys and additional types remain available for schema-only designs. API queries use bound values. HTTP models, validation, repositories, services and controllers are generated only for selected tables. The React table, editor and delete confirmation are emitted only when page selection is enabled. The generated routes require appropriate deployment access controls.
+
+The initial generation plan owns the schema and CRUD files under the pinned PostgreSQL adapter. Fingerprints, selected features and migration location are recorded in the existing portable manifest and version lock. The ordinary frozen dependency graph is reused. Existing managed projects can publish a new migration through Database Studio. Studio cannot replace their API, UI, tests or documentation during Phase 05. Phase 06 adds reviewed file-level ownership and conflict handling for incremental installation or updates.

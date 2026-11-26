@@ -19,7 +19,9 @@
     "@factory/generator": "workspace:*",
     "lucide-react": "1.80.0",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "@factory/schema": "workspace:*",
+    "pg": "8.22.0"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",
@@ -30,6 +32,7 @@
     "electron": "45.5.0",
     "esbuild": "0.28.2",
     "tailwindcss": "4.3.5",
-    "vite": "8.3.8"
+    "vite": "8.3.8",
+    "@types/pg": "8.15.6"
   }
 }

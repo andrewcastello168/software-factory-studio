@@ -81,6 +81,8 @@ jobs:
             Remove-Item Env:PGPASSWORD
           }
           $env:FACTORY_TEST_DATABASE_URL = 'postgresql://factory_test:' + $password + '@127.0.0.1:5432/factory_check'
+          pnpm exec vitest run apps/desktop/src/main/services/schema/studio.test.ts
+          if ($LASTEXITCODE -ne 0) { throw 'Database Studio PostgreSQL integration failed.' }
           pnpm verify:starter
           if ($LASTEXITCODE -ne 0) { throw 'Standalone starter verification failed.' }
 
@@ -103,4 +105,5 @@ jobs:
             apps/desktop/test-results/**/project-*.png
             apps/desktop/test-results/**/git-studio-*.png
             apps/desktop/test-results/**/new-project-*.png
+            apps/desktop/test-results/**/database-studio-*.png
           retention-days: 7

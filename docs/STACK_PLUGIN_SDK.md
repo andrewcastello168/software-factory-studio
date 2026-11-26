@@ -26,3 +26,7 @@ The first stack uses an Express/TypeScript backend and an independent React/Vite
 ## Enablement gate
 
 Test toolchain detection, incompatible OS or versions, deterministic generation, invalid and malicious input data, protected-file behavior, and user-facing diagnostics. Build and test the actual generated applications, exercise HTTP and persistence with disposable PostgreSQL, and publish the tested combination before enabling it in the wizard. Verify standalone operation using only the generated project's documented toolchain and configuration. Studio and portable metadata must not be runtime dependencies of the generated application. Each published adapter records migration authority and verification commands. Deprecation, rollback, and upgrade paths belong in the stack version documentation.
+
+## PostgreSQL contract exercised in Phase 05
+
+The built-in Node adapter consumes the version 1 model from the Schema package. It advertises its canonical SQL dialect subset, fixed migration directory and ledger convention. It validates backend and frontend table eligibility before emitting a new-project plan. Phase 05 does not yet require other adapters to share the Node runtime layout or migrations.

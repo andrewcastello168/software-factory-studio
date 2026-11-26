@@ -82,6 +82,8 @@ export class GitStudio {
     return git;
   }
 
+  isWriting() { return this.#writeLocked; }
+
   async dispose() {
     this.#disposed = true;
     await this.#job;

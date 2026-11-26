@@ -1,3 +1,4 @@
+import { Database } from 'lucide-react';
 import {
   Blocks, BookOpen, Box, Clock3, Folder, GitBranch, House, Layers3, Library, Package, Settings2, Users, Waypoints,
 } from 'lucide-react';
@@ -37,11 +38,12 @@ const groups: { title: string; entries: { title: string; icon: LucideIcon; page?
 ];
 
 export function Navigation({
-  page, onSelect, projectView, onProjectView,
+  page, onSelect, projectView, onProjectView, database,
 }: {
   page: Page | null;
   onSelect: (page: Page) => void;
   projectView: ProjectView | null;
+  database: boolean;
   onProjectView: (view: ProjectView) => void;
 }) {
   return (
@@ -59,6 +61,9 @@ export function Navigation({
             <li><Button aria-current={projectView === 'git' ? 'page' : undefined} onClick={() => onProjectView('git')}>
               <GitBranch size={16} aria-hidden="true" />Git Studio
             </Button></li>
+            {database && <li><Button aria-current={projectView === 'database' ? 'page' : undefined} onClick={() => onProjectView('database')}>
+              <Database size={16} aria-hidden="true" />Database Studio
+            </Button></li>}
           </ul>
         </section>
       )}

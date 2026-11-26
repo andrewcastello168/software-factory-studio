@@ -3,6 +3,8 @@ import type { IpcMainInvokeEvent } from 'electron';
 import { readFile, realpath } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import {
+  SCHEMA_CHANNEL, isMigrationPreview, isNullableSchemaSnapshot, isSchemaConnection, isSchemaEdit,
+  isSchemaLayout, isSchemaPhysical, isSchemaPoints, isSchemaProposal, isSchemaPublish, isSchemaSnapshot, isSqlImport,
   CHANNEL, failure, isAppInfo, isPreferences, isPreferenceSnapshot, isPreferenceWrite, success,
   validateReply, PROJECT_CHANNEL, isProjectCatalog, isProjectId, isProjectSelection,
   GIT_CHANNEL, isGitAction, isGitCloneRequest, isGitCloneResult, isGitCompareRequest, isGitDiff, isGitDiffRequest,
@@ -17,12 +19,15 @@ import { ProjectWorkspace } from './services/projects/workspace';
 import { GitStudio } from './services/git/studio';
 import { GenerationJournal } from './services/generation/journal';
 import { GeneratorStudio } from './services/generation/studio';
+import { DatabaseStudio } from './services/schema/studio';
+import { SchemaStore } from './services/schema/storage';
 
 const development = !app.isPackaged && process.env.FACTORY_DESKTOP_DEV === '1';
 let window: BrowserWindow | undefined;
 let projects: ProjectWorkspace | undefined;
 let gitStudio: GitStudio | undefined;
 let generatorStudio: GeneratorStudio | undefined;
+let databaseStudio: DatabaseStudio | undefined;
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'studio', privileges: { standard: true, secure: true, supportFetchAPI: true } },
@@ -108,6 +113,25 @@ function installGeneratorBridge() {
     ? generatorStudio?.resume(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
   handle(GENERATOR_CHANNEL.release, isGeneratorPending, (...args) => args.length === 1 && isProjectId(args[0])
     ? generatorStudio?.release(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+}
+
+function installSchemaBridge() {
+  handle(SCHEMA_CHANNEL.inspect, isSchemaSnapshot, (...args) => args.length === 1 && isProjectId(args[0])
+    ? databaseStudio?.inspect(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(SCHEMA_CHANNEL.parse, isSchemaProposal, (...args) => args.length === 1 && isSqlImport(args[0])
+    ? databaseStudio?.parse(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(SCHEMA_CHANNEL.preview, isMigrationPreview, (...args) => args.length === 1 && isSchemaEdit(args[0])
+    ? databaseStudio?.preview(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(SCHEMA_CHANNEL.publish, isNullableSchemaSnapshot, (...args) => args.length === 1 && isSchemaPublish(args[0])
+    ? databaseStudio?.publish(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(SCHEMA_CHANNEL.release, isNullableSchemaSnapshot, (...args) => args.length === 1 && isSchemaPublish(args[0])
+    ? databaseStudio?.release(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  handle(SCHEMA_CHANNEL.layout, isSchemaPoints, (...args) => args.length === 1 && isSchemaLayout(args[0])
+    ? databaseStudio?.layout(args[0]) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  for (const [channel, apply] of [[SCHEMA_CHANNEL.physical, false], [SCHEMA_CHANNEL.apply, true]] as const) {
+    handle(channel, isSchemaPhysical, (...args) => args.length === 1 && isSchemaConnection(args[0])
+      ? databaseStudio?.physical(args[0], apply) ?? failure('ACCESS_DENIED') : failure('INVALID_REQUEST'));
+  }
 }
 
 async function installProtocol() {
@@ -203,15 +227,20 @@ async function openWindow() {
     adopt: (root) => workspace.adoptCreated(root),
   }, { choose: projectDialogs.chooseDirectory, confirm: projectDialogs.confirm });
   generatorStudio = generator;
-  const git = new GitStudio({
+  const git: GitStudio = new GitStudio({
     root: (id) => workspace.root(id),
     canOpen: () => workspace.canOpen(),
     allowsAuxiliaryPath: (path) => workspace.allowsAuxiliaryPath(path),
     adopt: (root) => workspace.adoptCreated(root),
-    generationPending: async (path) => Boolean(await generator.protectsGit(path)),
+    generationPending: async (path) => Boolean(await generator.protectsGit(path)) || database.protectsGit(path),
     refresh: (id) => workspace.rescan(id),
   }, projectDialogs);
   gitStudio = git;
+  const database: DatabaseStudio = new DatabaseStudio(new SchemaStore(app.getPath('userData')), {
+    root: (id) => workspace.root(id), git: (id) => git.status(id), gitWriting: () => git.isWriting(),
+    refresh: (id) => workspace.rescan(id),
+  }, projectDialogs);
+  databaseStudio = database;
   current.on('focus', () => { void workspace.reconcile(); });
   current.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   current.webContents.on('will-frame-navigate', (event) => event.preventDefault());
@@ -233,11 +262,13 @@ async function openWindow() {
   current.on('closed', () => {
     workspace.dispose();
     generator.dispose();
+    database.dispose();
     void git.dispose().catch(() => undefined);
     if (window === current) {
       projects = undefined;
       gitStudio = undefined;
       generatorStudio = undefined;
+      databaseStudio = undefined;
       window = undefined;
     }
   });
@@ -273,6 +304,7 @@ if (!app.requestSingleInstanceLock()) {
     installProjectBridge();
     installGitBridge();
     installGeneratorBridge();
+    installSchemaBridge();
     installBridge(new PreferenceStore(join(app.getPath('userData'), 'preferences.json')));
     await openWindow();
     app.on('activate', () => { if (!window) void openWindow().catch(reportStartupError); });

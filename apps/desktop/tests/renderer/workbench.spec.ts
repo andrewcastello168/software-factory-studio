@@ -18,7 +18,10 @@ test.beforeEach(async ({ page }) => {
       name: 'Renderer fixture',
       directory: '/fixture/Renderer fixture',
       availability: 'ready',
-      metadata: { status: 'absent' },
+      metadata: new URL(location.href).searchParams.has('managed') ? { status: 'managed', descriptor: {
+        id: '02b192a8-b874-4423-9add-af527064998f', name: 'Renderer fixture', type: 'full-stack',
+        stackId: 'node-express-react-postgres', profileId: 'layered-web',
+      } } : { status: 'absent' },
       entries: [
         { path: 'src', kind: 'directory', modifiedAt: null, size: null },
         { path: 'src/index.ts', kind: 'file', modifiedAt: null, size: 25 },
@@ -43,6 +46,20 @@ test.beforeEach(async ({ page }) => {
       remotes: [{ name: 'origin', kind: 'https' }],
     };
     const studio: StudioBridge = {
+      schema: {
+        inspect: async () => ({ ok: true, value: {
+          revision: 'f'.repeat(64), migrations: [], diagnostics: [], layout: [], recovery: null,
+          schema: { version: 1, tables: [{ name: 'items', columns: [{ name: 'id', type: 'integer', nullable: false }],
+            constraints: [{ name: 'items_pkey', kind: 'primary', columns: ['id'] }] }] },
+        } }),
+        parse: async () => ({ ok: false, error: 'ACCESS_DENIED' }),
+        preview: async () => ({ ok: false, error: 'ACCESS_DENIED' }),
+        publish: async () => ({ ok: false, error: 'ACCESS_DENIED' }),
+        release: async () => ({ ok: false, error: 'ACCESS_DENIED' }),
+        layout: async () => ({ ok: false, error: 'ACCESS_DENIED' }),
+        physical: async () => ({ ok: false, error: 'ACCESS_DENIED' }),
+        apply: async () => ({ ok: false, error: 'ACCESS_DENIED' }),
+      },
       generator: {
         chooseParent: async () => ({ ok: true, value: { id: project.id, directory: '/fixture' } }),
         preview: async ({ config }) => ({ ok: true, value: {
@@ -258,4 +275,23 @@ test('New Project keeps the preview reviewed and explains stale plans in a compa
   await expect(wizard.getByRole('button', { name: 'Generate Project', exact: true })).toBeDisabled();
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
+});
+
+
+test('Database Studio navigation is scoped to the managed project and the diagram is keyboard operable', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open Folder', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Database Studio', exact: true })).toHaveCount(0);
+  await page.goto('/?managed');
+  await page.getByRole('button', { name: 'Open Folder', exact: true }).click();
+  await page.getByRole('button', { name: 'Database Studio', exact: true }).press('Enter');
+  await expect(page.getByText('Declared source schema')).toBeVisible();
+  await page.getByRole('button', { name: 'ERD', exact: true }).press('Enter');
+  const item = page.getByRole('button', { name: 'Select table items', exact: true });
+  await item.press('Enter');
+  await expect(item).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Zoom in' }).press('Enter');
+  await expect(page.getByText('120%', { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Renderer fixture' }).press('Delete');
+  await expect(page.getByRole('region', { name: 'Database Studio', exact: true })).toHaveCount(0);
 });

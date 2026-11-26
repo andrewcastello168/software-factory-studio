@@ -1,6 +1,7 @@
 import { hasExactKeys, isRecord } from './validation';
 import type { ProjectBridge } from './projects';
 import type { GitBridge } from './git';
+import type { SchemaBridge } from './schema';
 import type { GeneratorBridge } from './generator';
 
 export { hasControlCharacters, hasExactKeys, isRecord } from './validation';
@@ -8,6 +9,7 @@ export * from './projects';
 export * from './git';
 export * from './generator';
 export * from './generator-modules';
+export * from './schema';
 
 export const CHANNEL = {
   appInfo: 'factory:app-info',
@@ -61,6 +63,11 @@ const errorCodes = [
   'GENERATOR_STORAGE',
   'GENERATOR_RECOVERY',
   'GENERATOR_CONFLICT',
+  'SCHEMA_UNAVAILABLE',
+  'SCHEMA_STALE',
+  'SCHEMA_CONFLICT',
+  'SCHEMA_DATABASE',
+  'SCHEMA_STORAGE',
 ] as const;
 
 export type ErrorCode = typeof errorCodes[number];
@@ -71,6 +78,7 @@ export interface StudioBridge {
   projects: ProjectBridge;
   git: GitBridge;
   generator: GeneratorBridge;
+  schema: SchemaBridge;
   getAppInfo(): Promise<Result<AppInfo>>;
   readPreferences(): Promise<Result<PreferenceSnapshot>>;
   writePreferences(request: PreferenceWrite): Promise<Result<Preferences>>;

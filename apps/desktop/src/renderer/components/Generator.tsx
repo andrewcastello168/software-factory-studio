@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, CircleCheck, FileText, FolderOpen, ShieldCheck } from 'lucide-react';
-import { isStarterConfig, MODULE_CATALOG, STARTER, WELCOME_EXAMPLE } from '@factory/contracts';
+import { isStarterConfig, MODULE_CATALOG, SCHEMA_LIMITS, STARTER, WELCOME_EXAMPLE } from '@factory/contracts';
 import type {
-  ErrorCode, GeneratorParent, GeneratorPending, GeneratorPreview, GeneratorReceipt, ProjectSelection, Result, StarterConfig,
+  CrudSelection, DatabaseSchema, ErrorCode, GeneratorParent, GeneratorPending, GeneratorPreview, GeneratorReceipt, ProjectSelection, Result, SchemaDiagnostic, StarterConfig,
 } from '@factory/contracts';
 import { browserPreview } from '../usePreferences';
 import { Button, Dialog, Input } from './Controls';
+import { emptySchema, validateCrud } from '@factory/schema';
+import { Diagnostics, SchemaDesigner } from './schema/Designer';
+import { schemaBridge } from './schema/DatabaseStudio';
 
 export const generatorBridge = browserPreview ? undefined : window.studio?.generator;
 
 const messages: Partial<Record<ErrorCode, string>> = {
   GENERATOR_DESTINATION: 'Choose an available parent outside an existing Git working tree. The project folder must be new.',
+  SCHEMA_CONFLICT: 'The selected tables and features cannot be generated together. Review the schema and the optional Welcome example.',
   GENERATOR_STALE: 'The destination or review changed. Check the folder and create a fresh preview.',
   GENERATOR_STORAGE: 'Studio could not read or save the generation journal. Check access to Studio application data.',
   GENERATOR_RECOVERY: 'Generation needs recovery. Open Generation Recovery to inspect and resume the saved operation.',
@@ -37,6 +41,13 @@ export function GeneratorDialog({ close, opened, recovery }: {
   const [customSlug, setCustomSlug] = useState(false);
   const [port, setPort] = useState('3000');
   const [welcome, setWelcome] = useState(false);
+  const [databaseEnabled, setDatabaseEnabled] = useState(false);
+  const [schema, setSchema] = useState<DatabaseSchema>(emptySchema);
+  const [table, setTable] = useState('');
+  const [backend, setBackend] = useState<string[]>([]);
+  const [frontend, setFrontend] = useState<string[]>([]);
+  const [ddl, setDdl] = useState('');
+  const [sqlIssues, setSqlIssues] = useState<SchemaDiagnostic[]>([]);
   const [parent, setParent] = useState<GeneratorParent | null>(null);
   const [plan, setPlan] = useState<GeneratorPreview | null>(null);
   const [receipt, setReceipt] = useState<GeneratorReceipt | null>(null);
@@ -46,12 +57,23 @@ export function GeneratorDialog({ close, opened, recovery }: {
   const [journal, setJournal] = useState<GeneratorPending[]>();
   const heading = useRef<HTMLHeadingElement>(null);
 
+  const crud: CrudSelection = { schema, migrations: true, backend, frontend };
+  const crudIssues = databaseEnabled ? validateCrud(crud) : [];
   const config: StarterConfig = {
     name: name.trim().normalize('NFC'), slug, port: Number(port),
     appType: STARTER.appType, stack: STARTER.stack, database: STARTER.database,
     architecture: STARTER.architecture, engineering: STARTER.engineering, modules: welcome ? [WELCOME_EXAMPLE] : [],
+    ...(databaseEnabled ? { crud } : {}),
   };
   const valid = isStarterConfig(config);
+  const canReview = valid && crudIssues.length === 0;
+
+  function changeSchema(value: DatabaseSchema) {
+    setSchema(value);
+    const names = new Set(value.tables.map(({ name }) => name));
+    setBackend((current) => current.filter((name) => names.has(name)));
+    setFrontend((current) => current.filter((name) => names.has(name)));
+  }
   const selectedFile = plan?.files.find((item) => item.path === file);
   const failedReview = Boolean(error && step === 'review');
 
@@ -186,14 +208,51 @@ export function GeneratorDialog({ close, opened, recovery }: {
               <summary>Planned options</summary>
               <p className="generator-muted">Backend-only, frontend-only, and database-free templates are planned.</p>
               <ul aria-label="Planned optional modules">
-                {MODULE_CATALOG.filter((module) => module.version === null).map(({ id, label }) =>
+                {MODULE_CATALOG.filter((module) => module.version === null && module.id !== 'crud').map(({ id, label }) =>
                   <li key={id}>{label}</li>)}
               </ul>
             </details>
           </fieldset>
+          {schemaBridge && <section className="generator-schema" aria-label="Project database schema">
+            <label className="generator-module">
+              <input type="checkbox" checked={databaseEnabled} onChange={(event) => setDatabaseEnabled(event.target.checked)} />
+              <span><strong>Define a database schema</strong>
+                <span className="generator-muted">Include a migration and select which tables need an API or React page.</span>
+              </span>
+            </label>
+            {databaseEnabled && <>
+              <details className="generator-planned">
+                <summary>Import PostgreSQL DDL</summary>
+                <label className="schema-draft-label">PostgreSQL DDL<textarea rows={6} value={ddl} maxLength={SCHEMA_LIMITS.sql}
+                  onChange={(event) => { setDdl(event.target.value); setSqlIssues([]); }} /></label>
+                <Button className="outlined-button" disabled={!ddl.trim() || Boolean(busy)} onClick={() => {
+                  const parser = schemaBridge;
+                  if (parser) void request('Parsing SQL locally…', () => parser.parse({ sql: ddl, schema }), (result) => {
+                    setSqlIssues(result.diagnostics);
+                    if (!result.diagnostics.length) { changeSchema(result.schema); setDdl(''); }
+                  });
+                }}>Parse SQL</Button>
+                <Diagnostics items={sqlIssues} />
+              </details>
+              <SchemaDesigner selected={table} select={setTable} schema={schema} onChange={changeSchema} />
+              {schema.tables.length > 0 && <fieldset className="schema-layers">
+                <legend>Generate record management</legend>
+                <p className="generator-muted">API routes have no built-in sign-in. Use appropriate network and access controls when deploying.</p>
+                {schema.tables.map(({ name }) => <div key={name}><code>{name}</code>
+                  <label><input type="checkbox" aria-label={'Backend API for ' + name} checked={backend.includes(name)} onChange={(event) => {
+                    setBackend(event.target.checked ? [...backend, name] : backend.filter((item) => item !== name));
+                    if (!event.target.checked) setFrontend(frontend.filter((item) => item !== name));
+                  }} /> Backend API</label>
+                  <label><input type="checkbox" aria-label={'React page for ' + name} checked={frontend.includes(name)} disabled={!backend.includes(name)}
+                    onChange={(event) => setFrontend(event.target.checked ? [...frontend, name] : frontend.filter((item) => item !== name))} /> React page</label>
+                </div>)}
+              </fieldset>}
+              <Diagnostics items={schema.tables.length ? crudIssues : []} />
+            </>}
+          </section>}
           <div className="dialog-actions">
             <Button onClick={() => go('project')} disabled={Boolean(busy)}>Back</Button>
-            <Button variant="primary" disabled={!bridge || !parent || !valid || Boolean(busy)}
+            <Button variant="primary" disabled={!bridge || !parent || !canReview || Boolean(busy)}
               onClick={() => bridge && parent && void request('Inspecting destination and planning files…', () => bridge.preview({ parentId: parent.id, config }), (result) => {
                 setPlan(result); setFile('AGENTS.md'); setStep('review');
               })}>Review Files</Button>
@@ -205,7 +264,8 @@ export function GeneratorDialog({ close, opened, recovery }: {
             <div><strong>{plan.files.length} new files</strong><p className="generator-path"><bdi>{plan.directory}</bdi></p>
               <p className="generator-muted">{plan.config.modules.length
                 ? plan.config.modules.map(({ id, version }) => (MODULE_CATALOG.find((entry) => entry.id === id)?.label ?? id) + ' v' + version).join(', ')
-                : 'Foundation only'}</p></div>
+                : 'Foundation'}{plan.config.crud ? ' · Schema migration · ' + plan.config.crud.backend.length + (plan.config.crud.backend.length === 1 ? ' API · ' : ' APIs · ')
+                  + plan.config.crud.frontend.length + (plan.config.crud.frontend.length === 1 ? ' React page' : ' React pages') : plan.config.modules.length ? '' : ' only'}</p></div>
             <ShieldCheck size={19} aria-hidden="true" />
           </div>
           <div className="generator-preview">

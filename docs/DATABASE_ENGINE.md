@@ -1,31 +1,43 @@
 # Database engine
 
-## Authority for PostgreSQL stacks
+## Authoritative views
 
-The committed, ordered PostgreSQL migration files plus supported working-tree migration changes are the declared source schema for both planned PostgreSQL stacks. The PostgreSQL dialect and migration convention are pinned by stack version. The Phase 04 Node starter uses `db/migrations/` and the `schema_migrations` checksum ledger. The Go adapter declares and verifies its own relative migration location in Phase 08. Studio reconstructs the supported schema from the ordered SQL. Portable `.factory/schema.json` stores diagram layout, stable metadata and supported modeling settings. It does not authorize DDL execution or override migration SQL.
+Ordered PostgreSQL migrations in the selected worktree define the declared source schema. The Node starter uses `db/migrations/NNNN_name.sql` and a `schema_migrations` ledger with SHA-256 of the exact UTF-8 source bytes.
 
-| View | Derivation | User-facing meaning |
+| View | Derivation | Meaning |
 | --- | --- | --- |
-| Declared source schema | Parse supported migration files in selected worktree order and record path, ID, and digest. | What this worktree declares. |
-| Pending migrations | Compare source migration IDs and digests to a trusted ledger in the explicitly selected database. | What this target has yet to apply. Until a ledger was read successfully, pending status is unknown. |
-| Actual database state | Opt-in read-only catalog introspection against the selected connection. | What currently exists physically. Comparison can reveal drift or an unknown migration history. |
+| Declared source | Ordered, locally parsed SQL, including supported external changes | What this worktree declares |
+| Applied and pending | Ordered source names and checksums compared with the selected database ledger | What the database recorded and what remains pending. A divergent ledger or incomplete source gives unknown status. |
+| Physical | Opt-in, read-only catalog snapshot for a single namespace, with observation time | What the inspected target actually contains |
 
-Track migration path, identity, ordering, checksum, and ledger state separately. Edited applied migrations, duplicate migration IDs, unknown history, and partially parsed SQL block automated apply for affected scopes. Display supported, incomplete, and unsupported coverage with source locations. PostgreSQL identifiers and types follow dialect rules. Unsupported statements remain inspectable and cannot be round-tripped through a lossy model.
+Diagram coordinates are stored separately in versioned, per-user Studio data keyed to the admitted worktree. Layout can move independently of the SQL and contains no connection settings. Schema publication is portable through the migrations. Sharing layouts is deferred.
 
-## Modeling and synchronization
+## Supported design and import
 
-Represent tables, columns and types, defaults, nullability, primary and foreign keys, constraints, and indexes. Use stable identifiers for diagram presentation and explicit rename intent. Visual editing proposes a new migration and a schema preview. SQL import parses and previews input without opening a live write connection. In Phase 05, persist a reviewed source change by adding a new migration through the Phase 04 journaled create path. Extend that path only as needed to create the new file safely in an existing project and preserve historical migrations. Editing existing application source and generating CRUD are Phase 06 work. ERD layout can be versioned independently of database credentials.
+The version 1 model supports up to 32 tables, 32 columns and 32 constraints or indexes per table. Database Studio offers a table inspector, independent ERD with zoom, pan and keyboard repositioning, SQL import into a draft, migration history, and a separate physical view. The New Project Wizard also supports DDL import and table editing.
 
-On rescan, rebuild the affected declared schema from current ordered migration files, invalidate stale generation plans, and report incompatible or incomplete input. For example, when a developer adds a supported table migration in VS Code, identify the new table and offer a separate plan for missing application components once Phase 06 is available. Preserve the original migration as the schema source and avoid emitting a duplicate. Apply the same rule when a Studio-authored migration has already been saved. Compare provenance so generated components can be matched to the correct schema revision. Switching branches refreshes the source view and invalidates cached pending results until the ledger is read again. A previous physical snapshot retains its connection and observation time and is marked stale for the new comparison. A branch switch never opens a write connection or applies migrations.
+| Area | Supported in Phase 05 |
+| --- | --- |
+| Types | `smallint`, `integer`, `bigint`, unconstrained `numeric`, `text`, `boolean`, `date`, `timestamp`, `timestamptz`, `uuid`, and `jsonb` |
+| Defaults | Bounded compatible literals, empty JSON stores, `CURRENT_DATE`, and `CURRENT_TIMESTAMP`. Timestamp values are normalized consistently for comparison. |
+| Keys | Primary and unique keys, including ordered composite keys. Same-namespace foreign keys to primary or unique columns of matching types. Supported delete actions are no action, restrict, cascade, and set null. |
+| Checks and indexes | A direct column or text-length comparison with a compatible literal, and plain ascending B-tree indexes. |
+| DDL | `CREATE TABLE`, plain `CREATE INDEX`, and `ALTER TABLE … ADD COLUMN/CONSTRAINT`. Exact bundled Phase 04 baseline and Welcome migrations have explicit recognition. |
 
-Introspection is opt-in and read-only. A schema comparison can produce a reviewed proposal. Importing introspection results into source requires an explicit generation plan. A difference may reflect out-of-band DDL, a different database, a modified migration, or incomplete parsing. Show these conditions before proposing changes.
+Use lowercase ASCII identifiers and explicit constraint names for portable comparisons. The parser locally interprets a bounded SQL subset and never executes imported text. SQL requiring runtime expressions, arbitrary functions, arrays, identity/serial, enum/domain definitions, precision modifiers, cross-schema references, quoted mixed-case names, column renames, destruction, or non-default storage/index options is unsupported. The source view reports the first unsupported statement and preserves the SQL for inspection. Detected catalog features outside the model produce diagnostics rather than a lossy source update.
 
-## Applying migrations
+## Migration publication and recovery
 
-Studio Phase 05 may apply explicitly reviewed, supported migrations to an approved disposable or local development database. The Node application has a standard standalone migration command from Phase 04. Show the target, migration order and file checksums, SQL, lock or data-loss risks, transaction behavior, and recovery prerequisites. Revalidate the selected target, permissions, ledger, and source checksums immediately before apply. Use least-privilege, independently stored credentials and parameterized catalog queries. Require an explicit destructive review for drops, risky rewrites, and destructive rollback. Production changes are managed through an explicitly authorized external release workflow with access policies, backups, and migration review. Studio never triggers them automatically.
+Drafts change proposed definitions only. Preview derives a deterministic additive migration. It orders tables and columns before keys, foreign keys, then indexes so mutual references can be planned. Existing columns and constraints cannot be removed or rewritten. An added required column on an existing table needs a default.
 
-Coordinate concurrent migration execution with a database lock and ledger. Recheck ledger state under the lock. Prefer a transactional migration where PostgreSQL supports it and record the ledger entry in the same transaction. Block unsupported non-transactional operations until a dedicated recovery design exists. A partially applied migration requires inspection and explicit resolution. Database backups, restores, and forward fixes are separate from Git checkpoints. Never describe a Git reset as database rollback.
+Native approval identifies the canonical destination and SHA-256. Main rechecks the worktree grant, Git refs, migration directory identity, source filename order, and fingerprints before committing a new file. Publication reuses the generator's exclusive staging and hard-link primitive. A local journal retains interrupted intent. Resume requires fresh native approval and the original base; handoff drops the local record and leaves every workspace file available for inspection. A pending publication blocks Studio Git operations that could change the worktree. Project reopen, refresh, and Git checkout read source only.
+
+## PostgreSQL inspection and development apply
+
+Introspection uses explicitly entered credentials, one native confirmation, bound catalog queries, and a read-only transaction. PostgreSQL versions 15–17 are admitted. Version 17 is the tested reference. Remote inspection requires verified TLS and uses the system trust settings available to Node. Studio clears the password after each request, does not retain credentials in its settings or metadata, and returns bounded errors. Catalog inspection does not propose or apply changes to the declared source.
+
+Development apply is restricted to loopback IPs and a database named `factory_dev_*` or the `factory_check` fixture database. Review the target, SQL, and checksums, then approve in a separate native confirmation. Even on loopback use a disposable or development-only instance and an appropriately scoped account. Studio checks the previously observed ledger, files, Git refs and physical schema again under the same advisory lock used by the starter. It applies recognized bundled migrations or canonical additive Studio migrations and verifies the final catalog and ledger before commit. Failure rolls back SQL and ledger entries. Differently formatted manual DDL can be inspected, compared, and applied using the standalone terminal workflow after review. Destructive, nontransactional and production changes remain in a separate reviewed release workflow. Git history is independent of database backup, restoration, and migration recovery.
 
 ## Verification
 
-Use disposable PostgreSQL databases and independent test credentials. Test composite keys, foreign keys, indexes, explicit renames, unsupported statements, manually authored migrations, dirty branch transitions, stale previews, drift, changed migration checksums, introspection permissions, and failed apply. Confirm schema edits, imports, scans, branch switches, and Git recovery leave the physical database unchanged unless the user separately approves a supported migration operation. See [Testing strategy](TESTING_STRATEGY.md).
+Use the [inventory DDL fixture](../tests/fixtures/inventory.sql) and disposable PostgreSQL schemas. Verify foreign keys, checks, exact checksums, stale source, drift, failed apply, and independent CRUD. Use [Testing strategy](TESTING_STRATEGY.md) for Linux, Windows, and native renderer evidence.
