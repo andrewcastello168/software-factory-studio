@@ -46,3 +46,8 @@ Use the [inventory DDL fixture](../tests/fixtures/inventory.sql) and disposable 
 ## Phase 06 migration handoff
 
 Generation Review uses supported checked-out migration files directly. It flags external files, preserves their sequence and checksums, and detects eligible tables that lack an API or page. Approval writes only the reviewed application files and metadata. The source, applied ledger, pending status and physical database retain their existing authorities. Unsupported DDL or edits to earlier schema sources block incremental generation until reviewed.
+
+
+## Phase 07 module migrations
+
+Bundled identity migrations are versioned DDL. The generator preserves previously applied files and appends reviewed module SQL to the current sequence when installing into a compatible project. The reserved factory_identity_ namespace cannot be used for generated business CRUD. Development apply still requires separate consent. Identity session, role, account, throttling and audit tables are internal infrastructure.
