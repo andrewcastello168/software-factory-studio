@@ -61,3 +61,9 @@ The transaction preserves verified originals in sibling backups until all review
 The library accepts typed data and bounded advisory text. It rejects unknown fields, executable metadata, common credential patterns, and unsafe branding values. Portable exports and project context contain the selected definitions, never runtime environment values. Review authored free text before sharing.
 
 Generated applications use scrypt-derived password hashes and database-backed, expiring sessions with token digests at rest. Login and administration use parameterized queries. Unsafe requests require the configured exact Origin. HTTPS mode accepts direct TLS or a trusted loopback proxy that overwrites forwarded protocol and client address. Local loopback HTTP requires explicit opt-in. Critical administration endpoints enforce role and bootstrap administrator boundaries before database writes. Audit coverage is described in the generated identity guide.
+
+## Phase 08 stack boundary
+
+Only the versioned built-in registry can dispatch a planner. Go does not accept Node executable module releases, untrusted commands or arbitrary output paths. Existing workspace, Git, link, junction, digest and recovery checks protect Go the same way as Node. Template generation and inspection execute no external tools. The verification runner executes generated fixtures separately under a pinned toolchain.
+
+The generated Go service defaults to loopback and no login. It uses bounded requests and deadlines, parameterized pgx queries, sanitized errors, and structured logs without credentials or request contents. Its migration command is separate and explicit. Set up appropriate TLS and access controls for nonlocal production deployment.

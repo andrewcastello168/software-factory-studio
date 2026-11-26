@@ -51,3 +51,7 @@ The incremental Vitest fixtures cover native Git staleness, external SQL, custom
 ## Phase 07 verification
 
 The same CI workflows run six standalone configurations including the full authenticated and incrementally installed reference applications. Verification uses separate PostgreSQL namespaces and generated credentials, tests credential and role boundaries through HTTP, and exercises protected browser pages. The native suite captures engineering profile publish and the exact wizard review using a disposable profile and controlled native confirmation.
+
+## Phase 08 generated Go checks
+
+`pnpm verify:starter` verifies the six Node MVP cases and the Go foundation and inventory cases. Supply the exact Go toolchain on PATH and select `FACTORY_STARTER_VARIANT=go-foundation` or `go-inventory` for a targeted check. The verifier checks Go hashes, formatting, vet, tests and build, frozen frontend dependencies and production assets, starts the generated binary, and exercises a disposable PostgreSQL namespace. It compares stack-specific locks with the same profile, checks migration rejection and rollback, and adds reviewed supplier CRUD without modifying custom service bytes. Use `FACTORY_STARTER_BROWSER=1` for the sandboxed generated web checks and `FACTORY_GO_SECURITY=1` with a pinned govulncheck binary for the Go scan. The Windows native suite captures the Technology Catalog and New Project Wizard.

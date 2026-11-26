@@ -82,7 +82,7 @@ Use `pnpm dev:web` for a separate Vite renderer preview at `http://127.0.0.1:448
 | `pnpm start` | Run the built desktop app through its production renderer origin |
 | `pnpm test:renderer` | Playwright tests against the built renderer with a test-only bridge and the browser development mode |
 | `pnpm test:electron` | Playwright flows through sandboxed Electron with disposable profiles, projects, and Git repositories |
-| `pnpm verify:starter` | Generate foundation, Welcome and inventory configurations, then verify standalone startup, migration and CRUD |
+| `pnpm verify:starter` | Generate the Node MVP and Go foundation and inventory configurations, then verify standalone startup, migration and CRUD |
 
 The [Windows verification workflow](.github/workflows/windows.yml) runs automatically on pull requests to `main`. It builds the application on Windows x64 and runs the renderer and native Electron suites. To reproduce those checks locally and open the built app on Windows x64:
 
@@ -119,3 +119,11 @@ Read [AGENTS.md](AGENTS.md) for repository instructions. Verify the checkout and
 | Scope, dependencies, and acceptance criteria | [Roadmap](docs/ROADMAP.md) |
 | Verification record for each phase | [Progress](docs/PROGRESS.md) |
 | Technical decisions and trade-offs | [Decisions](docs/DECISIONS.md) |
+
+## Create a Go project
+
+Choose **Go · Gin · React · Vite · PostgreSQL** in **New Project**, then review the Go Service v1 plan. Use Go 1.26.11, PostgreSQL 17, and Node.js 22.16.0 with pnpm 10.13.1 for the frontend build.
+
+From the generated project root, run `go mod download`, `go mod verify`, and `pnpm install --frozen-lockfile`. Set `DATABASE_URL` for your reviewed development database and run `go run -mod=readonly -buildvcs=false ./cmd/migrate` explicitly. Start `go run -mod=readonly -buildvcs=false ./cmd/server` and `pnpm dev:web` in separate terminals. Build with `pnpm build` and `go build -mod=readonly -buildvcs=false -o factory-server ./cmd/server`. Use `factory-server.exe` as the output name on Windows. The backend runtime requires the built binary and web assets, with configuration supplied by the process environment.
+
+The same advisory engineering profiles, Business Workspace branding, Database Studio, and schema-based CRUD are available to Go projects. Welcome and identity modules remain Node offerings. See the [stack compatibility matrix and SDK](docs/STACK_PLUGIN_SDK.md#built-in-sdk-v1).
