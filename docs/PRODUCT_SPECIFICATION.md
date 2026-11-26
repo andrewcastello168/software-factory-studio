@@ -63,7 +63,7 @@ Skip optional steps only when the current stack has no applicable choices. Keep 
 
 | Capability | Delivery status at Phase 00 |
 | --- | --- |
-| Full Stack with Node.js, TypeScript, Express, React, Vite, and PostgreSQL | First planned and gated vertical slice in Phase 04 |
+| Full Stack with Node.js, TypeScript, Express, React, Vite, and PostgreSQL | Phase 04 built-in full-stack starter |
 | Full Stack with Go, Gin, React, Vite, and PostgreSQL | Second planned and gated vertical slice in Phase 08 |
 | Generation for other combinations | Unsupported until implementation and verification |
 

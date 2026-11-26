@@ -87,3 +87,12 @@ Linux and macOS use nonrecursive watchers for a bounded set of inspected directo
 | Keep Git orchestration inside Electron main with existing workspace grants | The normal project explorer stays read-only. Native confirmation, a reviewed repository revision, and named commands give the renderer narrow access. Polling refreshes the current tab without adding long-lived Git handles that could obstruct moves on Windows. |
 | Scope the Git execution policy to standalone roots, public HTTPS, and separately admitted bare local remotes | Git configuration and attributes can delegate to external processes. A restricted config surface, inert hook path, and explicit argv preserve the product boundary at the cost of rejecting customized repositories, linked worktrees, private authentication, and custom transports until reviewed designs exist. |
 | Separate fetch from a verified fast-forward, and push a reviewed object to an explicit upstream | Remote-tracking fetch results can survive a refused local checkout. This yields an accurate partial outcome and leaves divergent or ignored work intact. No physical database action follows branch changes. |
+
+## Phase 04 decisions
+
+| Decision | Rationale and trade-off |
+| --- | --- |
+| Ship one Full-stack starter with Layered Web and Standard Engineering v1 | A single verified option exercises server, browser, documentation and PostgreSQL without a template library. Profile versions are portable and new Studio versions leave generated projects alone. |
+| Track the standalone lock and use Node's TypeScript development mode | Node 22.16.0 and pnpm 10.13.1 align with Studio. TypeScript 6 rewrites relative extensions for the production server build. The project needs no Studio runtime. |
+| Publish new files exclusively and record recovery in app data | Same-directory staged hard links avoid overwriting existing content. The wizard supports absent destinations on filesystems with hard links. Recovery is resume or manual handoff, and avoids deletions of user files. |
+| Verify file bytes in Studio and run code separately | A successful generation does not execute scripts or connect to a database. Platform workflow fixtures install, run, build and verify the generated app with their own disposable PostgreSQL databases. |

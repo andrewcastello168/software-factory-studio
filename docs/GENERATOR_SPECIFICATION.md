@@ -39,3 +39,17 @@ Initial outputs include normal application source, build scripts, lockfiles, env
 ## Phase 04 project instructions
 
 The first stack plan includes an ordinary `AGENTS.md` and README with the supported commands, layout, local configuration keys without values, ownership rules, and reviewed migration workflow. Generate them deterministically from the pinned stack profile. Preview their paths and changes and apply the same collision, stale review, and recovery rules as source files. Existing user instructions remain owned by their author unless the reviewed plan identifies an authorized edit. An AI provider, runtime agent, and executable project context are outside this scope.
+
+## Phase 04 implementation decisions
+
+The initial wizard authorizes one absent child of a native-selected parent outside an existing Git worktree. Existing folders, Git initialization and incremental edits are separate operations. The immutable plan binds one explicit project UUID, normalized name, folder/package slug, API port, the selected built-in profile versions, and exact file bytes. Main retains the plan and consumes the opaque approval token. The native confirmation identifies the target and SHA-256 digest. Every intended write is create-only.
+
+The portable descriptor identifies the project and stack. The version lock records the built-in template digest, the Layered Web architecture profile and Standard Engineering profile versions. The manifest records the exact SHA-256 of all baseline outputs except itself. The reviewed plan digest and final read-back also cover the manifest.
+
+Before writing, main flushes an app-data recovery record containing the approved plan identity and destination grant. It creates each directory exclusively, stores its identity, stages each file in its checked destination directory, flushes the staged bytes, and publishes with a same-filesystem hard link that fails if the target exists. After read-back, Studio removes the staged name and checkpoints progress. The final verification compares all names and bytes before closing the journal. Hard-link support is required on the destination filesystem.
+
+Recovery requires native reselection of the original parent and explicit approval after a restart. Studio verifies recorded directory identities and regenerates the exact reviewed plan. It preserves conflicts and incomplete or ambiguous staging files for manual review. Phase 04 offers resume and manual handoff. It has no deletion or rollback command. Overlapping Git writes are blocked while the journal is pending.
+
+Linux anchors file operations to an opened directory via procfs. Windows uses opened directory identity and checks canonical paths around native operations, with exclusive file publication and verification. These checks detect changed paths and refuse recovery against replacement directories. On platforms without descriptor-relative writes in Node, the path check and syscall retain a same-user concurrency window. A Windows native sandbox or handle-relative write API would be required to isolate actively racing desktop processes.
+
+Desktop verification covers file integrity and successful admission. Installs, tests, application startup and database commands run independently in disposable fixtures and in the user's terminal. The wizard never installs dependencies, starts the project or connects to its database.
