@@ -239,3 +239,13 @@ The subsequent Windows run exposed scheduling timeouts in two existing native fi
 The Linux cloud regression passed 94 Vitest checks, 11 Chromium renderer checks, and 10 sandboxed Electron cases. All eight standalone Node.js and Go configurations passed PostgreSQL and Chromium verification. pnpm and Go advisory checks passed. The opt-in Linux public HTTPS clone test reached a direct DNS restriction for `github.com`; studio intentionally disables ambient Git configuration and proxies for that transport. The Windows CI workflow exercises public HTTPS separately.
 
 The first complete Windows run reached the generated inventory application's Vite production build and exposed an NTFS short-path alias mismatch for the additional HTML input. The generator now derives the Vite root and all inputs from the same native canonical path. Vite readiness markers also ignore console color sequences. The subsequent platform runs retain the same real PostgreSQL, browser and Electron checks.
+
+## Phase 11 · Engineering standards, collaboration and release
+
+The isolated task branch is based on `5492acd`. PR #13 and its verified Phase 10 implementation are included.
+
+- P11-01 and P11-02 use existing generator, Git and runtime inspection. The native Electron reference exercises inspected locks, a real failed test, a passing rerun, and stale evidence after a source edit.
+- P11-03 uses two disposable linked Git worktrees and separate library profiles. Verified exact profile and template sharing, immutable version retention, idempotent import, differentiated client branding, and rejection of corrupted bundle bytes. The generated CI checks use those imported definitions in the starter regression workflow.
+- P11-04 exercises create-only CI and Docker configuration generation with the existing journal. The standalone script supports optional Docker verification with a disposable Compose database.
+- P11-05 verified that the Node.js archive extracts, installs frozen production dependencies, and runs health and readiness against disposable PostgreSQL without Studio. The release test also verifies SHA-256, stale source rejection, missing output, and recreation of the exact archive. The Go reference runs the same checks with native executables.
+- P11-06 records artifact and quality evidence locally. Check the Phase 11 pull request for final Linux and Windows x64 workflow evidence.

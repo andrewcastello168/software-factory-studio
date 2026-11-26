@@ -155,3 +155,11 @@ Use the pinned adapter's development commands and direct argv with session-scope
 ### Data-only design and one owned page entry
 
 Store API, page, requirements and workflow designs in a versioned worktree document. Derive implementation signals from the pinned generation manifest and actual source files. Scope the first reviewed React extension to an unauthenticated Node Business Workspace with a second Vite entry and reusable branded layout. This keeps its integration independent of existing React routing and avoids replacing custom pages or controller code. Later extensions can introduce versioned authenticated routes and reviewed component composition.
+
+## Phase 11 · Client delivery and version sharing
+
+Use the existing incremental review and append only known deployment and CI files. Existing custom files block template publication. Pin container bases by manifest digest and keep migration execution separate from startup.
+
+Run Quality Center jobs through the developer command policy. Keep worktree-scoped evidence local and bind it to Git, source and configuration bytes. Publish a portable USTAR artifact from a clean revision with current passing checks and matching build outputs. Node packages use the locked production dependency install and Go packages carry native binaries. Explicit provider publication and desktop packaging remain separate tasks.
+
+Share canonical content-addressed asset bundles using Git with exact asset and compatibility digests. Built-in module and stack metadata remain references to code shipped by Studio. This preserves a local workflow without expanding the importer into an executable plugin system.

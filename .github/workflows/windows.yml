@@ -16,7 +16,7 @@ jobs:
   windows-x64:
     name: Windows x64
     runs-on: windows-2025
-    timeout-minutes: 15
+    timeout-minutes: 22
     defaults:
       run:
         shell: pwsh
@@ -114,6 +114,7 @@ jobs:
             apps/desktop/test-results/**/database-studio-*.png
             apps/desktop/test-results/**/generation-review-*.png
             apps/desktop/test-results/**/developer-*.png
+            apps/desktop/test-results/**/delivery-*.png
             apps/desktop/test-results/**/engineering-library-*.png
             apps/desktop/test-results/**/technology-catalog-*.png
           retention-days: 7
