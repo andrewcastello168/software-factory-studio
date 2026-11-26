@@ -33,39 +33,6 @@ jobs:
           node-version-file: .node-version
           architecture: x64
 
-      - name: Diagnose Windows stat identity
-        run: |
-          @'
-          const fs = require('node:fs/promises');
-          const os = require('node:os');
-          const path = require('node:path');
-          (async () => {
-            const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'factory-stat-'));
-            const file = path.join(directory, 'preferences.json');
-            const summarize = (stats) => ({
-              file: stats.isFile(),
-              dev: stats.dev.toString(16),
-              ino: stats.ino.toString(16),
-              birthtime: stats.birthtimeNs.toString(16)
-            });
-            try {
-              await fs.writeFile(file, '{}');
-              const handle = await fs.open(file, 'r');
-              try {
-                console.log('FACTORY_STAT', JSON.stringify({
-                  lstat: summarize(await fs.lstat(file, {bigint: true})),
-                  stat: summarize(await fs.stat(file, {bigint: true})),
-                  fstat: summarize(await handle.stat({bigint: true})),
-                }));
-              } finally {
-                await handle.close();
-              }
-            } finally {
-              await fs.rm(directory, {recursive: true, force: true});
-            }
-          })().catch((error) => { console.error(error); process.exitCode = 1; });
-          '@ | node
-
       - name: Install pinned pnpm
         run: |
           $packageManager = (Get-Content package.json -Raw | ConvertFrom-Json).packageManager
