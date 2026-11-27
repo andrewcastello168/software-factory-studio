@@ -97,7 +97,7 @@ export function DeveloperWorkspace({ project, signal, openTable }: { project: Op
   const handoff = (action: Handoff['action']) => void run('Opening…', () => bridge.handoff({
     projectId: project.id, action, path: action === 'choose-editor' ? null : target || null,
     line: action === 'editor' && target && line ? Number(line) : null,
-    column: action === 'editor' && target && column ? Number(column) : null,
+    column: action === 'editor' && target && line && column ? Number(column) : null,
   }), (ok) => { if (ok) setNotice(action === 'choose-editor' ? 'VS Code approved for this Studio window.' : 'Sent to the desktop.'); });
   const controls = (id: string, action: 'stop' | 'open' | 'clear') => void run('Updating process…',
     () => bridge.control({ projectId: project.id, id, action }), () => void refreshLogs());
@@ -134,7 +134,10 @@ export function DeveloperWorkspace({ project, signal, openTable }: { project: Op
             {project.entries.filter(({ kind, path }) => kind !== 'link' && !path.startsWith('.factory/') && path !== '.factory')
               .slice(0, 900).map(({ path }) => <option key={path} value={path}>{path}</option>)}
           </select></label>
-          <label>Line <input type="number" min="1" value={line} onChange={(event) => setLine(event.target.value)} disabled={!project.entries.some(({ kind, path }) => kind === 'file' && path === target)} /></label>
+          <label>Line <input type="number" min="1" value={line} onChange={(event) => {
+            setLine(event.target.value);
+            if (!event.target.value) setColumn('');
+          }} disabled={!project.entries.some(({ kind, path }) => kind === 'file' && path === target)} /></label>
           <label>Column <input type="number" min="1" value={column} onChange={(event) => setColumn(event.target.value)} disabled={!line} /></label>
         </div>
         <div className="dev-actions">

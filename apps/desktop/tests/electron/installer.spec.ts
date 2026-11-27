@@ -20,7 +20,16 @@ test('installer lifecycle uses the installed archive and retains real local data
     await writeFile(custom, 'Client work survives Studio maintenance.\n', { flag: 'wx' });
   }
 
-  const instance = await launchStudio();
+  const restrictedTools = lifecycle === 'restricted-tools';
+  const environment = { ...process.env };
+  if (restrictedTools) {
+    // Preserve the normal Windows profile while removing the locations the Studio probe uses.
+    for (const name of Object.keys(environment)) {
+      if (/^(path|programfiles(?:\(x86\))?|programw6432)$/iu.test(name)) delete environment[name];
+    }
+    environment.PATH = join(process.env.SystemRoot!, 'System32');
+  }
+  const instance = await launchStudio(undefined, environment);
   try {
     const page = await instance.firstWindow();
     await expect(page).toHaveURL('studio://app/');
@@ -77,10 +86,15 @@ test('installer lifecycle uses the installed archive and retains real local data
       await page.getByText('Getting started', { exact: true }).press('Enter');
       await page.getByRole('button', { name: 'Check developer tools' }).click();
       const toolchain = page.getByLabel('Detected developer tools');
-      await expect(toolchain).toContainText(/Git\s*\d+\.\d+\.\d+/u);
-      await expect(toolchain).toContainText(/Node\.js\s*22\.16\.0/u);
-      await expect(toolchain).toContainText('pnpm');
-      await expect(toolchain).toContainText('Go');
+      if (restrictedTools) {
+        await expect(toolchain.getByText('Not detected', { exact: true })).toHaveCount(4);
+        await expect(page.getByRole('button', { name: 'New Project', exact: true })).toBeEnabled();
+      } else {
+        await expect(toolchain).toContainText(/Git\s*\d+\.\d+\.\d+/u);
+        await expect(toolchain).toContainText(/Node\.js\s*22\.16\.0/u);
+        await expect(toolchain).toContainText(/pnpm\s*10\.13\.1/u);
+        await expect(toolchain).toContainText(/Go\s*1\.26\.11/u);
+      }
       await page.screenshot({ path: test.info().outputPath(`installed-home-${lifecycle}.png`) });
       await page.getByRole('button', { name: 'View engineering standards' }).click();
       await expect(page.getByRole('region', { name: 'Engineering Profiles' })).toContainText('Installer fixture profile');

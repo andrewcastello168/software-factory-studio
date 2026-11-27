@@ -15,6 +15,9 @@ concurrency:
 jobs:
   windows-installer:
     name: Install and verify Windows x64 RC
+    permissions:
+      contents: read
+      actions: read
     runs-on: windows-2025
     timeout-minutes: 28
     defaults:
@@ -54,12 +57,10 @@ jobs:
       - name: Compile production application
         run: pnpm build
 
-      - name: Build unsigned candidate and compatible upgrade fixture
+      - name: Build unsigned candidate and verify provenance
         run: |
           pnpm package:windows
           if ($LASTEXITCODE -ne 0) { throw 'Candidate packaging failed.' }
-          pnpm package:windows --upgrade-fixture
-          if ($LASTEXITCODE -ne 0) { throw 'Upgrade fixture packaging failed.' }
           $release = 'apps/desktop/dist/windows-release'
           $evidence = Get-Content "$release/build-evidence.json" -Raw | ConvertFrom-Json
           $installer = Join-Path $release $evidence.artifact
@@ -73,17 +74,49 @@ jobs:
           $evidence | Add-Member -NotePropertyName windowsVersion -NotePropertyValue ([Environment]::OSVersion.VersionString)
           $evidence | ConvertTo-Json -Depth 4 | Set-Content "$release/build-evidence.json"
           $evidence | ConvertTo-Json -Depth 4 | Write-Output
-          foreach ($bundle in @('main', 'preload', 'renderer')) {
-            Move-Item -Path "apps/desktop/dist/$bundle" -Destination (Join-Path $env:RUNNER_TEMP "studio-unpackaged-$bundle")
-          }
 
       - name: Install, upgrade, uninstall and reinstall Studio
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $release = 'apps/desktop/dist/windows-release'
           $evidence = Get-Content "$release/build-evidence.json" -Raw | ConvertFrom-Json
           $candidate = Join-Path $release $evidence.artifact
-          $previous = 'apps/desktop/dist/upgrade-fixture/Software-Factory-Studio-1.0.0-rc.0-windows-x64.exe'
-          ./scripts/verify-windows-installer.ps1 -Candidate $candidate -Previous $previous -DisposableAccount
+          $historicalArtifact = 15173153152
+          $expires = [DateTimeOffset]::Parse('2026-12-27T04:47:55Z')
+          if ([DateTimeOffset]::UtcNow -lt $expires) {
+            $baseline = Join-Path $env:RUNNER_TEMP 'studio-rc1'
+            $previousVersion = '1.0.0-rc.1'
+            $uri = "$env:GITHUB_API_URL/repos/andrewcastello168/software-factory-studio/actions/artifacts/$historicalArtifact/zip"
+            # PowerShell drops Authorization when following the redirect to the artifact storage host.
+            Invoke-WebRequest -Uri $uri -Headers @{ Authorization = "Bearer $env:GH_TOKEN" } -TimeoutSec 180 -OutFile "$baseline.zip"
+            if ((Get-FileHash "$baseline.zip").Hash -ne 'd7655f8760723b5b6247c6f95fcefd50cb1a2456ba437a8a651e7e3a0bb9e247') {
+              throw 'The archived RC ZIP does not match the pinned checksum.'
+            }
+            Expand-Archive -LiteralPath "$baseline.zip" -DestinationPath $baseline
+            $previous = Join-Path $baseline 'Software-Factory-Studio-1.0.0-rc.1-windows-x64.exe'
+            if ((Get-FileHash $previous).Hash -ne '008fb64edfd846d5b72d402343ab7487d46cbc419234cc6598522c69ed00a7df') {
+              throw 'The rc.1 installer does not match the pinned checksum.'
+            }
+            $upgrade = 'historical-rc-1'
+          } else {
+            # Earlier workflow artifacts expire. Keep the installer lifecycle check and label its limited scope.
+            Remove-Item Env:GH_TOKEN
+            pnpm package:windows --upgrade-fixture
+            if ($LASTEXITCODE -ne 0) { throw 'Upgrade fixture packaging failed.' }
+            $previous = 'apps/desktop/dist/upgrade-fixture/Software-Factory-Studio-1.0.0-rc.0-windows-x64.exe'
+            $previousVersion = '1.0.0-rc.0'
+            $upgrade = 'same-source-fixture'
+          }
+          Remove-Item Env:GH_TOKEN -ErrorAction SilentlyContinue
+          foreach ($bundle in @('main', 'preload', 'renderer')) {
+            Move-Item "apps/desktop/dist/$bundle" (Join-Path $env:RUNNER_TEMP "studio-unpackaged-$bundle")
+          }
+          ./scripts/verify-windows-installer.ps1 -Candidate $candidate -Previous $previous -PreviousVersion $previousVersion -DisposableAccount
+          $evidence | Add-Member -NotePropertyName upgrade -NotePropertyValue $upgrade
+          $evidence | Add-Member -NotePropertyName previousVersion -NotePropertyValue $previousVersion
+          $evidence | ConvertTo-Json -Depth 4 | Set-Content "$release/build-evidence.json"
+          Write-Output "Installer upgrade verified from $previousVersion ($upgrade)."
 
       - name: Install Playwright Chromium
         run: pnpm --filter @factory/desktop exec playwright install chromium

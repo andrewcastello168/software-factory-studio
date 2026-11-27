@@ -53,6 +53,7 @@ interface Job {
   child?: ChildProcess | undefined;
   secrets: string[];
   stop?: (() => Promise<void>) | undefined;
+  stopping?: Promise<void> | undefined;
   done: Promise<void>;
   finish(): void;
 }
@@ -525,7 +526,12 @@ export class DeveloperStudio {
     }
   }
 
-  async #stop(job: Job) {
+  #stop(job: Job) {
+    job.stopping ??= this.#stopAndWait(job).finally(() => { job.stopping = undefined; });
+    return job.stopping;
+  }
+
+  async #stopAndWait(job: Job) {
     const previous = job.process.state;
     job.process.state = 'stopping';
     try { await job.stop?.(); }
@@ -635,8 +641,8 @@ export class DeveloperStudio {
     await Promise.allSettled([...this.#jobs].map(async ([key, job]) => {
       try { await this.#guard(job.projectId, job.root); }
       catch {
-        if (['starting', 'running'].includes(job.process.state)) await this.#stop(job);
-        this.#jobs.delete(key);
+        if (job.stopping || ['starting', 'running', 'stopping'].includes(job.process.state)) await this.#stop(job);
+        if (this.#jobs.get(key) === job) this.#jobs.delete(key);
       }
     }));
   }

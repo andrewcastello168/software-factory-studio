@@ -3,7 +3,7 @@
 ## Install and launch
 
 1. In the repository's **Actions** tab, open a successful **Windows installer verification** run for the reviewed source commit. Download **software-factory-studio-windows-x64-rc** under **Artifacts** and extract the ZIP.
-2. Compare the installer SHA-256 with the accompanying `.sha256` file and `build-evidence.json`. Run `Get-FileHash .\Software-Factory-Studio-1.0.0-rc.1-windows-x64.exe -Algorithm SHA256` in PowerShell from the extracted folder.
+2. Compare the installer SHA-256 with the accompanying `.sha256` file and `build-evidence.json`. Run `Get-FileHash .\Software-Factory-Studio-1.0.0-rc.2-windows-x64.exe -Algorithm SHA256` in PowerShell from the extracted folder.
 3. In an authorized internal test environment, open the installer as your usual Windows user and select the current-user installation. Follow your organization's Windows policy for unsigned software. The release candidate may show a SmartScreen or unknown publisher warning.
 4. Launch **Software Factory Studio** from Start. You can pin it or manually create a desktop shortcut. The installer creates only the Start Menu shortcut.
 

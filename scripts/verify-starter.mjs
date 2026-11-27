@@ -133,7 +133,7 @@ async function inventoryBrowser(page, incremental) {
   await updated.waitFor({ state: 'hidden' });
 }
 
-async function addSuppliers(fixture, go) {
+async function verifyIncrementalCrud(fixture, go, table = 'suppliers') {
   const { IncrementalStudio } = await vite.ssrLoadModule('/apps/desktop/src/main/services/incremental/studio.ts');
   const { IncrementalStore } = await vite.ssrLoadModule('/apps/desktop/src/main/services/incremental/storage.ts');
   const { admitRoot } = await vite.ssrLoadModule('/apps/desktop/src/main/services/projects/filesystem.ts');
@@ -141,8 +141,12 @@ async function addSuppliers(fixture, go) {
   const rootGrant = await admitRoot(fixture);
   const userData = await mkdtemp(join(tmpdir(), 'studio-incremental-profile-'));
   const projectId = randomUUID();
-  const migration = await readFile(resolve(root, 'tests/fixtures/suppliers.sql'), 'utf8');
-  const migrationPath = join(fixture, 'db/migrations/0003_suppliers.sql');
+  const contacts = table === 'supplier_contacts';
+  const migration = contacts
+    ? 'CREATE TABLE supplier_contacts (id integer PRIMARY KEY, supplier_id integer NOT NULL REFERENCES suppliers (id), name text NOT NULL);\n'
+    : await readFile(resolve(root, 'tests/fixtures/suppliers.sql'), 'utf8');
+  const migrationName = contacts ? '0006_supplier_contacts.sql' : '0003_suppliers.sql';
+  const migrationPath = join(fixture, 'db', 'migrations', migrationName);
   const service = go ? 'internal/records/service.go' : 'server/features/crud/service.ts';
   const servicePath = join(fixture, service);
   const custom = (await readFile(servicePath, 'utf8')) + '\n// Existing inventory approval policy.\n';
@@ -163,7 +167,7 @@ async function addSuppliers(fixture, go) {
       const original = await readFile(entrypoint, 'utf8');
       await writeFile(entrypoint, original + '\n// Local routing policy.\n');
       const revision = verified(await studio.inspect(projectId)).revision;
-      const conflict = verified(await studio.preview({ projectId, revision, backend: ['suppliers'], frontend: ['suppliers'] }));
+      const conflict = verified(await studio.preview({ projectId, revision, backend: [table], frontend: [table] }));
       assert(conflict.changes.some(({ path, action }) => path === 'internal/httpapp/http.go' && action === 'conflict'));
       assert.equal((await studio.action({ projectId, id: conflict.id }, 'apply')).ok, false);
       const incompatible = verified(await studio.preview({ projectId, revision, backend: [], frontend: [],
@@ -173,8 +177,8 @@ async function addSuppliers(fixture, go) {
       await writeFile(entrypoint, original);
     }
     const inspected = verified(await studio.inspect(projectId));
-    const select = { projectId, revision: inspected.revision, backend: ['suppliers'], frontend: ['suppliers'] };
-    assert(inspected.sources.some(({ name, external }) => name === '0003_suppliers.sql' && external));
+    const select = { projectId, revision: inspected.revision, backend: [table], frontend: [table] };
+    assert(inspected.sources.some(({ name, external }) => name === migrationName && external));
     const review = verified(await studio.preview(select));
     assert.deepEqual(review.issues, []);
     assert(review.changes.some(({ path, action }) => path === service && action === 'protected'));
@@ -307,7 +311,7 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
       assert.equal((await fetch(url + '/api/crud/suppliers')).status, 404);
       await stop(server);
       server = undefined;
-      await addSuppliers(fixture, go);
+      await verifyIncrementalCrud(fixture, go);
     }
     if (identity === 'installed') {
       if (database) run('db:migrate');
@@ -437,6 +441,33 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
       server = undefined;
       await verifyDeveloper(vite, fixture, env, developmentPort);
     }
+    if (plan.fromInstalled) {
+      await stop(server);
+      server = undefined;
+      await verifyIncrementalCrud(fixture, go, 'supplier_contacts');
+      if (go) {
+        goCommand(['test', '-mod=readonly', './...']);
+        buildGo();
+      } else run('test');
+      run('build');
+      migrate();
+      assert.equal((await client.query('SELECT to_regclass($1) AS name', [schema + '.supplier_contacts'])).rows[0].name,
+        schema + '.supplier_contacts');
+      server = go ? launch() : spawn(process.execPath, ['dist/server/server.js'], { cwd: fixture, env, stdio: 'inherit' });
+      await ready(server, url + '/api/health');
+      const headers = {};
+      if (identity) {
+        const session = await fetch(url + '/api/auth/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Origin: url }, body: JSON.stringify(fixtureIdentity),
+        });
+        assert.equal(session.status, 200);
+        headers.Cookie = session.headers.get('set-cookie').split(';')[0];
+      }
+      const records = await fetch(url + '/api/crud/supplier_contacts', { headers });
+      assert.equal(records.status, 200);
+      assert.deepEqual((await records.json()).data.rows, []);
+      console.log('Installed reference verified a later manual migration and reviewed CRUD while preserving custom source.');
+    }
     if (delivery) {
       await stop(server);
       server = undefined;
@@ -471,7 +502,7 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
     }
     if (client) {
       const { rows } = await client.query('SELECT table_name FROM information_schema.tables WHERE table_schema = $1 ORDER BY table_name', [schema]);
-      const expected = ['schema_migrations', ...(demo ? ['welcome_messages'] : []), ...(inventory ? plan.config.crud.schema.tables.map(({ name }) => name) : []), ...(incremental ? ['suppliers'] : [])];
+      const expected = ['schema_migrations', ...(demo ? ['welcome_messages'] : []), ...(inventory ? plan.config.crud.schema.tables.map(({ name }) => name) : []), ...(incremental ? ['suppliers'] : []), ...(plan.fromInstalled ? ['supplier_contacts'] : [])];
       if (identity) {
         expected.push('factory_identity_users', 'factory_identity_sessions', 'factory_identity_attempts');
         if (identity === 'full') expected.push('factory_identity_roles', 'factory_identity_role_permissions', 'factory_identity_user_roles', 'factory_identity_audit');
@@ -523,7 +554,7 @@ try {
         return output;
       }));
       console.log('Verifying standalone files emitted by the installed Studio: ' + kind);
-      await verify({ config, files }, false, true, false, go ? undefined : 'full', AUTHENTICATION, go, false, !go);
+      await verify({ config, files, fromInstalled: true }, false, true, false, go ? undefined : 'full', AUTHENTICATION, go, false, true);
     }
   } else {
     const profile = { kind: 'profile', id: randomUUID(), version: 2, name: 'Client delivery', advice: { Testing: 'Use disposable PostgreSQL schemas.' } };
