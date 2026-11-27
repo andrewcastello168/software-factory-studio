@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { createServer } from 'node:net';
+import { once } from 'node:events';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
@@ -60,9 +61,10 @@ describe('developer workspace native operations', () => {
 
       const serverPath = join(first, 'server', 'server.ts');
       await writeFile(serverPath, `
+import { writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 const port = Number(process.env.PORT);
-createServer((req, res) => {
+const server = createServer((req, res) => {
   res.setHeader('content-type', 'application/json');
   if (req.url?.startsWith('/api/redirect')) { res.writeHead(302, { location: 'http://169.254.169.254/' }); res.end('moved'); return; }
   if (req.url?.startsWith('/api/oversized')) { res.end('x'.repeat(170000)); return; }
@@ -70,6 +72,10 @@ createServer((req, res) => {
 }).listen(port, '127.0.0.1', () => {
   console.log(JSON.stringify({ event: 'listening', port }));
   console.error('password=fixture-password');
+});
+if (process.platform !== 'win32') process.once('SIGTERM', () => {
+  writeFileSync('stopping.fixture', 'signal received');
+  setTimeout(() => server.close(() => writeFileSync('stopped.fixture', 'server closed')), 1200);
 });
 `);
       expect(await service.start({ projectId: id, id: beforeEdit.value.id })).toEqual({ ok: false, error: 'DEVELOPER_STALE' });
@@ -118,8 +124,23 @@ createServer((req, res) => {
       expect(await service.handoff({ ...input, projectId: id, path: 'server/server.ts' })).toEqual({ ok: true, value: true });
       expect(reveal).toHaveBeenCalledWith(serverPath);
 
-      expect(await service.control({ projectId: id, id: approved.value.id, action: 'stop' })).toEqual({ ok: true, value: true });
-      expect(await service.logs(id)).toMatchObject({ ok: true, value: [{ process: { state: 'stopped' } }] });
+      const stopping = service.control({ projectId: id, id: approved.value.id, action: 'stop' });
+      if (process.platform !== 'win32') {
+        try {
+          await expect.poll(() => readFile(join(first, 'stopping.fixture'), 'utf8').catch(() => null), { interval: 10 })
+            .toBe('signal received');
+          await service.dispose();
+          expect(await readFile(join(first, 'stopped.fixture'), 'utf8')).toBe('server closed');
+          const reusable = createServer();
+          reusable.listen(port, '127.0.0.1');
+          await once(reusable, 'listening');
+          await new Promise<void>((resolve) => reusable.close(() => resolve()));
+        } finally { await stopping; }
+      } else {
+        expect(await stopping).toEqual({ ok: true, value: true });
+        expect(await service.logs(id)).toMatchObject({ ok: true, value: [{ process: { state: 'stopped' } }] });
+      }
+      expect(await stopping).toEqual({ ok: true, value: true });
       grants.delete(id);
       await service.reconcile();
       expect(await service.logs(id)).toEqual({ ok: false, error: 'ACCESS_DENIED' });

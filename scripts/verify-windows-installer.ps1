@@ -2,6 +2,7 @@
 param(
     [Parameter(Mandatory)][string]$Candidate,
     [Parameter(Mandatory)][string]$Previous,
+    [Parameter(Mandatory)][string]$PreviousVersion,
     [switch]$DisposableAccount
 )
 
@@ -69,8 +70,8 @@ New-Item -Path $fixture -ItemType Directory | Out-Null
 $version = (Get-Content apps/desktop/package.json -Raw | ConvertFrom-Json).version
 try {
     Invoke-Installer $Previous '/S /currentuser'
-    $null = Assert-Installed '1.0.0-rc.0'
-    Invoke-InstalledSmoke 'seed' '1.0.0-rc.0'
+    $null = Assert-Installed $PreviousVersion
+    Invoke-InstalledSmoke 'seed' $PreviousVersion
     $paths = @('preferences.json', 'recent-projects.json', 'engineering-library.json')
     $hashes = @{}
     foreach ($path in $paths) { $hashes[$path] = (Get-FileHash (Join-Path $profile $path)).Hash }
@@ -107,6 +108,7 @@ try {
     Invoke-Installer $Candidate '/S /currentuser'
     $null = Assert-Installed $version
     Invoke-InstalledSmoke 'after-uninstall' $version
+    Invoke-InstalledSmoke 'restricted-tools' $version
 } finally {
     Remove-Item Env:FACTORY_INSTALL_LIFECYCLE, Env:FACTORY_INSTALL_FIXTURE, Env:FACTORY_INSTALL_VERSION -ErrorAction SilentlyContinue
 }

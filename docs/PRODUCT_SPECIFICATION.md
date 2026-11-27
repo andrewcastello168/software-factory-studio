@@ -18,25 +18,23 @@ Phase 07 adds reusable context profiles for architecture guidance, module conven
 
 The global scope owns reusable assets, settings, and project entry points. Project scope owns work for the selected directory. Scope, working directory, branch, and working tree status stay visible so a user can tell where an action will run. A scan that cannot establish branch or status displays its actual state.
 
-| Scope | Area | Destinations |
-| --- | --- | --- |
-| Global | Workspace | Home, Projects, Recent Projects, New Project, Open Folder, Clone Repository |
-| Global | Factory Library | Technology Catalog, Architecture Library, Template Studio, Module Library, Component Library, Plugin Manager |
-| Global | Organization | Team Workspace, Engineering Standards, Settings |
-| Project | Project | Overview, Project Structure, Requirements |
-| Project | Application Engineering | Database Studio, Module Manager, API Designer, Page Builder, Appearance, Business Workflows |
-| Project | Development | Source Code, Git Studio, Generation Review, Run & Debug, API Playground, Terminal, Logs |
-| Project | Quality and Release | Testing, Project Inspector, Environment Manager, Deployment, Release Manager |
-| Project | Management | Project History, Recovery Center, Project Settings |
+| Scope | Current destinations |
+| --- | --- |
+| Global workspace | Home, Projects, Recent Projects, New Project, Open Folder, Clone Repository |
+| Global library | Technology Catalog, Architecture Library, Template Studio, Module Library, AI Context, Engineering Standards |
+| Global preferences | Settings |
+| Active project | Overview, Project Structure, Git Studio, Database Studio, Generation Review |
+| Developer Tools | Runtime, API Designer, API Playground, Page Designer, Requirements |
+| Client Delivery | Project Inspector, Quality Center, Shared Library, Deployment, Release Center, Project History |
 
-Navigation is driven by capabilities and context. Keep Overview, Project Structure, Git Studio, and generation entry points near primary project navigation. Prefer an external editor handoff for ordinary editing. Group branch tools in Git Studio, file and generation recovery in Recovery Center, and release controls in Release Manager. Retain Page Builder and API Designer as later stack-specific extensions. Full IDE parity and sophisticated visual page authoring have lower priority than templates, modules, and generation safety. Give unknown projects a read-only inspection path and explain why generation is unsupported when the user reaches that context. Show only usable commands in the command palette and sidebar. The roadmap defines when each destination becomes available.
+Some project views require a managed stack or a usable worktree. The selected worktree determines Git and generation scope. Source editing opens in a configured external editor. Component Library, Plugin Manager and Team Workspace are planned. The implemented page publisher supports a single optional Business Workspace page on an unauthenticated Node project. Follow the [audit matrix](FINAL_PRODUCT_AUDIT.md#capability-matrix) for observed capabilities and limitations.
 
 ## Project lifecycle
 
 | User action | Product behavior |
 | --- | --- |
-| Open Folder | Use the native chooser, admit the selected directory to the session, and read a bounded snapshot. Opening an unsupported project still enables inspection when that feature is delivered. |
-| New Project | Run the wizard against one enabled stack. Choose an empty directory or a new child under a parent selected through the native dialog. Preview and approve the resolved destination and deterministic plan. |
+| Open Folder | Use the native chooser, admit the selected directory to the session, and read a bounded snapshot. Opening an unsupported project still enables bounded filesystem inspection. |
+| New Project | Select one of the enabled full-stack adapters. Choose a parent through the native dialog. Studio verifies a vacant new child directory. Preview and approve the resolved destination and deterministic plan. |
 | Clone Repository | Ask for the remote and destination, confirm the operation, and admit the resulting directory only after clone succeeds. Phase 03 supports public HTTPS and explicitly selected local bare repositories. Review the exact source and a new child folder under a natively selected parent. |
 | Reopen Recent | Reopen the actual directory by reference. If it is gone, offer Locate or Remove from Recents. An identity mismatch during Locate requires an explicit choice. |
 | Rescan | Reconcile changes from native watchers and manual refresh. Refresh the snapshot on focus or watcher loss. External changes make affected previews stale. |
@@ -61,10 +59,10 @@ Skip optional steps only when the current stack has no applicable choices. Keep 
 
 ## Technology delivery
 
-| Capability | Delivery status at Phase 00 |
+| Capability | Implemented scope |
 | --- | --- |
-| Full Stack with Node.js, TypeScript, Express, React, Vite, and PostgreSQL | Phase 04 built-in full-stack starter |
-| Full Stack with Go, Gin, React, Vite, and PostgreSQL | Second planned and gated vertical slice in Phase 08 |
+| Full Stack with Node.js, TypeScript, Express, React, Vite, and PostgreSQL | Built-in Layered Web starter and verified incremental workflows |
+| Full Stack with Go, Gin, React, Vite, and PostgreSQL | Built-in Go Service starter and verified incremental workflows |
 | Generation for other combinations | Unsupported until implementation and verification |
 
 The long-term category model covers Full Stack, Backend API, Web Frontend, Desktop, Mobile, Background Worker, CLI, and Static Website. The catalog can eventually describe Node.js, Go, Python, PHP, Java, C#, Rust, React, Next.js, Vue, Angular, Svelte, Electron, Tauri, Flutter, React Native, PostgreSQL, MySQL, MariaDB, SQLite, MongoDB, SQL Server, and Oracle. A catalog entry describes a possibility. Enable a wizard choice only when its complete versioned combination passes the applicable release gate.
@@ -73,7 +71,7 @@ Use explicit availability when describing a capability. **Planned** means schedu
 
 ## Libraries and collaboration
 
-Architecture, UI, module, component, and deployment templates are distinct versioned library assets. The resolution order is explicit per project and pinned in portable locks. Users can customize branding, logos, typography, colors, themes, layout, navigation, login screens, forms, tables, and components and save reusable versions in personal or team libraries. Imported assets remain untrusted. The [SDK](STACK_PLUGIN_SDK.md) defines compatibility and activation.
+Architecture, UI, module, component, and deployment templates are distinct versioned library assets. The resolution order is explicit per project and pinned in portable locks. Business Workspace supports versioned text branding, a primary color and theme choice. Project forms and tables derive from supported schema and ordinary client code. Broader visual editing remains outside current scope. Imported assets remain untrusted. The [SDK](STACK_PLUGIN_SDK.md) defines compatibility and activation.
 
 The module roadmap starts with authentication, user management, RBAC, audit logging, Excel and CSV, file management, notifications, reporting, scheduler, payment adapters, and deployment configuration. Modules declare compatible stacks, dependencies, versions, migration ownership, and reviewable file changes. Installation after project creation uses the same planner and recovery path as other incremental changes. Team libraries, standards, and policy can live in Git and be checked in CI, with access enforced by the host and Git provider.
 

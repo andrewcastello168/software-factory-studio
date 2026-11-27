@@ -46,6 +46,15 @@ test('reviews a real application command, saves API and page designs, and traces
 
     await page.getByRole('button', { name: 'Developer Tools', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Editor and terminal' })).toBeVisible();
+    await page.getByLabel('Workspace item').selectOption('server/server.ts');
+    const line = page.getByRole('spinbutton', { name: 'Line', exact: true });
+    const column = page.getByRole('spinbutton', { name: 'Column', exact: true });
+    await line.fill('12');
+    await column.fill('3');
+    await line.clear();
+    await expect(column).toBeDisabled();
+    await expect(column).toHaveValue('');
+    await page.getByLabel('Workspace item').selectOption('');
     await expect(page.getByRole('button', { name: 'Review Command', exact: true })).toBeEnabled({ timeout: 12_000 });
     await page.getByRole('button', { name: 'Review Command', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Command preview' })).toBeVisible();

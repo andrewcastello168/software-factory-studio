@@ -20,7 +20,18 @@ test('installer lifecycle uses the installed archive and retains real local data
     await writeFile(custom, 'Client work survives Studio maintenance.\n', { flag: 'wx' });
   }
 
-  const instance = await launchStudio();
+  const restrictedTools = lifecycle === 'restricted-tools';
+  const environment = { ...process.env };
+  if (restrictedTools) {
+    // Keep ordinary Windows environment settings while hiding locations the Studio probe uses.
+    for (const name of Object.keys(environment)) {
+      if (/^(path|programfiles(?:\(x86\))?|programw6432)$/iu.test(name)) delete environment[name];
+    }
+    environment.PATH = join(process.env.SystemRoot!, 'System32');
+  }
+  const profile = restrictedTools ? join(stage, 'First launch profile') : undefined;
+  if (profile) await mkdir(profile);
+  const instance = await launchStudio(profile, environment);
   try {
     const page = await instance.firstWindow();
     await expect(page).toHaveURL('studio://app/');
@@ -50,7 +61,7 @@ test('installer lifecycle uses the installed archive and retains real local data
     expect(native).toMatchObject({
       version: expectedVersion, architecture: 'x64', sandboxed: true, noSandbox: false,
     });
-    expect(await realpath(native.appData)).toBe(await realpath(join(process.env.APPDATA!, 'Software Factory Studio')));
+    expect(await realpath(native.appData)).toBe(await realpath(profile ?? join(process.env.APPDATA!, 'Software Factory Studio')));
     if (lifecycle === 'seed') {
       await instance.evaluate(({ dialog, app }) => {
         const path = process.getBuiltinModule('node:path')!;
@@ -73,19 +84,28 @@ test('installer lifecycle uses the installed archive and retains real local data
       await page.getByRole('radio', { name: 'Dark' }).click();
       await expect(page.getByText('Preferences saved')).toBeVisible();
     } else {
-      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+      if (!restrictedTools) await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
       await page.getByText('Getting started', { exact: true }).press('Enter');
       await page.getByRole('button', { name: 'Check developer tools' }).click();
       const toolchain = page.getByLabel('Detected developer tools');
-      await expect(toolchain).toContainText(/Git\s*\d+\.\d+\.\d+/u);
-      await expect(toolchain).toContainText(/Node\.js\s*22\.16\.0/u);
-      await expect(toolchain).toContainText('pnpm');
-      await expect(toolchain).toContainText('Go');
+      if (restrictedTools) {
+        await expect(toolchain.getByText('Not detected', { exact: true })).toHaveCount(4);
+        await expect(page.getByRole('button', { name: 'New Project', exact: true })).toBeEnabled();
+      } else {
+        await expect(toolchain).toContainText(/Git\s*\d+\.\d+\.\d+/u);
+        await expect(toolchain).toContainText(/Node\.js\s*22\.16\.0/u);
+        await expect(toolchain).toContainText(/pnpm\s*10\.13\.1/u);
+        await expect(toolchain).toContainText(/Go\s*1\.26\.11/u);
+      }
       await page.screenshot({ path: test.info().outputPath(`installed-home-${lifecycle}.png`) });
-      await page.getByRole('button', { name: 'View engineering standards' }).click();
-      await expect(page.getByRole('region', { name: 'Engineering Profiles' })).toContainText('Installer fixture profile');
       const catalog = await page.evaluate(() => window.studio?.projects.list());
-      expect(catalog).toMatchObject({ ok: true, value: { recents: [{ name: 'Client project café', directory: await realpath(project) }] } });
+      if (restrictedTools) {
+        expect(catalog).toMatchObject({ ok: true, value: { recents: [] } });
+      } else {
+        await page.getByRole('button', { name: 'View engineering standards' }).click();
+        await expect(page.getByRole('region', { name: 'Engineering Profiles' })).toContainText('Installer fixture profile');
+        expect(catalog).toMatchObject({ ok: true, value: { recents: [{ name: 'Client project café', directory: await realpath(project) }] } });
+      }
     }
     expect(await readFile(custom, 'utf8')).toBe('Client work survives Studio maintenance.\n');
     expect(await readdir(project)).toEqual(['client-owned.txt']);

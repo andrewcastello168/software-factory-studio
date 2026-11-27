@@ -4,7 +4,7 @@ Open a project or registered worktree and select **Developer Tools**. All action
 
 ## VS Code and terminals
 
-Choose the project root, a listed folder, or a source file. The editor accepts a one-based line and optional column for files. The Project Structure tree also has editor and file-manager actions next to source files. Studio discovers VS Code in platform installation locations. Use **Choose VS Code** to select and approve an alternate executable for the current Studio window. Install VS Code separately. Editor and terminal startup may run their normal user settings or extensions. Use VS Code Workspace Trust for unfamiliar repositories.
+Choose the project root, a listed folder, or a source file. The editor accepts a one-based line and optional column for files. Clearing the line clears the column. The Project Structure tree also has editor and file-manager actions next to source files. Studio discovers VS Code in platform installation locations. Use **Choose VS Code** to select and approve an alternate executable for the current Studio window. Install VS Code separately. Editor and terminal startup may run their normal user settings or extensions. Use VS Code Workspace Trust for unfamiliar repositories.
 
 **Open Terminal** hands off to Windows Command Prompt with AutoRun disabled, or a supported installed Linux terminal. Studio supplies the selected directory and no project command. Embedded terminals and debugger attachment are outside this phase. Install the desktop tools separately if they are unavailable.
 

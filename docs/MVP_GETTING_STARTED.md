@@ -11,4 +11,4 @@
 
 For an existing compatible project, open **Generation Review**, expand **Install optional modules**, and select the releases and required dependencies. Inspect the source and migration changes before approving. Resolve reported custom entrypoint conflicts manually. Use the recovery record if publication is interrupted. Apply the appended SQL only when you have reviewed the target database.
 
-Phase 07 supports the modular Node/PostgreSQL stack, a business shell with text branding, and the bundled identity releases. Arbitrary executable imports, full visual editing, upgrades, removals and extra stacks remain unavailable.
+The Go/Gin starter supports the same approved PostgreSQL and React workflow using the Go Service architecture. Its identity modules are unavailable. See the [stack matrix](STACK_PLUGIN_SDK.md#built-in-sdk-v1) and [client delivery guide](CLIENT_DELIVERY.md) to verify, package and deploy either generated stack.
