@@ -150,9 +150,11 @@ export function DeliveryWorkspace({ project, signal, openSource, openRecovery }:
   const id = project.id;
   const refresh = useCallback(async (force = false) => {
     if (!bridge || (lock.current && !force)) return;
-    if (observation.current) {
-      await observation.current;
-      if (!force || observation.current) return;
+    const inFlight = observation.current;
+    if (inFlight) {
+      if (!force) return inFlight;
+      await inFlight;
+      if (observation.current) return observation.current;
     }
     const task = (async () => {
       const outcome = await bridge.inspect(id);
