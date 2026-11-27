@@ -191,14 +191,16 @@ export async function verifyDelivery(vite, directory, env, go, packageManager, p
     }
     exec(services.gitBin, ['init', '-b', 'main'], root.path, process.env, 'pipe');
     services.commit(root.path, 'Pin reviewed client release');
+    const peer = join(parent, 'Parallel client café');
+    const peerId = randomUUID();
+    if (verifyClient) {
+      exec(services.gitBin, ['worktree', 'add', '-b', 'audit-client', peer], root.path, process.env, 'pipe');
+      grants.set(peerId, await services.admitRoot(peer));
+    }
     const writable = await delivery.inspect(id);
     assert(writable.ok && writable.value.clean && writable.value.source);
     const source = writable.value.source;
     if (verifyClient) {
-      const peer = join(parent, 'Parallel client café');
-      exec(services.gitBin, ['worktree', 'add', '-b', 'audit-client', peer], root.path, process.env, 'pipe');
-      const peerId = randomUUID();
-      grants.set(peerId, await services.admitRoot(peer));
       await writeFile(join(peer, 'peer-only.txt'), 'Independent worktree content.\n', { flag: 'wx' });
       const [primaryGit, peerGit] = await Promise.all([services.git.status(id), services.git.status(peerId)]);
       assert(primaryGit.ok && primaryGit.value.state === 'repository');
