@@ -280,8 +280,8 @@ async function installProtocol() {
   });
 }
 
-async function installedPathGuard() {
-  if (!app.isPackaged) return (_path: string) => false;
+async function installedPathGuard(): Promise<(path: string) => boolean> {
+  if (!app.isPackaged) return () => false;
   const installation = pathKey(await realpath(dirname(process.execPath)));
   const contains = (parent: string, child: string) => {
     const rel = relative(parent, child);
