@@ -453,16 +453,16 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
       await verifyDelivery(vite, fixture, env, go, packageManager, port);
     }
     const instructions = await readFile(join(fixture, 'AGENTS.md'), 'utf8');
+    const profile = plan.config.library?.profile;
+    if (profile) assert(instructions.includes(profile.name + ' v' + profile.version));
     if (go) {
       assert(instructions.includes('Go 1.26.11'));
-      assert(instructions.includes(delivery ? 'Client Delivery' : 'Client delivery v2'));
       assert(!instructions.includes('Express') && !instructions.includes('pnpm db:migrate'));
       assert((await readFile(join(fixture, 'docs/ENGINEERING_PROFILE.md'), 'utf8')).includes('Go Service conventions'));
       if (server) assert.equal((await fetch(url + '/api/auth/session')).status, 404);
     } else assert(instructions.includes('Standard Engineering profile v1'));
     assert.equal(instructions.includes('Welcome example'), demo);
     if (identity) {
-      assert(instructions.includes(delivery ? 'Client Delivery' : 'Client delivery v2'));
       const profileGuide = await readFile(join(fixture, 'docs', 'ENGINEERING_PROFILE.md'), 'utf8');
       assert(profileGuide.includes('Use disposable PostgreSQL schemas.'));
       assert.equal(instructions.includes('rbac v1.0.0'), identity === 'full');
@@ -523,7 +523,7 @@ try {
         return output;
       }));
       console.log('Verifying standalone files emitted by the installed Studio: ' + kind);
-      await verify({ config, files }, false, true, false, go ? undefined : 'full', AUTHENTICATION, go, false, false);
+      await verify({ config, files }, false, true, false, go ? undefined : 'full', AUTHENTICATION, go, false, !go);
     }
   } else {
     const profile = { kind: 'profile', id: randomUUID(), version: 2, name: 'Client delivery', advice: { Testing: 'Use disposable PostgreSQL schemas.' } };

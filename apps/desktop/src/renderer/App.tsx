@@ -225,7 +225,7 @@ export function App() {
             title={repo ? `${repo.branch ?? 'Detached HEAD'} · ${gitLabel(repo)} · ${repo.head ?? 'Unborn HEAD'}` : 'Open Git Studio'}>
             <GitBranch size={14} aria-hidden="true" /><bdi>{repo?.branch ?? (repo ? 'Detached HEAD' : gitLabel(git.status))}</bdi>
             {repo && <span className="context-git-status">{gitLabel(repo)}</span>}
-          </Button> : <span className="context-detail"><GitBranch size={14} aria-hidden="true" /><span>Git unavailable</span></span>}
+          </Button> : <span className="context-detail"><GitBranch size={14} aria-hidden="true" /><span>{activeProject ? 'Git unavailable' : 'No repository selected'}</span></span>}
         </div>
         <OpenCommandButton open={openPalette} shortcut={shortcut} />
       </header>
