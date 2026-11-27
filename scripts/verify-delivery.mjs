@@ -173,7 +173,7 @@ export async function verifyDocker(directory, go, env) {
   } finally { command('down', '-v'); }
 }
 
-export async function verifyDelivery(vite, directory, env, go, packageManager, port) {
+export async function verifyDelivery(vite, directory, env, go, packageManager, port, verifyClient) {
   const parent = await realpath(await mkdtemp(join(tmpdir(), 'studio-release-')));
   const profile = join(parent, 'profile');
   const install = join(parent, 'independent client');
@@ -194,6 +194,22 @@ export async function verifyDelivery(vite, directory, env, go, packageManager, p
     const writable = await delivery.inspect(id);
     assert(writable.ok && writable.value.clean && writable.value.source);
     const source = writable.value.source;
+    if (verifyClient) {
+      const peer = join(parent, 'Parallel client café');
+      exec(services.gitBin, ['worktree', 'add', '-b', 'audit-client', peer], root.path, process.env, 'pipe');
+      const peerId = randomUUID();
+      grants.set(peerId, await services.admitRoot(peer));
+      await writeFile(join(peer, 'peer-only.txt'), 'Independent worktree content.\n', { flag: 'wx' });
+      const [primaryGit, peerGit] = await Promise.all([services.git.status(id), services.git.status(peerId)]);
+      assert(primaryGit.ok && primaryGit.value.state === 'repository');
+      assert(peerGit.ok && peerGit.value.state === 'repository');
+      assert.equal(primaryGit.value.repositoryId, peerGit.value.repositoryId);
+      assert.notEqual(primaryGit.value.worktreeId, peerGit.value.worktreeId);
+      assert.equal(peerGit.value.branch, 'audit-client');
+      await assert.rejects(readFile(join(root.path, 'peer-only.txt')), { code: 'ENOENT' });
+      assert.equal((await delivery.inspect(id)).value?.source, source);
+      console.log('Client release retained its source evidence while a linked worktree contained separate changes.');
+    }
     const taskList = go ? ['lint', 'typecheck', 'format', 'vet', 'test', 'build'] : ['lint', 'typecheck', 'test', 'build'];
     if (!go && env.TEST_DATABASE_URL) taskList.push('postgres');
     if (process.env.FACTORY_DELIVERY_AUDIT === '1') taskList.push('audit');
@@ -238,6 +254,7 @@ export async function verifyDelivery(vite, directory, env, go, packageManager, p
       { cwd: install, env: { ...env, HOST: '127.0.0.1', PORT: String(port) }, stdio: 'ignore', windowsHide: true });
     await localhostReady(child, 'http://127.0.0.1:' + port + '/api/health');
     await localhostReady(child, 'http://127.0.0.1:' + port + '/api/ready', env.DATABASE_URL ? 200 : 503);
+    await verifyClient?.();
     const exited = new Promise((done) => child.once('exit', done));
     child.kill();
     await exited;

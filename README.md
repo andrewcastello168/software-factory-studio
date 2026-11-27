@@ -1,10 +1,10 @@
 # Software Factory Studio
 
-Software Factory Studio is a local-first, Git-native, AI-ready desktop engineering platform. It helps developers maintain ordinary local repositories and will generate independent applications from reusable engineering assets. Studio complements VS Code, Codex, and other coding assistants. Its core workflows require no AI subscription, paid API, or Studio backend.
+Software Factory Studio is a local-first, Git-native, AI-ready desktop engineering platform. It helps developers maintain ordinary local repositories and generate independent applications from reusable engineering assets. Studio complements VS Code, Codex, and other coding assistants. Its core workflows require no AI subscription, paid API, or Studio backend.
 
 ## Repository status
 
-The desktop provides local project workspaces, Git Studio, and independently runnable Node.js and Go full-stack generators. The primary factory MVP is Phase 07, after independent application generation, database-driven changes, and incremental code protection. Windows x64 is the first desktop target. See [Progress](docs/PROGRESS.md) for platform-specific evidence.
+The desktop provides local project workspaces, Git Studio, and independently runnable Node.js and Go full-stack generators. The primary factory MVP is Phase 07, after independent application generation, database-driven changes, and incremental code protection. Windows x64 is the first desktop target. See [Progress](docs/PROGRESS.md) and the [Final product audit](docs/FINAL_PRODUCT_AUDIT.md) for verified scope and release gates.
 
 ## Install the Windows release candidate
 
@@ -26,7 +26,7 @@ Open a project or worktree and select **Developer Tools**. Use Runtime to inspec
 
 ## Use Git Studio
 
-Install native Git 2.39 or newer in a system location. On Windows use the standard Git for Windows installation under Program Files. Open a repository or registered local worktree folder, then select **Git Studio** in the project sidebar or click the Git context in the top bar. The panel shows local and remote branches, HEAD, upstream divergence and real working or staged patches. Select a file to inspect a hunk and use its adjacent Stage or Unstage control. Set repository-local `user.name` and `user.email` using `git config --local` before committing. This phase isolates global and system config to keep imported repositories from activating host tools.
+Install native Git 2.39 or newer in a system location. On Windows use the standard Git for Windows installation under Program Files. Open a repository or registered local worktree folder, then select **Git Studio** in the project sidebar or click the Git context in the top bar. The panel shows local and remote branches, HEAD, upstream divergence and real working or staged patches. Select a file to inspect a hunk and use its adjacent Stage or Unstage control. Set repository-local `user.name` and `user.email` using `git config --local` before committing. Studio isolates global and system config to keep imported repositories from activating host tools.
 
 Use **Clone Repository** on Home or from the command palette. Select a public HTTPS URL or a local bare Git repository and choose the native destination parent. Studio creates a new child folder after confirmation. Fetch, fast-forward pull and ordinary push use existing upstream and remote configuration. Local transfer requires separate selection of the bare remote. Private authentication, SSH and tracked submodules remain outside the transfer policy. Use the existing Git client for unsupported configurations. See [Git safety](docs/GIT_SAFETY.md).
 

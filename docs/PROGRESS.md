@@ -263,3 +263,9 @@ Local Linux x64 passed frozen installation, lint, type checking, build, 94 Vites
 The sandboxed Linux ASAR regression passed 11 native cases. It exercised the packaged renderer and preload, both generators, project and Git worktrees, Database Studio, incremental review, Developer Tools, and Client Delivery. The unconfigured optional public HTTPS check and the Windows-only installer test were skipped in that run.
 
 Windows Server 2025 x64 completed the installer lifecycle for the Phase 12 workflow, including current-user registration, the Start Menu target, launch from ASAR with the renderer sandboxed, upgrade from the compatible fixture, in-place reinstall, uninstall, and reinstall with the existing profile. The pull request records the final source revision, artifact digest, screenshots and CI results. Interactive Windows desktop and signing checks are listed in the distribution guide.
+
+## Final product audit · rc.2
+
+The isolated `work` branch started from `main` at `3d83e7d` after Phase 12 and PR #15. A native-process test reproduced an early return while stopping a managed backend during shutdown. The repaired service joins the in-flight termination. The editor control now clears a stale column when the line is cleared. The [audit](FINAL_PRODUCT_AUDIT.md) records the Phase 00–12 matrix, independent client checks, measured startup and workspace performance, and manual release gates.
+
+Local sandboxed ASAR regression passed 11 native cases, with Windows lifecycle and optional public HTTPS scoped to the Windows jobs. Local PostgreSQL-backed Vitest passed 94 cases. The Windows workflow pins the original rc.1 artifact, verifies both digests, and records genuine versus fixture-based upgrade evidence. The audit pull request records current platform results and the downloadable installer and screenshots.

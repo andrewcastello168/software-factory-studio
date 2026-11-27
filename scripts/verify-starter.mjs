@@ -227,6 +227,20 @@ async function installIdentity(fixture, authentication) {
   } finally { studio.dispose(); await rm(profile, { recursive: true, force: true, maxRetries: 5 }); }
 }
 
+async function verifyContacts(url, identity) {
+  const headers = {};
+  if (identity) {
+    const session = await fetch(url + '/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Origin: url }, body: JSON.stringify(fixtureIdentity),
+    });
+    assert.equal(session.status, 200);
+    headers.Cookie = session.headers.get('set-cookie').split(';')[0];
+  }
+  const records = await fetch(url + '/api/crud/supplier_contacts', { headers });
+  assert.equal(records.status, 200);
+  assert.deepEqual((await records.json()).data.rows, []);
+}
+
 async function verify(plan, demo, inventory, incremental, identity, authentication, go, design, delivery) {
   const fixture = await mkdtemp(join(tmpdir(), 'studio-generated-app-'));
   const port = plan.config.port;
@@ -455,17 +469,7 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
         schema + '.supplier_contacts');
       server = go ? launch() : spawn(process.execPath, ['dist/server/server.js'], { cwd: fixture, env, stdio: 'inherit' });
       await ready(server, url + '/api/health');
-      const headers = {};
-      if (identity) {
-        const session = await fetch(url + '/api/auth/login', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', Origin: url }, body: JSON.stringify(fixtureIdentity),
-        });
-        assert.equal(session.status, 200);
-        headers.Cookie = session.headers.get('set-cookie').split(';')[0];
-      }
-      const records = await fetch(url + '/api/crud/supplier_contacts', { headers });
-      assert.equal(records.status, 200);
-      assert.deepEqual((await records.json()).data.rows, []);
+      await verifyContacts(url, identity);
       console.log('Installed reference verified a later manual migration and reviewed CRUD while preserving custom source.');
     }
     if (delivery) {
@@ -481,7 +485,29 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
           await rm(join(fixture, 'dist', 'factory-migrate'), { force: true });
         }
       }
-      await verifyDelivery(vite, fixture, env, go, packageManager, port);
+      await verifyDelivery(vite, fixture, env, go, packageManager, port, plan.fromInstalled ? async () => {
+        await verifyContacts(url, identity);
+        if (process.env.FACTORY_STARTER_BROWSER === '1') {
+          const { chromium } = fromStudio('@playwright/test');
+          const browser = await chromium.launch({ chromiumSandbox: true,
+            ...(process.env.FACTORY_CHROMIUM_PATH ? { executablePath: process.env.FACTORY_CHROMIUM_PATH } : {}) });
+          try {
+            const page = await browser.newPage();
+            await page.goto(url);
+            if (identity) {
+              await page.getByRole('textbox', { name: 'Email' }).fill(fixtureIdentity.email);
+              await page.getByLabel('Password', { exact: true }).fill(fixtureIdentity.password);
+              await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+            }
+            const response = page.waitForResponse((entry) => entry.ok()
+              && new URL(entry.url()).pathname === '/api/crud/supplier_contacts');
+            await page.getByRole('combobox', { name: 'Table' }).selectOption('supplier_contacts');
+            await response;
+            await page.getByText('No matching records.', { exact: true }).waitFor();
+          } finally { await browser.close(); }
+        }
+        console.log('Extracted client release verified the new PostgreSQL API and, when enabled, browser route.');
+      } : undefined);
     }
     const instructions = await readFile(join(fixture, 'AGENTS.md'), 'utf8');
     const profile = plan.config.library?.profile;

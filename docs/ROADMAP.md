@@ -155,3 +155,7 @@ Add `factory-generator` in Phase 04, `factory-schema` in Phase 05, and `factory-
 | P12-03 Packaged boundary | Launch without the checkout's built bundles. Verify ASAR contents, native sandbox, denied renderer capabilities and protected installation paths. Run the installed native workflow suite for both generator stacks, Git, Developer Tools and Client Delivery. |
 | P12-04 First run and native behavior | Expose first-launch guidance and real developer-tool discovery. Record Windows desktop evidence separately for interactive installation, OS scaling, Explorer, VS Code and terminal handoff. |
 | P12-05 Delivery and release readiness | Keep Linux and Windows regressions, upload the reviewed RC and screenshots, document Windows lifecycle and signing, and record the remaining audit gates. Public distribution requires authorized signing and Windows policy validation. |
+
+## Final product audit
+
+Keep Phase 00–12 acceptance gates. Use the [final audit](FINAL_PRODUCT_AUDIT.md) to record evidence for the supported workflows, release candidates, remaining desktop acceptance, signing and the decision for public distribution.

@@ -173,3 +173,7 @@ Keep the id `com.softwarefactorystudio.desktop` and the product name `Software F
 Use an unsigned CI build for internal acceptance without exposing certificate material to pull requests. Require Authenticode signing only when using the explicit signing command on a trusted host. Build an `rc.0` compatibility fixture from the same source as `rc.1` to exercise installer identity, data preservation and executable replacement. It is a test artifact. It does not prove upgrading a previously released version.
 
 Pin the two packaging-time minimatch resolutions to the advisory fix at 11.0.1. Electron Builder uses the retained CommonJS matcher interfaces and the installer tests verify the active Windows packaging path. Remove the scoped overrides when the pinned builder graph ships the fix.
+
+## Preserve previous installer provenance during stabilization
+
+Audit a real upgrade using the retained rc.1 artifact and pin both the archive and executable digests before execution. Use contents and Actions read permissions, remove the access token before running the installer, and fail on incorrect digests. Keep lifecycle coverage after artifact expiry using a separately labeled same-source fixture. A hosted missing-tool environment does not replace interactive acceptance on a clean workstation. Keep the candidate unsigned for controlled internal testing until a separately authorized signer is available.
