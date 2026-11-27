@@ -55,7 +55,7 @@ try {
   server.printUrls();
   watcher = await context({
     ...electronBuild,
-    plugins: [{
+    plugins: [...electronBuild.plugins, {
       name: 'restart-electron',
       setup(build) {
         build.onEnd(({ errors }) => {
