@@ -56,7 +56,7 @@ try {
     version,
     main: manifest.main,
     description: 'Local-first development and engineering workbench',
-    author: 'Software Factory Studio',
+    author: { name: 'Software Factory Studio' },
     private: true,
   }, null, 2));
   await build({
@@ -78,6 +78,8 @@ try {
         oneClick: false,
         perMachine: false,
         allowElevation: false,
+        packElevateHelper: false,
+        uninstallDisplayName: manifest.productName,
         allowToChangeInstallationDirectory: false,
         createStartMenuShortcut: true,
         createDesktopShortcut: false,

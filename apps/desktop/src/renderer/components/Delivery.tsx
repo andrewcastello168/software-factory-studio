@@ -150,7 +150,10 @@ export function DeliveryWorkspace({ project, signal, openSource, openRecovery }:
   const id = project.id;
   const refresh = useCallback(async (force = false) => {
     if (!bridge || (lock.current && !force)) return;
-    if (observation.current) return observation.current;
+    if (observation.current) {
+      await observation.current;
+      if (!force || observation.current) return;
+    }
     const task = (async () => {
       const outcome = await bridge.inspect(id);
       if (outcome.ok) setInspection(outcome.value);
@@ -236,7 +239,7 @@ export function DeliveryWorkspace({ project, signal, openSource, openRecovery }:
 
   return <div className="page developer-page delivery-page">
     <header className="page-header"><div><h1>Client Delivery</h1><p className="project-path"><bdi>{project.directory}</bdi></p></div>
-      <Button className="outlined-button" disabled={Boolean(busy)} onClick={() => void refresh()}><RefreshCw size={15}/>Refresh Evidence</Button></header>
+      <Button className="outlined-button" disabled={Boolean(busy)} onClick={() => void refresh(true)}><RefreshCw size={15}/>Refresh Evidence</Button></header>
     <nav className="dev-tabbar" aria-label="Delivery views">{views.map((item) => <Button key={item} aria-current={view === item ? 'page' : undefined}
       onClick={() => setView(item)}>{item}</Button>)}</nav>
     {error && <p className="notice" role="alert">{error}</p>}

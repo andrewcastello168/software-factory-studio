@@ -85,12 +85,22 @@ jobs:
           $previous = 'apps/desktop/dist/upgrade-fixture/Software-Factory-Studio-1.0.0-rc.0-windows-x64.exe'
           ./scripts/verify-windows-installer.ps1 -Candidate $candidate -Previous $previous -DisposableAccount
 
-      - name: Verify workflows from the installed app
+      - name: Install Playwright Chromium
+        run: pnpm --filter @factory/desktop exec playwright install chromium
+
+      - name: Verify installed workflows and their generated applications
         env:
           FACTORY_TEST_PUBLIC_HTTPS: '1'
+          FACTORY_REQUIRE_DATABASE: '1'
+          FACTORY_STARTER_BROWSER: '1'
         run: |
           $env:FACTORY_INSTALLED_EXECUTABLE = Join-Path $env:LOCALAPPDATA 'Programs/Software Factory Studio/Software Factory Studio.exe'
+          $env:FACTORY_INSTALLED_FIXTURES = Join-Path $env:RUNNER_TEMP 'studio-installed-output'
+          New-Item -Path $env:FACTORY_INSTALLED_FIXTURES -ItemType Directory | Out-Null
           pnpm test:electron
+          if ($LASTEXITCODE -ne 0) { throw 'Installed workflow tests failed.' }
+          $env:FACTORY_TEST_DATABASE_URL = ./scripts/start-windows-verification-database.ps1
+          pnpm verify:starter
 
       - name: Upload verified installer and build evidence
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

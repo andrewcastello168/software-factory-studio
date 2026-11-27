@@ -70,7 +70,7 @@ test('installer lifecycle uses the installed archive and retains real local data
       await library.getByRole('button', { name: 'Publish version', exact: true }).click();
       await expect(library.getByRole('status')).toContainText('Published immutable version 1.');
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
-      await page.getByRole('radio', { name: 'Dark' }).check();
+      await page.getByRole('radio', { name: 'Dark' }).click();
       await expect(page.getByText('Preferences saved')).toBeVisible();
     } else {
       await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
@@ -85,7 +85,7 @@ test('installer lifecycle uses the installed archive and retains real local data
       await page.getByRole('button', { name: 'View engineering standards' }).click();
       await expect(page.getByRole('region', { name: 'Engineering Profiles' })).toContainText('Installer fixture profile');
       const catalog = await page.evaluate(() => window.studio?.projects.list());
-      expect(catalog).toMatchObject({ ok: true, value: { recents: [{ name: 'Client project café', directory: project }] } });
+      expect(catalog).toMatchObject({ ok: true, value: { recents: [{ name: 'Client project café', directory: await realpath(project) }] } });
     }
     expect(await readFile(custom, 'utf8')).toBe('Client work survives Studio maintenance.\n');
     expect(await readdir(project)).toEqual(['client-owned.txt']);

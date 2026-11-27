@@ -39,10 +39,15 @@ function Invoke-Installer([string]$File, [string]$Arguments) {
 function Assert-Installed([string]$Version) {
     $entry = @(Get-StudioRegistration)
     if ($entry.Count -ne 1 -or $entry[0].DisplayVersion -ne $Version -or $entry[0].Publisher -ne $product) {
-        throw "The current-user uninstall entry does not match $Version."
+        $found = $entry | Select-Object DisplayName, DisplayVersion, Publisher | ConvertTo-Json -Compress
+        throw "Expected a current-user uninstall entry for $Version. Found: $found"
     }
     if (-not (Test-Path $exe -PathType Leaf) -or -not (Test-Path $startMenu -PathType Leaf) -or (Test-Path $desktop)) {
         throw 'Unexpected executable or shortcut state.'
+    }
+    $metadata = (Get-Item $exe).VersionInfo
+    if ($metadata.ProductName -ne $product -or $metadata.CompanyName -ne $product) {
+        throw 'Installed Windows executable metadata does not match the Studio identity.'
     }
     $shell = New-Object -ComObject WScript.Shell
     $link = $shell.CreateShortcut($startMenu)
