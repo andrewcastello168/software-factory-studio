@@ -52,6 +52,7 @@ export class ProjectWorkspace {
     private readonly store: RecentStore,
     private readonly dialogs: ProjectDialogs,
     private readonly notify: (catalog: ProjectCatalog) => void,
+    private readonly isProtectedDirectory: (path: string) => boolean = () => false,
   ) {
     this.#initialized = this.store.load().then(async (references) => {
       if (!references) {
@@ -100,6 +101,7 @@ export class ProjectWorkspace {
 
   async #adopt(root: ProjectRoot, scan: ProjectScan, prior?: RecentReference, replacePrior = false): Promise<Result<ProjectSelection>> {
     if (this.#closed) return failure('ACCESS_DENIED');
+    if (this.isProtectedDirectory(root.path)) return failure('PROJECT_UNAVAILABLE');
     try {
       await checkedDirectory(root.path, root.identity);
     } catch {
@@ -162,6 +164,7 @@ export class ProjectWorkspace {
         const path = await this.dialogs.choose(prior?.directory);
         if (!path || this.#closed) return this.#selection(null);
         const root = await admitRoot(path);
+        if (this.isProtectedDirectory(root.path)) return failure('PROJECT_UNAVAILABLE');
         const scan = await scanProject(root);
         let replacePrior = false;
         if (prior) {
@@ -225,6 +228,7 @@ export class ProjectWorkspace {
       if (!record) return failure('RECENT_NOT_FOUND');
       try {
         const root = await admitRoot(record.directory);
+        if (this.isProtectedDirectory(root.path)) return failure('PROJECT_UNAVAILABLE');
         if (pathKey(root.path) === pathKey(record.directory) && sameDirectory(root.identity, record.identity)) {
           const scan = await scanProject(root);
           if (record.projectId === null || record.projectId === portableId(scan.metadata)) {
@@ -267,6 +271,7 @@ export class ProjectWorkspace {
   async #availability(record: RecentReference): Promise<ProjectAvailability> {
     try {
       const root = await admitRoot(record.directory);
+      if (this.isProtectedDirectory(root.path)) return 'unavailable';
       if (pathKey(root.path) !== pathKey(record.directory) || !sameDirectory(root.identity, record.identity)) return 'changed';
       if (record.projectId && record.projectId !== portableId(await readProjectMetadata(root))) return 'changed';
       return 'ready';

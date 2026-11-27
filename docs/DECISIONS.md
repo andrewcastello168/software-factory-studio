@@ -163,3 +163,11 @@ Use the existing incremental review and append only known deployment and CI file
 Run Quality Center jobs through the developer command policy. Keep worktree-scoped evidence local and bind it to Git, source and configuration bytes. Publish a portable USTAR artifact from a clean revision with current passing checks and matching build outputs. Node packages use the locked production dependency install and Go packages carry native binaries. Explicit provider publication and desktop packaging remain separate tasks.
 
 Share canonical content-addressed asset bundles using Git with exact asset and compatibility digests. Built-in module and stack metadata remain references to code shipped by Studio. This preserves a local workflow without expanding the importer into an executable plugin system.
+
+## Windows RC distribution
+
+Use Electron Builder 26.18.0 with the existing Electron 45.5.0, Node.js 22.16.0 and pnpm 10.13.1. Its Node engine supports the pinned host. Build only the Windows x64 NSIS target and leave the unrelated Squirrel postinstall script disabled. Stage the bundles and reviewed guides in an allowlisted, dependency-free app directory before archiving. Workspace packages, generator templates and their pinned locks are compiled into the production bundles. The Electron archive contains no package-manager installation, test fixtures or source checkout. Packaging, edition, and release upload are separate from automatic updating.
+
+Keep the id `com.softwarefactorystudio.desktop` and the product name `Software Factory Studio` stable across releases. The current-user installation has its own program directory and Start Menu shortcut. The Electron product-name-based profile remains in roaming application data. NSIS preserves it on uninstall, which also preserves sensitive local data until the user handles it separately. Refuse to admit the installation tree as a project or publishing destination.
+
+Use an unsigned CI build for internal acceptance without exposing certificate material to pull requests. Require Authenticode signing only when using the explicit signing command on a trusted host. Build an `rc.0` compatibility fixture from the same source as `rc.1` to exercise installer identity, data preservation and executable replacement. It is a test artifact. It does not prove upgrading a previously released version.

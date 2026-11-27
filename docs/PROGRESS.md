@@ -253,3 +253,7 @@ The isolated task branch is based on `5492acd`. PR #13 and its verified Phase 10
 Local Linux frozen install, lint, typecheck and production build passed. The regression included 94 Vitest and 11 renderer cases. The Phase 11 sandboxed Electron case passed in both themes with failed, passed and stale quality evidence. The direct registry audit from the controlled desktop process encountered the cloud's DNS restriction. Generated CI commands also exercised the advisory check through the normal package manager environment.
 
 The cloud Docker daemon pulled the pinned Node.js, Go and PostgreSQL images. Direct registry probes from its build network failed DNS resolution, and the proxied package fetch reported an untrusted certificate chain. The Linux workflow includes Docker build and Compose verification for both reference apps, using its disposable service database and isolated Docker projects.
+
+## Phase 12 · Windows distribution
+
+Phase 12 starts from `main` at `562a5c2`, the merged Phase 11 PR #14. The candidate targets Windows x64 with the per-user NSIS installer. The upgrade fixture uses the same source as the candidate with an earlier prerelease version. The workflow tests the executable from the real installation and verifies the artifact digest, provenance and unsigned status before upload. See [Windows distribution](WINDOWS_DISTRIBUTION.md) for profile paths, uninstall behavior and interactive gates.

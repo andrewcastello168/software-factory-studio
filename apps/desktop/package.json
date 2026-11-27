@@ -1,7 +1,7 @@
 {
   "name": "@factory/desktop",
   "productName": "Software Factory Studio",
-  "version": "0.1.0",
+  "version": "1.0.0-rc.1",
   "private": true,
   "type": "module",
   "main": "dist/main/index.cjs",
@@ -9,6 +9,7 @@
     "dev": "node scripts/dev.mjs",
     "start": "electron .",
     "build": "vite build && node scripts/build-electron.mjs",
+    "package:windows": "node scripts/package-windows.mjs",
     "typecheck": "tsc -p tsconfig.main.json && tsc -p tsconfig.preload.json && tsc -p tsconfig.renderer.json && tsc -p tsconfig.tools.json",
     "test:renderer": "playwright test --config playwright.renderer.config.ts",
     "test:electron": "playwright test --config playwright.electron.config.ts",
@@ -17,22 +18,23 @@
   "dependencies": {
     "@factory/contracts": "workspace:*",
     "@factory/generator": "workspace:*",
-    "lucide-react": "1.80.0",
-    "react": "19.3.1",
-    "react-dom": "19.3.1",
     "@factory/schema": "workspace:*",
-    "pg": "8.22.0"
+    "lucide-react": "1.80.0",
+    "pg": "8.22.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",
     "@tailwindcss/vite": "4.3.5",
+    "@types/pg": "8.15.6",
     "@types/react": "19.3.3",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.3.0",
     "electron": "45.5.0",
+    "electron-builder": "26.18.0",
     "esbuild": "0.28.2",
     "tailwindcss": "4.3.5",
-    "vite": "8.3.8",
-    "@types/pg": "8.15.6"
+    "vite": "8.3.8"
   }
 }

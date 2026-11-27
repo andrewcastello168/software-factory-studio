@@ -1,0 +1,115 @@
+name: Windows installer verification
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-installer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-installer:
+    name: Install and verify Windows x64 RC
+    runs-on: windows-2025
+    timeout-minutes: 28
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out release candidate source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up pinned Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: '1.26.11'
+          cache-dependency-path: packages/generator/templates/go/go.sum
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          architecture: x64
+
+      - name: Install frozen workspace
+        run: |
+          $packageManager = (Get-Content package.json -Raw | ConvertFrom-Json).packageManager
+          npm install --global $packageManager --no-audit --no-fund
+          pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Compile production application
+        run: pnpm build
+
+      - name: Build unsigned candidate and compatible upgrade fixture
+        run: |
+          pnpm package:windows
+          if ($LASTEXITCODE -ne 0) { throw 'Candidate packaging failed.' }
+          pnpm package:windows --upgrade-fixture
+          if ($LASTEXITCODE -ne 0) { throw 'Upgrade fixture packaging failed.' }
+          $release = 'apps/desktop/dist/windows-release'
+          $evidence = Get-Content "$release/build-evidence.json" -Raw | ConvertFrom-Json
+          $installer = Join-Path $release $evidence.artifact
+          $signature = (Get-AuthenticodeSignature $installer).Status.ToString()
+          if ($signature -ne 'NotSigned' -or $evidence.signingRequested -or -not $evidence.workingTreeClean) { throw 'Expected an unsigned RC.' }
+          if ((Get-FileHash $installer).Hash.ToLowerInvariant() -ne $evidence.sha256 -or
+              (Get-Item $installer).Length -ne $evidence.bytes -or $evidence.source -ne (git rev-parse HEAD)) {
+            throw 'Installer bytes and provenance do not match the evidence.'
+          }
+          $evidence | Add-Member -NotePropertyName authenticode -NotePropertyValue $signature
+          $evidence | Add-Member -NotePropertyName windowsVersion -NotePropertyValue ([Environment]::OSVersion.VersionString)
+          $evidence | ConvertTo-Json -Depth 4 | Set-Content "$release/build-evidence.json"
+          $evidence | ConvertTo-Json -Depth 4 | Write-Output
+          foreach ($bundle in @('main', 'preload', 'renderer')) {
+            Move-Item -Path "apps/desktop/dist/$bundle" -Destination (Join-Path $env:RUNNER_TEMP "studio-unpackaged-$bundle")
+          }
+
+      - name: Install, upgrade, uninstall and reinstall Studio
+        run: |
+          $release = 'apps/desktop/dist/windows-release'
+          $evidence = Get-Content "$release/build-evidence.json" -Raw | ConvertFrom-Json
+          $candidate = Join-Path $release $evidence.artifact
+          $previous = 'apps/desktop/dist/upgrade-fixture/Software-Factory-Studio-1.0.0-rc.0-windows-x64.exe'
+          ./scripts/verify-windows-installer.ps1 -Candidate $candidate -Previous $previous -DisposableAccount
+
+      - name: Verify workflows from the installed app
+        env:
+          FACTORY_TEST_PUBLIC_HTTPS: '1'
+        run: |
+          $env:FACTORY_INSTALLED_EXECUTABLE = Join-Path $env:LOCALAPPDATA 'Programs/Software Factory Studio/Software Factory Studio.exe'
+          pnpm test:electron
+
+      - name: Upload verified installer and build evidence
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: software-factory-studio-windows-x64-rc
+          path: |
+            apps/desktop/dist/windows-release/Software-Factory-Studio-*-windows-x64.exe
+            apps/desktop/dist/windows-release/Software-Factory-Studio-*-windows-x64.exe.sha256
+            apps/desktop/dist/windows-release/build-evidence.json
+            apps/desktop/dist/windows-release/release-notes.md
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload installed application screenshots
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: installed-windows-workspaces
+          path: |
+            apps/desktop/dist/installer-evidence/**/installed-*.png
+            apps/desktop/test-results/**/*.png
+          retention-days: 30

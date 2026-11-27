@@ -1,12 +1,11 @@
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { _electron, expect, test } from '@playwright/test';
+import { join } from 'node:path';
+import { expect, test } from '@playwright/test';
 import type { ElectronApplication } from '@playwright/test';
+import { launchStudio } from './launch';
 
-const executablePath = createRequire(import.meta.url)('electron') as string;
 
 test('reviews a real application command, saves API and page designs, and traces source changes', async () => {
   test.setTimeout(100_000);
@@ -16,10 +15,7 @@ test('reviews a real application command, saves API and page designs, and traces
   let app: ElectronApplication | undefined;
   try {
     await Promise.all([mkdir(profile), mkdir(projects)]);
-    app = await _electron.launch({
-      executablePath, args: [resolve('.'), '--user-data-dir=' + profile],
-      env: { ...process.env, FACTORY_DESKTOP_DEV: '0' }, chromiumSandbox: true,
-    });
+    app = await launchStudio(profile);
     await app.evaluate(({ dialog, nativeTheme }, destination) => {
       nativeTheme.themeSource = 'light';
       Object.assign(dialog, {

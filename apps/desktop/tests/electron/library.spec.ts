@@ -1,11 +1,10 @@
 import { mkdir, mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { _electron, expect, test } from '@playwright/test';
+import { join } from 'node:path';
+import { expect, test } from '@playwright/test';
 import type { ElectronApplication } from '@playwright/test';
+import { launchStudio } from './launch';
 
-const executablePath = createRequire(import.meta.url)('electron') as string;
 
 test('publishes a profile and previews a pinned, branded project with identity modules', async () => {
   test.setTimeout(90_000);
@@ -16,10 +15,7 @@ test('publishes a profile and previews a pinned, branded project with identity m
   let app: ElectronApplication | undefined;
   try {
     await Promise.all([mkdir(profile), mkdir(folder)]);
-    app = await _electron.launch({
-      executablePath, args: [resolve('.'), '--user-data-dir=' + profile],
-      env: { ...process.env, FACTORY_DESKTOP_DEV: '0' }, chromiumSandbox: true,
-    });
+    app = await launchStudio(profile);
     await app.evaluate(({ dialog, nativeTheme }, path) => {
       nativeTheme.themeSource = 'dark';
       Object.assign(dialog, {

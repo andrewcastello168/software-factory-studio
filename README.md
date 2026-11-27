@@ -6,6 +6,10 @@ Software Factory Studio is a local-first, Git-native, AI-ready desktop engineeri
 
 The desktop provides local project workspaces, Git Studio, and independently runnable Node.js and Go full-stack generators. The primary factory MVP is Phase 07, after independent application generation, database-driven changes, and incremental code protection. Windows x64 is the first desktop target. See [Progress](docs/PROGRESS.md) for platform-specific evidence.
 
+## Install the Windows release candidate
+
+Download the **software-factory-studio-windows-x64-rc** ZIP from a successful **Windows installer verification** run. Verify the installer digest, install for the current user, and launch **Software Factory Studio** from Start. Open **Home → Getting started** to check developer tools. This internal RC is unsigned. See [Windows distribution](docs/WINDOWS_DISTRIBUTION.md) for installation, first launch, upgrades, uninstall and troubleshooting.
+
 ## Open a local project
 
 Use **Open Folder** in the desktop app to select a local directory. The project opens in its own tab. **Project Overview** shows the working directory and any portable descriptor. **Project Structure** lists files and expandable folders, with symbolic links and junctions shown as skipped. Studio reconciles external changes automatically. Use **Rescan** to refresh on demand.

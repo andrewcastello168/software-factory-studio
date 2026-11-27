@@ -1,6 +1,6 @@
 {
   "name": "software-factory-studio",
-  "version": "0.1.0",
+  "version": "1.0.0-rc.1",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.13.1",
@@ -15,6 +15,7 @@
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run",
     "build": "pnpm --filter @factory/desktop build",
+    "package:windows": "pnpm --filter @factory/desktop package:windows",
     "test:renderer": "pnpm --filter @factory/desktop test:renderer",
     "test:electron": "pnpm --filter @factory/desktop test:electron",
     "dev:web": "pnpm --filter @factory/desktop dev:web",

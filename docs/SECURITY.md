@@ -91,3 +91,9 @@ Quality execution uses main-process argument construction, known tool discovery 
 Shared bundles are closed, canonical data envelopes. Main recomputes their digests and built-in compatibility references and refuses conflicting local definitions. Export targets one fixed subdirectory of an authorized Git worktree. CI uses least-privilege contents access, disposable services and pinned actions. Docker build contexts allow known source paths and exclude environment files and common key formats. Clients must review custom source and compiled artifacts for embedded credentials.
 
 Packaging rejects unsafe paths, links, unexpected build files, stale evidence, non-clean worktrees and occupied destinations. It rechecks scope and approval inputs and uses exclusive binary publication with an intent record. Recoverable missing output can be republished only when the reviewed archive digest and source still match. Artifact metadata is local to the Studio profile. User-account code and concurrent outside processes remain outside Studio's isolation boundary.
+
+## Installed application boundary
+
+Installation preserves the packaged Electron bridge, origin, navigation, sandbox and workspace rules. The Windows installer uses the stable application identity and the current-user scope by default. User data remains outside the application and survives uninstall. Project grants and native publishing dialogs block paths that overlap the app installation. First-launch diagnostics accept no executables or arguments from the renderer. The read-only probe returns only validated version strings.
+
+The PR build ignores signing material and uploads the unsigned candidate as an Actions artifact. Verify its digest and provenance before internal use. Code signing requires a separately authorized Windows identity on a trusted host. Record publisher trust and SmartScreen results from a normal Windows policy environment. See [Windows distribution](WINDOWS_DISTRIBUTION.md).

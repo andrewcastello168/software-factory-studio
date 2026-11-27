@@ -352,6 +352,8 @@ export function App() {
                     newProject={generatorBridge ? () => setGeneratorView('new') : undefined}
                     cloneRepository={gitBridge ? () => setCloneOpen(true) : undefined}
                     openProjects={() => openPage('recents')}
+                    openCatalog={libraryBridge ? () => openPage('technology') : undefined}
+                    openStandards={libraryBridge ? () => openPage('profiles') : undefined}
                     native={workspace.native}
                     opening={workspace.opening}
                     projectCount={workspace.catalog.projects.length}

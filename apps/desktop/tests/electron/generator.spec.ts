@@ -1,12 +1,11 @@
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { _electron, expect, test } from '@playwright/test';
+import { join } from 'node:path';
+import { expect, test } from '@playwright/test';
 import type { ElectronApplication } from '@playwright/test';
+import { launchStudio } from './launch';
 
-const executablePath = createRequire(import.meta.url)('electron') as string;
 
 test('native New Project opens a verified managed starter after the reviewed approval', async () => {
   test.setTimeout(60_000);
@@ -17,12 +16,7 @@ test('native New Project opens a verified managed starter after the reviewed app
   let instance: ElectronApplication | undefined;
   try {
     await Promise.all([mkdir(profile), mkdir(parent)]);
-    instance = await _electron.launch({
-      executablePath,
-      args: [resolve('.'), '--user-data-dir=' + profile],
-      env: { ...process.env, FACTORY_DESKTOP_DEV: '0' },
-      chromiumSandbox: true,
-    });
+    instance = await launchStudio(profile);
     await instance.evaluate(({ dialog, nativeTheme }, selected) => {
       nativeTheme.themeSource = 'light';
       let prompts = 0;

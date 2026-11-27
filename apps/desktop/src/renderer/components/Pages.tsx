@@ -1,9 +1,11 @@
-import { ArrowUpRight, Command, FolderOpen, GitFork, Monitor, Moon, PanelLeft, Search, Settings2, Sun } from 'lucide-react';
-import type { Theme } from '@factory/contracts';
+import { ArrowUpRight, BookOpen, Command, FolderOpen, GitFork, Monitor, Moon, PanelLeft, Search, Settings2, Sun } from 'lucide-react';
+import { useState } from 'react';
+import { GO_STACK, STACKS } from '@factory/contracts';
+import type { Theme, Toolchain } from '@factory/contracts';
 import { Button } from './Controls';
 
 export function Home({
-  openSettings, openPalette, openFolder, openProjects, native, opening, projectCount, cloneRepository, newProject,
+  openSettings, openPalette, openFolder, openProjects, native, opening, projectCount, cloneRepository, newProject, openCatalog, openStandards,
 }: {
   openSettings: () => void;
   openPalette: () => void;
@@ -14,6 +16,8 @@ export function Home({
   native: boolean;
   opening: boolean;
   projectCount: number;
+  openCatalog?: (() => void) | undefined;
+  openStandards?: (() => void) | undefined;
 }) {
   return (
     <div className="page">
@@ -50,7 +54,50 @@ export function Home({
           </Button>
         </section>
       </div>
+      {native && <GettingStarted openCatalog={openCatalog} openStandards={openStandards} />}
     </div>
+  );
+}
+
+function GettingStarted({ openCatalog, openStandards }: {
+  openCatalog?: (() => void) | undefined;
+  openStandards?: (() => void) | undefined;
+}) {
+  const [status, setStatus] = useState<'idle' | 'checking' | 'failed'>('idle');
+  const [tools, setTools] = useState<Toolchain>();
+  const { execution, databaseRuntime } = STACKS[GO_STACK];
+  const inspect = window.studio?.inspectToolchain;
+  async function check() {
+    if (!inspect) return;
+    setStatus('checking');
+    try {
+      const result = await inspect();
+      if (!result.ok) throw new Error(result.error);
+      setTools(result.value);
+      setStatus('idle');
+    } catch {
+      setTools(undefined);
+      setStatus('failed');
+    }
+  }
+  return (
+    <details className="home-guide">
+      <summary><BookOpen size={16} aria-hidden="true" />Getting started</summary>
+      <div className="home-guide-body">
+        <p>Studio includes its own runtime. Use New Project to scaffold a client application, or Open Folder to work in an existing directory.</p>
+        <p>To run generated projects, install Node.js {execution.node}, pnpm {execution.pnpm} and {databaseRuntime}. Go projects also need Go {execution.go}. Git Studio requires Git 2.39 or later.</p>
+        <div className="home-project-actions">
+          {openCatalog && <Button onClick={openCatalog}>View technology catalog</Button>}
+          {openStandards && <Button onClick={openStandards}>View engineering standards</Button>}
+          {inspect && <Button onClick={() => void check()} disabled={status === 'checking'}>Check developer tools</Button>}
+        </div>
+        {status === 'checking' && <p role="status">Checking installed tools…</p>}
+        {status === 'failed' && <p role="alert">Tool discovery failed. Retry or check the tools from your terminal.</p>}
+        {tools && <dl className="home-toolchain" aria-label="Detected developer tools" aria-live="polite">
+          {Object.entries(tools).map(([name, version]) => <div key={name}><dt>{name}</dt><dd>{version ?? 'Not detected'}</dd></div>)}
+        </dl>}
+      </div>
+    </details>
   );
 }
 

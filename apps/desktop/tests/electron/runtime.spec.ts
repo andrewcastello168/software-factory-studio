@@ -1,25 +1,18 @@
 import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { _electron, expect, test } from '@playwright/test';
+import { join } from 'node:path';
+import { expect, test } from '@playwright/test';
 import type { ElectronApplication } from '@playwright/test';
+import { launchStudio } from './launch';
 import { APP_URL } from '../../src/main/security';
 
-const require = createRequire(import.meta.url);
-const executablePath = require('electron') as string;
 
 test('built Electron enforces boundaries and saves preferences across a native relaunch', async () => {
   const profile = await mkdtemp(join(tmpdir(), 'factory-electron-'));
   let instance: ElectronApplication | undefined;
 
   const launch = async () => {
-    instance = await _electron.launch({
-      executablePath,
-      args: [resolve('.'), `--user-data-dir=${profile}`],
-      env: { ...process.env, FACTORY_DESKTOP_DEV: '0' },
-      chromiumSandbox: true,
-    });
+    instance = await launchStudio(profile);
     const effective = await instance.evaluate(({ app }) => app.getPath('userData'));
     expect(await realpath(effective)).toBe(await realpath(profile));
     return instance;
@@ -64,6 +57,7 @@ test('built Electron enforces boundaries and saves preferences across a native r
       expect(denied).toBe('denied');
     });
 
+    const appPath = await first.evaluate(({ app }) => app.getAppPath());
     const unauthorized = await first.evaluate(async ({ BrowserWindow }, preload) => {
       const other = new BrowserWindow({ show: false, webPreferences: { preload, sandbox: true, contextIsolation: true } });
       try {
@@ -74,7 +68,7 @@ test('built Electron enforces boundaries and saves preferences across a native r
       } finally {
         other.destroy();
       }
-    }, resolve('dist/preload/index.cjs'));
+    }, join(appPath, 'dist/preload/index.cjs'));
     expect(unauthorized).toEqual({ ok: false, error: 'ACCESS_DENIED' });
     await expect(page.getByRole('separator', { name: 'Sidebar width' })).toHaveAttribute('aria-valuenow', '240');
 

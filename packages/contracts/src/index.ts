@@ -25,6 +25,7 @@ export * from './library';
 
 export const CHANNEL = {
   appInfo: 'factory:app-info',
+  toolchain: 'factory:toolchain',
   readPreferences: 'factory:read-preferences',
   writePreferences: 'factory:write-preferences',
   systemTheme: 'factory:system-theme',
@@ -39,6 +40,15 @@ export type DesktopPlatform = 'win32' | 'linux' | 'darwin';
 export interface AppInfo {
   version: string;
   platform: DesktopPlatform;
+}
+
+const toolNames = ['Git', 'Node.js', 'pnpm', 'Go'] as const;
+export type Toolchain = Record<typeof toolNames[number], string | null>;
+
+export function isToolchain(value: unknown): value is Toolchain {
+  return isRecord(value) && hasExactKeys(value, toolNames)
+    && toolNames.every((name) => value[name] === null
+      || (typeof value[name] === 'string' && /^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}$/u.test(value[name])));
 }
 
 export interface Preferences {
@@ -115,6 +125,7 @@ export interface StudioBridge {
   incremental: IncrementalBridge;
   library: LibraryBridge;
   getAppInfo(): Promise<Result<AppInfo>>;
+  inspectToolchain(): Promise<Result<Toolchain>>;
   readPreferences(): Promise<Result<PreferenceSnapshot>>;
   writePreferences(request: PreferenceWrite): Promise<Result<Preferences>>;
   onSystemThemeChange(listener: (theme: SystemTheme) => void): () => void;
