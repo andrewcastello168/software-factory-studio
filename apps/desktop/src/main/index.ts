@@ -11,28 +11,29 @@ import {
 import { randomUUID } from 'node:crypto';
 import { sha256 } from '@factory/generator';
 import { assertVacant, publish } from './services/generation/transaction';
-import { admitRoot } from './services/projects/filesystem';
+import { admitRoot, pathKey } from './services/projects/filesystem';
 import { DeveloperStudio } from './services/developer/studio';
+import { inspectToolchain } from './services/developer/tools';
 import { GIT_ADVANCED_CHANNEL, isGitAdvancedOutcome, isGitApproved, isGitReview, isGitReviewInput, isGitScope,
   isGitWorkspaceDetails } from '@factory/contracts';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, protocol, session, shell } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
 import { existsSync } from 'node:fs';
 import { readFile, realpath } from 'node:fs/promises';
-import { basename, dirname, join, relative, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import {
   LIBRARY_CHANNEL, isLibraryAsset, isLibraryAssets,
   INCREMENTAL_CHANNEL, isIncrementalApproval, isIncrementalInspection, isIncrementalPreview, isIncrementalSelection,
   isNullableIncrementalInspection,
   SCHEMA_CHANNEL, isMigrationPreview, isNullableSchemaSnapshot, isSchemaConnection, isSchemaEdit,
   isSchemaLayout, isSchemaPhysical, isSchemaPoints, isSchemaProposal, isSchemaPublish, isSchemaSnapshot, isSqlImport,
-  CHANNEL, failure, isAppInfo, isPreferences, isPreferenceSnapshot, isPreferenceWrite, success,
+  CHANNEL, failure, isAppInfo, isToolchain, isPreferences, isPreferenceSnapshot, isPreferenceWrite, success,
   validateReply, PROJECT_CHANNEL, isProjectCatalog, isProjectId, isProjectSelection,
   GIT_CHANNEL, isGitAction, isGitCloneRequest, isGitCloneResult, isGitCompareRequest, isGitDiff, isGitDiffRequest,
   isGitOutcome, isGitState,
   GENERATOR_CHANNEL, isGeneratorParent, isGeneratorPending, isGeneratorPreview, isGeneratorReceipt, isGeneratorRequest,
 } from '@factory/contracts';
-import type { Result, SystemTheme, Validator } from '@factory/contracts';
+import type { Result, SystemTheme, Toolchain, Validator } from '@factory/contracts';
 import { APP_URL, DEV_URL, PRODUCTION_CSP, isAuthorizedFrame, isRendererDocument, rendererRestrictions, resolveBundledRoute } from './security';
 import { PreferenceStore } from './services/preferences';
 import { RecentStore } from './services/projects/recents';
@@ -46,6 +47,7 @@ import { IncrementalStudio } from './services/incremental/studio';
 import { LibraryStore } from './services/library';
 import { IncrementalStore } from './services/incremental/storage';
 
+const distributionId = 'com.softwarefactorystudio.desktop';
 const development = !app.isPackaged && process.env.FACTORY_DESKTOP_DEV === '1';
 let window: BrowserWindow | undefined;
 let projects: ProjectWorkspace | undefined;
@@ -83,6 +85,19 @@ function installBridge(store: PreferenceStore, library: LibraryStore) {
   handle(LIBRARY_CHANNEL.list, isLibraryAssets, (...args) => args.length ? failure('INVALID_REQUEST') : library.list());
   handle(LIBRARY_CHANNEL.publish, isLibraryAsset, (...args) => args.length === 1 && isLibraryAsset(args[0])
     ? library.publish(args[0]) : failure('INVALID_REQUEST'));
+  let discovery: Promise<Result<Toolchain>> | undefined;
+  handle(CHANNEL.toolchain, isToolchain, async (...args) => {
+    if (args.length) return failure('INVALID_REQUEST');
+    const workspace = projects;
+    if (!workspace) return failure('ACCESS_DENIED');
+    if (discovery) return discovery;
+    discovery = inspectToolchain((path) => projects === workspace && workspace.allowsAuxiliaryPath(path))
+      .then(({ tools }) => {
+        const versions = Object.fromEntries(tools.map(({ name, version }) => [name, version]));
+        return projects === workspace && isToolchain(versions) ? success(versions) : failure('INVALID_REPLY');
+      }).finally(() => { discovery = undefined; });
+    return discovery;
+  });
   handle(CHANNEL.appInfo, isAppInfo, (...args) => {
     const info = { version: app.getVersion(), platform: process.platform };
     return args.length ? failure('INVALID_REQUEST') : isAppInfo(info) ? success(info) : failure('INVALID_REPLY');
@@ -161,6 +176,7 @@ function installDeveloperBridge() {
     if (!selected.filePath.toLowerCase().endsWith('.json') || existsSync(selected.filePath)) return failure('DESIGN_CONFLICT');
     try {
       const destination = await admitRoot(dirname(selected.filePath));
+      if ((await installedPathGuard())(destination.path)) return failure('DESIGN_CONFLICT');
       const name = basename(selected.filePath);
       if (!isWorkspacePath(name)) return failure('INVALID_REQUEST');
       const result = await studio.design(id);
@@ -264,7 +280,18 @@ async function installProtocol() {
   });
 }
 
+async function installedPathGuard(): Promise<(path: string) => boolean> {
+  if (!app.isPackaged) return () => false;
+  const installation = pathKey(await realpath(dirname(process.execPath)));
+  const contains = (parent: string, child: string) => {
+    const rel = relative(parent, child);
+    return rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+  };
+  return (path: string) => contains(installation, pathKey(path)) || contains(pathKey(path), installation);
+}
+
 async function openWindow(library: LibraryStore) {
+  const isProtectedDirectory = await installedPathGuard();
   const current = new BrowserWindow({
     title: 'Software Factory Studio',
     width: 1280,
@@ -309,6 +336,7 @@ async function openWindow(library: LibraryStore) {
         current.webContents.send(PROJECT_CHANNEL.changed, catalog);
       }
     },
+    isProtectedDirectory,
   );
   projects = workspace;
   const projectDialogs = {
@@ -317,7 +345,17 @@ async function openWindow(library: LibraryStore) {
       const selected = await dialog.showOpenDialog(current, {
         title, properties: ['openDirectory'], ...(defaultPath ? { defaultPath } : {}),
       });
-      return selected.canceled ? null : selected.filePaths[0] ?? null;
+      const path = selected.canceled ? undefined : selected.filePaths[0];
+      if (!path) return null;
+      if (app.isPackaged && isProtectedDirectory(await realpath(path))) {
+        await dialog.showMessageBox(current, {
+          type: 'warning', title: 'Choose a different directory',
+          message: 'Use a project directory outside the Software Factory Studio installation.',
+          buttons: ['OK'],
+        });
+        return null;
+      }
+      return path;
     },
     async confirm(title: string, detail: string, action: string) {
       if (current.isDestroyed()) return false;
@@ -422,6 +460,8 @@ function reportStartupError() {
   console.error('Studio could not load its renderer. Build the application or check the development server.');
   app.exit(1);
 }
+
+if (process.platform === 'win32' && app.isPackaged) app.setAppUserModelId(distributionId);
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();

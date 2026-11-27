@@ -453,16 +453,16 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
       await verifyDelivery(vite, fixture, env, go, packageManager, port);
     }
     const instructions = await readFile(join(fixture, 'AGENTS.md'), 'utf8');
+    const profile = plan.config.library?.profile;
+    if (profile) assert(instructions.includes(profile.name + ' v' + profile.version));
     if (go) {
       assert(instructions.includes('Go 1.26.11'));
-      assert(instructions.includes(delivery ? 'Client Delivery' : 'Client delivery v2'));
       assert(!instructions.includes('Express') && !instructions.includes('pnpm db:migrate'));
       assert((await readFile(join(fixture, 'docs/ENGINEERING_PROFILE.md'), 'utf8')).includes('Go Service conventions'));
       if (server) assert.equal((await fetch(url + '/api/auth/session')).status, 404);
     } else assert(instructions.includes('Standard Engineering profile v1'));
     assert.equal(instructions.includes('Welcome example'), demo);
     if (identity) {
-      assert(instructions.includes(delivery ? 'Client Delivery' : 'Client delivery v2'));
       const profileGuide = await readFile(join(fixture, 'docs', 'ENGINEERING_PROFILE.md'), 'utf8');
       assert(profileGuide.includes('Use disposable PostgreSQL schemas.'));
       assert.equal(instructions.includes('rbac v1.0.0'), identity === 'full');
@@ -495,67 +495,97 @@ try {
   const { planProject, readIncrementalProject, composeDesign, sha256 } = await vite.ssrLoadModule('/packages/generator/src/index.ts');
   const { AUTHENTICATION, GO_STACK, IDENTITY_MODULES, BUSINESS_TEMPLATE, STARTER, STACKS, WELCOME_EXAMPLE } = await vite.ssrLoadModule('/packages/contracts/src/index.ts');
   const { parseSql } = await vite.ssrLoadModule('/packages/schema/src/index.ts');
-  const { schema: inventory, diagnostics } = parseSql(await readFile(resolve(root, 'tests/fixtures/inventory.sql'), 'utf8'));
+  const inventorySql = await readFile(resolve(root, 'tests/fixtures/inventory.sql'), 'utf8');
+  const { schema: inventory, diagnostics } = parseSql(inventorySql);
   assert.deepEqual(diagnostics, []);
-  const profile = { kind: 'profile', id: randomUUID(), version: 2, name: 'Client delivery', advice: { Testing: 'Use disposable PostgreSQL schemas.' } };
-  const shared = await verifySharedAssets(vite);
-  const variants = process.env.FACTORY_STARTER_VARIANT ? [process.env.FACTORY_STARTER_VARIANT]
-    : ['foundation', 'welcome', 'inventory', 'incremental', 'identity', 'installed', 'go-foundation', 'go-inventory'];
-  for (const variant of variants) {
-    const go = variant.startsWith('go-');
-    const identity = variant === 'identity' ? 'full' : variant === 'installed' ? 'installed' : undefined;
-    const design = variant === 'inventory';
-    const delivery = variant === 'identity' || variant === 'go-inventory';
-    const records = Boolean(identity || design || variant === 'incremental' || variant === 'go-inventory');
-    const demo = variant === 'welcome';
-    const incremental = variant === 'incremental' || variant === 'go-inventory';
-    const selectedSchema = identity === 'installed'
-      ? parseSql('CREATE TABLE products (id integer PRIMARY KEY, name text NOT NULL);').schema
-      : incremental ? { ...inventory, tables: inventory.tables.filter(({ name }) => name !== 'suppliers')
-      .map((table) => table.name !== 'products' ? table : { ...table, columns: table.columns.filter(({ name }) => name !== 'supplier_id'),
-        constraints: table.constraints.filter(({ name }) => name !== 'products_supplier_id_fkey') }) } : inventory;
-    const types = go && incremental ? parseSql('ALTER TABLE warehouses ADD COLUMN external_id uuid; ALTER TABLE warehouses ADD COLUMN aisle smallint;', selectedSchema) : null;
-    if (types) assert.deepEqual(types.diagnostics, []);
-    const schema = types?.schema ?? selectedSchema;
-    const tables = schema.tables.map(({ name }) => name);
-    const stack = STACKS[go ? GO_STACK : STARTER.stack];
-    const plan = planProject({
-      name: 'Inventory Portal', slug: 'inventory-portal', port: await freePort(),
-      appType: STARTER.appType, stack: stack.id, database: STARTER.database,
-      architecture: stack.architecture, engineering: STARTER.engineering, modules: identity === 'full' ? [...IDENTITY_MODULES] : demo ? [WELCOME_EXAMPLE] : [],
-      ...(records ? { crud: { schema, migrations: true, backend: tables, frontend: tables } } : {}),
-      ...(identity || go || design ? { library: { profile: delivery ? shared.profile : profile, template: delivery ? shared.template : BUSINESS_TEMPLATE,
-        branding: { color: identity === 'full' ? '#2458a4' : '#594688', theme: 'dark', mark: go ? 'GO' : design ? 'DP' : identity === 'full' ? 'IN' : 'CL' } } } : {}),
-    }, randomUUID());
-    if (go) {
-      const node = planProject({ ...plan.config, stack: STARTER.stack, architecture: STARTER.architecture }, randomUUID());
-      const get = (value, path) => value.files.find((entry) => entry.path === path)?.content;
-      assert.notEqual(node.projectId, plan.projectId);
-      assert.equal(get(node, '.factory/engineering.json'), get(plan, '.factory/engineering.json'));
-      assert.notEqual(get(node, 'AGENTS.md'), get(plan, 'AGENTS.md'));
-      assert(!get(node, 'go.mod') && !get(plan, 'server/app.ts'));
-      assert.throws(() => planProject({ ...plan.config, modules: [AUTHENTICATION] }, randomUUID()));
-      assert.deepEqual(planProject(plan.config, plan.projectId), plan);
+  const installedFixtures = process.env.FACTORY_INSTALLED_FIXTURES;
+  if (installedFixtures) {
+    assert(database, 'Use a disposable PostgreSQL database to verify installed generator output.');
+    for (const kind of ['node', 'go']) {
+      const go = kind === 'go';
+      const directory = join(installedFixtures, kind);
+      const metadata = ['package.json', '.env.example', '.factory/project.json', '.factory/generation-manifest.json',
+        '.factory/versions.lock.json', '.factory/modules.json', '.factory/engineering.json'];
+      const read = async (path) => {
+        const content = await readFile(join(directory, path), 'utf8');
+        return { path, content, sha256: sha256(content), state: 'text' };
+      };
+      const project = readIncrementalProject(new Map(await Promise.all(metadata.map(async (path) => [path, await read(path)]))));
+      assert.equal(project.config.stack, go ? GO_STACK : STARTER.stack);
+      const schema = go ? parseSql(inventorySql + 'ALTER TABLE warehouses ADD COLUMN external_id uuid; ALTER TABLE warehouses ADD COLUMN aisle smallint;' +
+        'CREATE TABLE supplies (id integer PRIMARY KEY, name text NOT NULL);').schema : inventory;
+      const tables = schema.tables.map(({ name }) => name);
+      const config = { ...project.config, crud: { schema, migrations: true, backend: tables, frontend: tables } };
+      const expected = planProject(config, project.projectId);
+      const files = await Promise.all(expected.files.map(async (entry) => {
+        const output = await read(entry.path);
+        assert.equal(output.sha256, entry.sha256, 'Installed generator output does not match the reviewed plan: ' + entry.path);
+        return output;
+      }));
+      console.log('Verifying standalone files emitted by the installed Studio: ' + kind);
+      await verify({ config, files }, false, true, false, go ? undefined : 'full', AUTHENTICATION, go, false, !go);
     }
-    if (design) {
-      const files = new Map(plan.files.map((file) => [file.path, { state: 'text', ...file }]));
-      const unchanged = files.get('web/main.tsx');
-      const path = 'web/features/StudioPage.tsx';
-      for (const missing of [path, 'docs/STUDIO_PAGE.md', 'web/studio-page.html']) files.set(missing, { state: 'absent' });
-      const project = readIncrementalProject(files);
-      const reviewed = composeDesign(project, files, schema, { generate: true,
-        entry: { kind: 'page', id: 'inventory-review', title: 'Inventory review', description: 'Current stock records.', layout: 'table', api: 'list-products', columns: ['id', 'name'] } });
-      assert.deepEqual(reviewed.issues, []);
-      assert(reviewed.changes.some((entry) => entry.path === path && entry.action === 'create'));
-      for (const change of reviewed.changes) {
-        assert(change.after !== null);
-        files.set(change.path, { path: change.path, content: change.after, sha256: sha256(change.after), state: 'text' });
+  } else {
+    const profile = { kind: 'profile', id: randomUUID(), version: 2, name: 'Client delivery', advice: { Testing: 'Use disposable PostgreSQL schemas.' } };
+    const shared = await verifySharedAssets(vite);
+    const variants = process.env.FACTORY_STARTER_VARIANT ? [process.env.FACTORY_STARTER_VARIANT]
+      : ['foundation', 'welcome', 'inventory', 'incremental', 'identity', 'installed', 'go-foundation', 'go-inventory'];
+    for (const variant of variants) {
+      const go = variant.startsWith('go-');
+      const identity = variant === 'identity' ? 'full' : variant === 'installed' ? 'installed' : undefined;
+      const design = variant === 'inventory';
+      const delivery = variant === 'identity' || variant === 'go-inventory';
+      const records = Boolean(identity || design || variant === 'incremental' || variant === 'go-inventory');
+      const demo = variant === 'welcome';
+      const incremental = variant === 'incremental' || variant === 'go-inventory';
+      const selectedSchema = identity === 'installed'
+        ? parseSql('CREATE TABLE products (id integer PRIMARY KEY, name text NOT NULL);').schema
+        : incremental ? { ...inventory, tables: inventory.tables.filter(({ name }) => name !== 'suppliers')
+        .map((table) => table.name !== 'products' ? table : { ...table, columns: table.columns.filter(({ name }) => name !== 'supplier_id'),
+          constraints: table.constraints.filter(({ name }) => name !== 'products_supplier_id_fkey') }) } : inventory;
+      const types = go && incremental ? parseSql('ALTER TABLE warehouses ADD COLUMN external_id uuid; ALTER TABLE warehouses ADD COLUMN aisle smallint;', selectedSchema) : null;
+      if (types) assert.deepEqual(types.diagnostics, []);
+      const schema = types?.schema ?? selectedSchema;
+      const tables = schema.tables.map(({ name }) => name);
+      const stack = STACKS[go ? GO_STACK : STARTER.stack];
+      const plan = planProject({
+        name: 'Inventory Portal', slug: 'inventory-portal', port: await freePort(),
+        appType: STARTER.appType, stack: stack.id, database: STARTER.database,
+        architecture: stack.architecture, engineering: STARTER.engineering, modules: identity === 'full' ? [...IDENTITY_MODULES] : demo ? [WELCOME_EXAMPLE] : [],
+        ...(records ? { crud: { schema, migrations: true, backend: tables, frontend: tables } } : {}),
+        ...(identity || go || design ? { library: { profile: delivery ? shared.profile : profile, template: delivery ? shared.template : BUSINESS_TEMPLATE,
+          branding: { color: identity === 'full' ? '#2458a4' : '#594688', theme: 'dark', mark: go ? 'GO' : design ? 'DP' : identity === 'full' ? 'IN' : 'CL' } } } : {}),
+      }, randomUUID());
+      if (go) {
+        const node = planProject({ ...plan.config, stack: STARTER.stack, architecture: STARTER.architecture }, randomUUID());
+        const get = (value, path) => value.files.find((entry) => entry.path === path)?.content;
+        assert.notEqual(node.projectId, plan.projectId);
+        assert.equal(get(node, '.factory/engineering.json'), get(plan, '.factory/engineering.json'));
+        assert.notEqual(get(node, 'AGENTS.md'), get(plan, 'AGENTS.md'));
+        assert(!get(node, 'go.mod') && !get(plan, 'server/app.ts'));
+        assert.throws(() => planProject({ ...plan.config, modules: [AUTHENTICATION] }, randomUUID()));
+        assert.deepEqual(planProject(plan.config, plan.projectId), plan);
       }
-      assert.equal(files.get('web/main.tsx'), unchanged);
-      readIncrementalProject(files);
-      plan.files = [...files.values()].filter((file) => file.state === 'text');
+      if (design) {
+        const files = new Map(plan.files.map((file) => [file.path, { state: 'text', ...file }]));
+        const unchanged = files.get('web/main.tsx');
+        const path = 'web/features/StudioPage.tsx';
+        for (const missing of [path, 'docs/STUDIO_PAGE.md', 'web/studio-page.html']) files.set(missing, { state: 'absent' });
+        const project = readIncrementalProject(files);
+        const reviewed = composeDesign(project, files, schema, { generate: true,
+          entry: { kind: 'page', id: 'inventory-review', title: 'Inventory review', description: 'Current stock records.', layout: 'table', api: 'list-products', columns: ['id', 'name'] } });
+        assert.deepEqual(reviewed.issues, []);
+        assert(reviewed.changes.some((entry) => entry.path === path && entry.action === 'create'));
+        for (const change of reviewed.changes) {
+          assert(change.after !== null);
+          files.set(change.path, { path: change.path, content: change.after, sha256: sha256(change.after), state: 'text' });
+        }
+        assert.equal(files.get('web/main.tsx'), unchanged);
+        readIncrementalProject(files);
+        plan.files = [...files.values()].filter((file) => file.state === 'text');
+      }
+      await verify(plan, demo, records, incremental, identity, AUTHENTICATION, go, design, delivery);
     }
-    await verify(plan, demo, records, incremental, identity, AUTHENTICATION, go, design, delivery);
   }
 } finally {
   await vite.close();

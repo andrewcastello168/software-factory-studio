@@ -1,14 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { _electron, expect, test } from '@playwright/test';
+import { join } from 'node:path';
+import { expect, test } from '@playwright/test';
 import type { ElectronApplication } from '@playwright/test';
+import { launchStudio } from './launch';
 import { findGit } from '../../src/main/services/git/process';
 
-const require = createRequire(import.meta.url);
-const executablePath = require('electron') as string;
 
 test('Git Studio clones, commits and switches real native workspaces with read-only comparison', async () => {
   test.setTimeout(60_000);
@@ -41,12 +39,7 @@ test('Git Studio clones, commits and switches real native workspaces with read-o
     git(seed, 'commit', '-m', 'Add topic file');
     git(seed, 'push', bare, 'main', 'topic');
 
-    instance = await _electron.launch({
-      executablePath,
-      args: [resolve('.'), `--user-data-dir=${appData}`],
-      env: { ...process.env, FACTORY_DESKTOP_DEV: '0' },
-      chromiumSandbox: true,
-    });
+    instance = await launchStudio(appData);
     await instance.evaluate(({ dialog, nativeTheme }, paths) => {
       nativeTheme.themeSource = 'light';
       const queue = [...paths];
@@ -147,12 +140,7 @@ test('Git Studio clones an anonymous public HTTPS repository with verified TLS',
   let instance: ElectronApplication | undefined;
   try {
     await Promise.all([mkdir(profile), mkdir(destination)]);
-    instance = await _electron.launch({
-      executablePath,
-      args: [resolve('.'), `--user-data-dir=${profile}`],
-      env: { ...process.env, FACTORY_DESKTOP_DEV: '0' },
-      chromiumSandbox: true,
-    });
+    instance = await launchStudio(profile);
     await instance.evaluate(({ dialog }, path) => {
       Object.assign(dialog, {
         showOpenDialog: async () => ({ canceled: false, filePaths: [path] }),
@@ -196,8 +184,7 @@ test('opens a linked worktree separately and reviews a native Git merge', async 
     await writeFile(join(project, 'app.txt'), 'primary\n');
     git(project, 'add', '--', 'app.txt');
     git(project, 'commit', '-m', 'Initial fixture');
-    app = await _electron.launch({ executablePath, args: [resolve('.'), '--user-data-dir=' + data],
-      env: { ...process.env, FACTORY_DESKTOP_DEV: '0' }, chromiumSandbox: true });
+    app = await launchStudio(data);
     await app.evaluate(({ dialog, nativeTheme }, selections) => {
       const queue = [...selections];
       nativeTheme.themeSource = 'light';

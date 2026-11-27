@@ -145,3 +145,13 @@ Add `factory-generator` in Phase 04, `factory-schema` in Phase 05, and `factory-
 | P11-04 Deployment | Review and publish pinned GitHub Actions and Docker templates. Verify disposable PostgreSQL and actual container images where Docker is available. |
 | P11-05 Client release | Package and start independent Node.js and Go archives. Validate archive digests, revision, locks, stale/permission gates and identical republishing after missing output. |
 | P11-06 History and platforms | Surface quality, generation and artifact history with recovery boundaries. Verify scoped regressions in Linux and Windows x64. |
+
+### Phase 12 acceptance
+
+| Gate | Observable evidence |
+| --- | --- |
+| P12-01 Windows package | A pinned Windows x64 build produces a named NSIS RC. Record its source revision, size, SHA-256, versions and Authenticode status. |
+| P12-02 Installer lifecycle | Install per user, verify Start Menu and registration, launch a packaged app, upgrade from the compatibility fixture, reinstall in place, uninstall and reinstall. Verify retained preferences, recents, engineering assets and project files. |
+| P12-03 Packaged boundary | Launch without the checkout's built bundles. Verify ASAR contents, native sandbox, denied renderer capabilities and protected installation paths. Run the installed native workflow suite for both generator stacks, Git, Developer Tools and Client Delivery. |
+| P12-04 First run and native behavior | Expose first-launch guidance and real developer-tool discovery. Record Windows desktop evidence separately for interactive installation, OS scaling, Explorer, VS Code and terminal handoff. |
+| P12-05 Delivery and release readiness | Keep Linux and Windows regressions, upload the reviewed RC and screenshots, document Windows lifecycle and signing, and record the remaining audit gates. Public distribution requires authorized signing and Windows policy validation. |

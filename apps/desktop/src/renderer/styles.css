@@ -337,6 +337,15 @@ kbd {
 .quick-actions .button svg { color: var(--accent); }
 .quick-actions .button svg:last-child { color: var(--muted); }
 
+.home-guide { margin-top: 24px; border-block: 1px solid var(--line); }
+.home-guide summary { cursor: pointer; padding: 10px 4px; color: var(--ink); font-weight: 650; }
+.home-guide summary svg { display: inline-block; margin-inline: 6px; vertical-align: -3px; color: var(--accent); }
+.home-guide-body { display: grid; gap: 8px; padding: 2px 22px 14px; max-width: 740px; }
+.home-guide-body p { margin: 0; }
+.home-toolchain { display: grid; grid-template-columns: repeat(auto-fit, minmax(115px, 1fr)); gap: 8px; margin-top: 4px; }
+.home-toolchain dt { font-weight: 600; }
+.home-toolchain dd { color: var(--muted); font-variant-numeric: tabular-nums; margin: 0; }
+
 .settings-section { border-top: 1px solid var(--line); padding-top: 14px; }
 .theme-field { margin-top: 18px; min-inline-size: 0; }
 .theme-field legend { font-weight: 600; }

@@ -17,8 +17,7 @@ import { checkedDirectory, pathKey } from '../projects/filesystem';
 import type { ProjectRoot } from '../projects/filesystem';
 import { inspectFile, hashFile, readDirectory } from '../incremental/files';
 import { assertVacant, publish } from '../generation/transaction';
-import { findGit } from '../git/process';
-import { baseEnvironment, dependencyBin, openTool, pnpmScript, toolVersion, windows } from './tools';
+import { baseEnvironment, dependencyBin, inspectToolchain, openTool, windows } from './tools';
 import { prepareRequest, redact, requestSecrets, sendRequest, sensitiveKey } from './playground';
 
 interface Grant {
@@ -122,20 +121,7 @@ export class DeveloperStudio {
     const expected = parseConfig(sample?.state === 'text' ? sample.content : '');
     const port = Number(local.PORT ?? expected.PORT ?? project?.config.port);
     const context = await this.#context(id, root);
-    const targets = await Promise.all([openTool('node', this.grant.allows), openTool('go', this.grant.allows), findGit()]);
-    const [node, go, gitCandidate] = targets;
-    const git = gitCandidate && this.grant.allows(gitCandidate) ? gitCandidate : null;
-    const pnpm = await pnpmScript(node, this.grant.allows);
-    const toolTargets = [
-      { name: 'Git', executable: git, args: ['--version'], required: '2.39 or newer' },
-      { name: 'Node.js', executable: node?.target ?? null, args: ['--version'], required: stack?.execution.node ?? null },
-      { name: 'pnpm', executable: node?.target ?? null, args: pnpm ? [pnpm, '--version'] : [], required: stack?.execution.pnpm ?? null },
-      { name: 'Go', executable: go?.target ?? null, args: ['version'], required: stack?.execution.go ?? null },
-    ];
-    const tools = await Promise.all(toolTargets.map(async ({ name, executable, args, required }) => ({
-      name, executable: name === 'pnpm' ? pnpm : executable, required,
-      version: probe && executable && args.length ? await toolVersion(executable, args, this.grant.allows, [dirname(executable)]) : null,
-    })));
+    const { tools, node, go, pnpm } = await inspectToolchain(this.grant.allows, stack ? stack.execution : {}, probe);
     await this.#guard(id, root);
     const info: RuntimeInspection = {
       stack: stack?.label ?? null, tools, backendPort: isDevPort(port) ? port : null,

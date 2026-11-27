@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { checkedDirectory, pathKey } from '../projects/filesystem';
 import type { ProjectRoot } from '../projects/filesystem';
 import { readDirectory } from '../incremental/files';
+import { findGit } from '../git/process';
 
 export const windows = process.platform === 'win32';
 export const system = process.env.SystemRoot ?? 'C:\\Windows';
@@ -55,7 +56,7 @@ export async function openTool(name: 'node' | 'go' | 'gofmt' | 'govulncheck' | '
 export async function toolVersion(tool: string, args: string[], allowed: (path: string) => boolean, paths: string[] = []) {
   try {
     const cwd = await realpath(tmpdir());
-    if (!allowed(cwd)) return null;
+    if (!allowed(cwd) || !allowed(tool) || args.some((arg) => isAbsolute(arg) && !allowed(arg))) return null;
     const { stdout } = await promisify(execFile)(tool, args, {
       cwd, env: { ...baseEnvironment(paths), GOTOOLCHAIN: 'local', GOENV: 'off' }, timeout: 3500, maxBuffer: 4096, windowsHide: true,
     });
@@ -87,4 +88,25 @@ export async function dependencyBin(root: ProjectRoot, name: 'vite' | 'typescrip
   if (!within || within.startsWith('..') || isAbsolute(within) || !(await lstat(script)).isFile()) return null;
   await checkedDirectory(modules.path, modules.identity);
   return script;
+}
+
+export async function inspectToolchain(
+  allowed: (path: string) => boolean,
+  requirements: { node?: string | null; pnpm?: string | null; go?: string | null } = {},
+  probe = true,
+) {
+  const [node, go, gitCandidate] = await Promise.all([openTool('node', allowed), openTool('go', allowed), findGit()]);
+  const git = gitCandidate && allowed(gitCandidate) ? gitCandidate : null;
+  const pnpm = await pnpmScript(node, allowed);
+  const targets = [
+    { name: 'Git', executable: git, args: ['--version'], required: '2.39 or newer' },
+    { name: 'Node.js', executable: node?.target ?? null, args: ['--version'], required: requirements.node ?? null },
+    { name: 'pnpm', executable: node?.target ?? null, args: pnpm ? [pnpm, '--version'] : [], required: requirements.pnpm ?? null },
+    { name: 'Go', executable: go?.target ?? null, args: ['version'], required: requirements.go ?? null },
+  ] as const;
+  const tools = await Promise.all(targets.map(async ({ name, executable, args, required }) => ({
+    name, executable: name === 'pnpm' ? pnpm : executable, required,
+    version: probe && executable && args.length ? await toolVersion(executable, [...args], allowed, [dirname(executable)]) : null,
+  })));
+  return { tools, node, go, pnpm };
 }

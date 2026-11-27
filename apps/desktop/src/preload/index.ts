@@ -15,7 +15,7 @@ import {
   isNullableIncrementalInspection,
   SCHEMA_CHANNEL, isMigrationPreview, isNullableSchemaSnapshot, isSchemaConnection, isSchemaEdit,
   isSchemaLayout, isSchemaPhysical, isSchemaPoints, isSchemaProposal, isSchemaPublish, isSchemaSnapshot, isSqlImport,
-  CHANNEL, failure, isAppInfo, isPreferences, isPreferenceSnapshot, isPreferenceWrite,
+  CHANNEL, failure, isAppInfo, isToolchain, isPreferences, isPreferenceSnapshot, isPreferenceWrite,
   isSystemTheme, validateReply, PROJECT_CHANNEL, isProjectCatalog, isProjectId, isProjectSelection,
   GIT_CHANNEL, isGitAction, isGitCloneRequest, isGitCloneResult, isGitCompareRequest, isGitDiff, isGitDiffRequest,
   isGitOutcome, isGitState,
@@ -124,6 +124,7 @@ const studio: StudioBridge = {
     resume: (id) => invokeProject(GENERATOR_CHANNEL.resume, isGeneratorReceipt, id),
     release: (id) => invokeProject(GENERATOR_CHANNEL.release, isGeneratorPending, id),
   },
+  inspectToolchain: () => invoke(CHANNEL.toolchain, isToolchain),
   getAppInfo: () => invoke(CHANNEL.appInfo, isAppInfo),
   readPreferences: () => invoke(CHANNEL.readPreferences, isPreferenceSnapshot),
   writePreferences: (request) => isPreferenceWrite(request)

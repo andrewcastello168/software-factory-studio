@@ -1,12 +1,10 @@
 import { mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { _electron, expect, test } from '@playwright/test';
+import { join } from 'node:path';
+import { expect, test } from '@playwright/test';
 import type { ElectronApplication } from '@playwright/test';
+import { launchStudio } from './launch';
 
-const require = createRequire(import.meta.url);
-const executablePath = require('electron') as string;
 
 async function useFolderSelection(instance: ElectronApplication, folder: string) {
   await instance.evaluate(({ dialog }, submitted) => {
@@ -31,12 +29,7 @@ test('native project flow opens, refreshes, relocates and remembers real folders
   let instance: ElectronApplication | undefined;
 
   async function launch() {
-    instance = await _electron.launch({
-      executablePath,
-      args: [resolve('.'), `--user-data-dir=${profile}`],
-      env: { ...process.env, FACTORY_DESKTOP_DEV: '0' },
-      chromiumSandbox: true,
-    });
+    instance = await launchStudio(profile);
     expect(await realpath(await instance.evaluate(({ app }) => app.getPath('userData')))).toBe(await realpath(profile));
     return instance;
   }
