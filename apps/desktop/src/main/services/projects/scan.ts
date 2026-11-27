@@ -97,7 +97,7 @@ function entryFrom(relative: string, info: BigIntStats): ProjectEntry | null {
   return null;
 }
 
-export async function scanProject(root: ProjectRoot): Promise<ProjectScan> {
+export async function scanProject(root: ProjectRoot, excludedAtRoot: readonly string[] = []): Promise<ProjectScan> {
   const entries: ProjectEntry[] = [];
   const queue: ScanDirectory[] = [{ ...root, relative: '', parent: null }];
   const watched: ProjectScan['watched'] = [];
@@ -126,7 +126,7 @@ export async function scanProject(root: ProjectRoot): Promise<ProjectScan> {
               partial = true;
               continue;
             }
-            if (isExcludedProjectEntry(name)) continue;
+            if (isExcludedProjectEntry(name) || (!directory.relative && excludedAtRoot.includes(name.toLowerCase()))) continue;
 
             // Recheck actual entries at the requested path, including Windows junctions.
             const key = name.normalize('NFC');

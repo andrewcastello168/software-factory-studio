@@ -5,7 +5,7 @@ import type {
   DesignEntry, DesignSnapshot, ErrorCode, GitState, IncrementalApproval, IncrementalInspection, IncrementalPreview, IncrementalSelection, OpenProject, Result,
 } from '@factory/contracts';
 import {
-  artifactLinks, composeDesign, describeDesign, readDesign, classifyOwned, composeIncremental, composeModuleInstall, eligibility, incrementalPaths, IncrementalUnsupported, manifestEntries,
+  artifactLinks, composeDelivery, composeDesign, describeDesign, readDesign, classifyOwned, composeIncremental, composeModuleInstall, eligibility, incrementalPaths, IncrementalUnsupported, manifestEntries,
   previousSources, readIncrementalProject, sha256,
 } from '@factory/generator';
 import type { LocalFile } from '@factory/generator';
@@ -174,7 +174,8 @@ export class IncrementalStudio {
     const id = randomUUID();
     if (input.design) await this.#loadDesignReferences(captured, input.design.entry);
     const result = captured.issues.length ? { changes: [], issues: captured.issues, backend: [], frontend: [] }
-      : input.design ? composeDesign(captured.project, captured.files, captured.schema, input.design)
+      : input.delivery ? composeDelivery(captured.project, captured.files, input.delivery)
+        : input.design ? composeDesign(captured.project, captured.files, captured.schema, input.design)
         : input.modules?.length ? composeModuleInstall(captured.project, captured.files, captured.oldSchema, captured.source.migrations, input.modules)
         : composeIncremental(captured.project, captured.files, captured.schema, captured.oldSchema, captured.source.migrations, input);
     if (input.modules?.length && (input.backend.length || input.frontend.length)) result.issues.push('Review module installation and new CRUD layers separately.');

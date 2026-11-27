@@ -1,3 +1,4 @@
+import { isQualityTask, qualityTasks } from './delivery';
 import type { Result } from './index';
 import { isProjectId, isProjectSegment } from './projects';
 import { hasControlCharacters, hasExactKeys, isRecord } from './validation';
@@ -7,12 +8,12 @@ export const DEVELOPER_CHANNEL = {
   preview: 'factory:developer-preview', start: 'factory:developer-start', control: 'factory:developer-control',
   logs: 'factory:developer-logs', copy: 'factory:developer-copy', environment: 'factory:developer-environment', request: 'factory:developer-request',
 } as const;
-export const runtimeTasks = ['backend', 'frontend', 'build', 'test'] as const;
+export const runtimeTasks = ['backend', 'frontend', ...qualityTasks] as const;
 export type RuntimeTask = typeof runtimeTasks[number];
 export const httpMethods = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const;
 export type HttpMethod = typeof httpMethods[number];
 export type Handoff = { projectId: string; action: 'editor' | 'reveal' | 'terminal' | 'choose-editor'; path: string | null; line: number | null; column: number | null };
-export interface RuntimeSelection { projectId: string; task: RuntimeTask; frontendPort: number }
+export interface RuntimeSelection { projectId: string; task: RuntimeTask; frontendPort: number; quality?: true }
 export interface RuntimeStep { executable: string; args: string[] }
 export interface RuntimePreview { id: string; cwd: string; steps: RuntimeStep[]; port: number | null; environment: string[] }
 export interface RuntimeScope { projectId: string; id: string }
@@ -69,7 +70,9 @@ export const isHandoff = (x: unknown): x is Handoff =>
   && (x.line === null || (x.action === 'editor' && x.path !== null))
   && (x.action !== 'choose-editor' || x.path === null);
 export const isRuntimeSelection = (x: unknown): x is RuntimeSelection =>
-  keyset(x, ['projectId', 'task', 'frontendPort']) && isProjectId(x.projectId) && oneOf(runtimeTasks, x.task) && isDevPort(x.frontendPort);
+  isRecord(x) && hasExactKeys(x, ['projectId', 'task', 'frontendPort', ...(Object.hasOwn(x, 'quality') ? ['quality'] : [])])
+  && isProjectId(x.projectId) && oneOf(runtimeTasks, x.task) && isDevPort(x.frontendPort)
+  && (Object.hasOwn(x, 'quality') ? x.quality === true && isQualityTask(x.task) : ['backend', 'frontend', 'test', 'build'].includes(String(x.task)));
 export const isRuntimeScope = (x: unknown): x is RuntimeScope =>
   keyset(x, ['projectId', 'id']) && isProjectId(x.projectId) && isProjectId(x.id);
 export const isRuntimeControl = (x: unknown): x is RuntimeControl =>
@@ -86,7 +89,7 @@ const step = (x: unknown): x is RuntimeStep =>
   keyset(x, ['executable', 'args']) && short(x.executable, 4096) && array(x.args, 64, (a): a is string => short(a, 4096));
 export const isRuntimePreview = (x: unknown): x is RuntimePreview =>
   keyset(x, ['id', 'cwd', 'steps', 'port', 'environment']) && isProjectId(x.id) && short(x.cwd, 4096)
-  && array(x.steps, 4, step) && nullable(x.port, isDevPort) && strings(x.environment);
+  && array(x.steps, 5, step) && nullable(x.port, isDevPort) && strings(x.environment);
 const tool = (x: unknown): x is RuntimeTool =>
   keyset(x, ['name', 'executable', 'version', 'required']) && short(x.name) && nullable(x.executable, (a) => short(a, 4096))
   && nullable(x.version, string300) && nullable(x.required, string300);

@@ -10,6 +10,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as wait } from 'node:timers/promises';
 import { createServer } from 'vite';
+import { applyDeliveryFixture, verifyDelivery, verifySharedAssets } from './verify-delivery.mjs';
 import { verifyDeveloper } from './verify-developer.mjs';
 import { fixtureIdentity, identityBrowser, verifyIdentity, verifySecureCookie } from './verify-identity.mjs';
 
@@ -222,7 +223,7 @@ async function installIdentity(fixture, authentication) {
   } finally { studio.dispose(); await rm(profile, { recursive: true, force: true, maxRetries: 5 }); }
 }
 
-async function verify(plan, demo, inventory, incremental, identity, authentication, go, design) {
+async function verify(plan, demo, inventory, incremental, identity, authentication, go, design, delivery) {
   const fixture = await mkdtemp(join(tmpdir(), 'studio-generated-app-'));
   const port = plan.config.port;
   const url = 'http://127.0.0.1:' + port;
@@ -314,6 +315,7 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
     }
     run('lint');
     run('typecheck');
+    if (delivery) await applyDeliveryFixture(vite, fixture);
     if (go) {
       const sources = plan.files.filter(({ path }) => path.endsWith('.go')).map(({ path }) => path);
       assert.equal(spawnSync('gofmt', ['-l', ...sources], { cwd: fixture, encoding: 'utf8' }).stdout.trim(), '');
@@ -435,17 +437,32 @@ async function verify(plan, demo, inventory, incremental, identity, authenticati
       server = undefined;
       await verifyDeveloper(vite, fixture, env, developmentPort);
     }
+    if (delivery) {
+      await stop(server);
+      server = undefined;
+      if (go) await rm(binary, { force: true });
+      if (process.platform === 'linux') {
+        const ci = spawnSync('bash', ['delivery/verify.sh'], { cwd: fixture, env, stdio: 'inherit', timeout: 240_000 });
+        assert.equal(ci.status, 0, 'Generated CI command sequence failed.');
+        if (go) {
+          // Studio's build verifies the outputs from its own reviewed platform commands.
+          await rm(join(fixture, 'dist', 'factory-server'), { force: true });
+          await rm(join(fixture, 'dist', 'factory-migrate'), { force: true });
+        }
+      }
+      await verifyDelivery(vite, fixture, env, go, packageManager, port);
+    }
     const instructions = await readFile(join(fixture, 'AGENTS.md'), 'utf8');
     if (go) {
       assert(instructions.includes('Go 1.26.11'));
-      assert(instructions.includes('Client delivery v2'));
+      assert(instructions.includes(delivery ? 'Client Delivery' : 'Client delivery v2'));
       assert(!instructions.includes('Express') && !instructions.includes('pnpm db:migrate'));
       assert((await readFile(join(fixture, 'docs/ENGINEERING_PROFILE.md'), 'utf8')).includes('Go Service conventions'));
       if (server) assert.equal((await fetch(url + '/api/auth/session')).status, 404);
     } else assert(instructions.includes('Standard Engineering profile v1'));
     assert.equal(instructions.includes('Welcome example'), demo);
     if (identity) {
-      assert(instructions.includes('Client delivery v2'));
+      assert(instructions.includes(delivery ? 'Client Delivery' : 'Client delivery v2'));
       const profileGuide = await readFile(join(fixture, 'docs', 'ENGINEERING_PROFILE.md'), 'utf8');
       assert(profileGuide.includes('Use disposable PostgreSQL schemas.'));
       assert.equal(instructions.includes('rbac v1.0.0'), identity === 'full');
@@ -481,12 +498,14 @@ try {
   const { schema: inventory, diagnostics } = parseSql(await readFile(resolve(root, 'tests/fixtures/inventory.sql'), 'utf8'));
   assert.deepEqual(diagnostics, []);
   const profile = { kind: 'profile', id: randomUUID(), version: 2, name: 'Client delivery', advice: { Testing: 'Use disposable PostgreSQL schemas.' } };
+  const shared = await verifySharedAssets(vite);
   const variants = process.env.FACTORY_STARTER_VARIANT ? [process.env.FACTORY_STARTER_VARIANT]
     : ['foundation', 'welcome', 'inventory', 'incremental', 'identity', 'installed', 'go-foundation', 'go-inventory'];
   for (const variant of variants) {
     const go = variant.startsWith('go-');
     const identity = variant === 'identity' ? 'full' : variant === 'installed' ? 'installed' : undefined;
     const design = variant === 'inventory';
+    const delivery = variant === 'identity' || variant === 'go-inventory';
     const records = Boolean(identity || design || variant === 'incremental' || variant === 'go-inventory');
     const demo = variant === 'welcome';
     const incremental = variant === 'incremental' || variant === 'go-inventory';
@@ -505,7 +524,7 @@ try {
       appType: STARTER.appType, stack: stack.id, database: STARTER.database,
       architecture: stack.architecture, engineering: STARTER.engineering, modules: identity === 'full' ? [...IDENTITY_MODULES] : demo ? [WELCOME_EXAMPLE] : [],
       ...(records ? { crud: { schema, migrations: true, backend: tables, frontend: tables } } : {}),
-      ...(identity || go || design ? { library: { profile, template: BUSINESS_TEMPLATE,
+      ...(identity || go || design ? { library: { profile: delivery ? shared.profile : profile, template: delivery ? shared.template : BUSINESS_TEMPLATE,
         branding: { color: identity === 'full' ? '#2458a4' : '#594688', theme: 'dark', mark: go ? 'GO' : design ? 'DP' : identity === 'full' ? 'IN' : 'CL' } } } : {}),
     }, randomUUID());
     if (go) {
@@ -536,7 +555,7 @@ try {
       readIncrementalProject(files);
       plan.files = [...files.values()].filter((file) => file.state === 'text');
     }
-    await verify(plan, demo, records, incremental, identity, AUTHENTICATION, go, design);
+    await verify(plan, demo, records, incremental, identity, AUTHENTICATION, go, design, delivery);
   }
 } finally {
   await vite.close();

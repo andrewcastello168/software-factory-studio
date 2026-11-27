@@ -1,3 +1,5 @@
+import type { DeliveryBridge } from './delivery';
+export * from './delivery';
 import type { DesignBridge } from './design';
 export * from './design';
 import type { DeveloperBridge } from './developer';
@@ -93,6 +95,9 @@ const errorCodes = [
   'DEVELOPER_PROCESS',
   'DEVELOPER_NETWORK',
   'DESIGN_CONFLICT',
+  'DELIVERY_STALE',
+  'DELIVERY_BLOCKED',
+  'DELIVERY_CONFLICT',
 ] as const;
 
 export type ErrorCode = typeof errorCodes[number];
@@ -101,6 +106,7 @@ export type Validator<T> = (value: unknown) => value is T;
 
 export interface StudioBridge {
   developer: DeveloperBridge;
+  delivery: DeliveryBridge;
   design: DesignBridge;
   projects: ProjectBridge;
   git: GitBridge;

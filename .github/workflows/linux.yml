@@ -16,7 +16,7 @@ jobs:
   linux-x64:
     name: Linux x64
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17-alpine@sha256:f9cf3e1f0066f0eb0c48707d864f0ac5941e9ff454a072077d97a4d278d07d73
@@ -74,6 +74,7 @@ jobs:
         env:
           FACTORY_REQUIRE_DATABASE: '1'
           FACTORY_GO_SECURITY: '1'
+          FACTORY_DOCKER_VERIFY: '1'
           FACTORY_GO_VULNERABILITY_DB: file://${{ github.workspace }}/.verification-vulndb/data/osv
           FACTORY_TEST_DATABASE_URL: postgresql://factory_test:local-ci-fixture-only@127.0.0.1:${{ job.services.postgres.ports[5432] }}/factory_check
         run: |

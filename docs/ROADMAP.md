@@ -17,7 +17,7 @@ Each phase delivers a demonstrable slice. Alongside the feature gate below, comp
 | 08 · Multi-stack support and SDK validation | 05, 06, 07 | Generate an idiomatic Go/Gin + React/Vite + PostgreSQL app using the versioned SDK. Pass P08-01 through P08-05 below. Preserve Phase 07 reference behavior and record migrations and tooling per stack. |
 | 09 · Advanced Git and worktrees | 03, 06 | Deliver reviewed dirty-switch choices, linked checkout isolation, shared stashes, directional integration, guarded branch and file actions, and recovery. Pass P09-01 through P09-06. Full history graph, interactive rebase, tags and provider integration require separate verification. |
 | 10 · Editor integrations and design extensions | 05, 06, 08 | Deliver VS Code handoff, controlled local runtime and diagnostics, built-in API and page designs, and artifact traceability. Pass P10-01 through P10-06. Embedded editors, embedded terminals, debugger attachment and general-purpose builders remain extensions. |
-| 11 · Engineering standards, collaboration and release | 07, 09, 10 | Verify an engineering standard and shared template through Git and CI. Build and package a generated app using reviewed environment and deployment configuration. Show test, inspection, and release results, permission errors, and project history and recovery. Prove the core flow works without a mandatory Studio service. |
+| 11 · Engineering standards, collaboration and release | 07, 09, 10 | Verify an engineering standard and shared template through Git and CI. Build and package a generated app using reviewed environment and deployment configuration. Show test, inspection, and release results, permission errors, and project history and recovery. Prove the core flow works without a mandatory Studio service. Pass P11-01 through P11-06. |
 | 12 · Windows distribution and verification | 11 and Windows native evidence for relevant earlier phases | Produce a Windows x64 installer via Electron Builder and verify clean install, launch, upgrade with data preservation, uninstall, and documented signing and SmartScreen behavior on actual Windows. Record exact artifact and platform versions. |
 
 ## Product MVP
@@ -133,3 +133,15 @@ Add `factory-generator` in Phase 04, `factory-schema` in Phase 05, and `factory-
 | P10-04 Page source | Publish a reviewed branded React page from a saved design, build and render it against a real inventory fixture, and block unowned or customized inputs. |
 | P10-05 Traceability | Save a requirement and workflow with links to database, API, page and source artifacts. Open valid links and report missing or changed references. |
 | P10-06 Platforms and regression | Pass applicable Studio and generated stack checks on Linux and Windows x64. Record actual platform results and separate native desktop tool checks. |
+
+
+## Phase 11 acceptance
+
+| Gate | Observable check |
+| --- | --- |
+| P11-01 Inspector | Inspect actual worktree, profile, template, locks, ownership and migration sources. Display missing or modified files, blocked prerequisites, and links. |
+| P11-02 Quality | Run actual Node.js and Go verification with native command approval. Show failure, rerun and stale records with exit codes. |
+| P11-03 Shared library | Export/import a pinned profile and template across Git worktrees. Use them in independent projects and verify generated CI commands and old locks. |
+| P11-04 Deployment | Review and publish pinned GitHub Actions and Docker templates. Verify disposable PostgreSQL and actual container images where Docker is available. |
+| P11-05 Client release | Package and start independent Node.js and Go archives. Validate archive digests, revision, locks, stale/permission gates and identical republishing after missing output. |
+| P11-06 History and platforms | Surface quality, generation and artifact history with recovery boundaries. Verify scoped regressions in Linux and Windows x64. |

@@ -1,3 +1,5 @@
+import { DeliveryWorkspace, deliveryBridge } from './components/Delivery';
+import { FileCheck2 } from 'lucide-react';
 import { DeveloperWorkspace, developerBridge, developerErrors } from './components/Developer';
 import { Code2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -173,6 +175,7 @@ export function App() {
       { id: 'overview', title: 'Project Overview', icon: House, run: () => openProjectView('overview') },
       { id: 'structure', title: 'Project Structure', icon: Folder, run: () => openProjectView('structure') },
       { id: 'git', title: 'Git Studio', icon: GitBranch, run: () => openProjectView('git') },
+      ...(deliveryBridge ? [{ id: 'delivery', title: 'Client Delivery', icon: FileCheck2, run: () => openProjectView('delivery') }] : []),
       ...(developerBridge ? [{ id: 'developer', title: 'Developer Tools', icon: Code2, run: () => openProjectView('developer') }] : []),
       { id: 'rescan', title: 'Rescan Project', icon: RefreshCw, run: () => { void workspace.rescan(activeProject.id); void git.refresh(); } },
       { id: 'close-project', title: 'Close Project', icon: X, run: () => void closeProject(activeProject.id) },
@@ -232,7 +235,7 @@ export function App() {
           <>
             <aside className="sidebar">
               <div className="sidebar-heading"><span>Explorer</span><WorkspaceMenu commands={commands} /></div>
-              <Navigation page={active ? null : page} onSelect={openPage} projectView={view} onProjectView={openProjectView} database={database} generation={generation} developer={Boolean(developerBridge)} />
+              <Navigation page={active ? null : page} onSelect={openPage} projectView={view} onProjectView={openProjectView} database={database} generation={generation} developer={Boolean(developerBridge)} delivery={Boolean(deliveryBridge)} />
             </aside>
             <div
               className="separator"
@@ -319,6 +322,10 @@ export function App() {
                 : activeProject && view === 'generation' && generation ? <GenerationReview key={activeProject.id} project={activeProject}
                   signal={JSON.stringify([repo?.branch, repo?.head, repo?.operation, repo?.revision,
                     activeProject.entries.filter(({ path }) => path.startsWith('db/migrations/') || path.startsWith('.factory/'))])} />
+                : activeProject && view === 'delivery' && deliveryBridge ? <DeliveryWorkspace key={activeProject.id} project={activeProject}
+                  signal={JSON.stringify([repo?.revision, activeProject.entries.filter(({ path }) => path !== 'dist' && !path.startsWith('dist/'))
+                    .map(({ path, modifiedAt, size }) => [path, modifiedAt, size])])}
+                  openSource={(path) => openSource(activeProject.id, path, 'editor')} openRecovery={openProjectView} />
                 : activeProject && view === 'developer' && developerBridge ? <DeveloperWorkspace key={activeProject.id}
                   project={activeProject} signal={JSON.stringify([repo?.branch, repo?.head, repo?.revision, activeProject.entries.length])}
                   openTable={(name) => { setLinkedTable({ projectId: activeProject.id, name }); openProjectView('database'); }} />

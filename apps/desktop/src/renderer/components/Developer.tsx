@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Code2, FolderOpen, Play, RefreshCw, TerminalSquare } from 'lucide-react';
-import { runtimeTasks } from '@factory/contracts';
+const runtimeTasks = ['backend', 'frontend', 'build', 'test'] as const;
 import type { ArtifactLink, ErrorCode, Handoff, OpenProject, Result, RuntimeInspection, RuntimePreview, RuntimeTask, DeveloperBridge } from '@factory/contracts';
 import { browserPreview } from '../usePreferences';
 import { Button } from './Controls';
@@ -27,7 +27,9 @@ export const developerErrors: Partial<Record<ErrorCode, string>> = {
   GENERATOR_RECOVERY: 'Open Generation Review to inspect the pending transaction.',
 };
 
-export const taskLabels: Record<RuntimeTask, string> = { backend: 'Backend', frontend: 'Frontend', build: 'Build', test: 'Tests' };
+export const taskLabels: Record<RuntimeTask, string> = { backend: 'Backend', frontend: 'Frontend', build: 'Build', test: 'Tests',
+  lint: 'Lint', typecheck: 'Type check', audit: 'Dependency audit', format: 'Go formatting', vet: 'Go vet',
+  vulnerability: 'Go vulnerability analysis', postgres: 'PostgreSQL integration' };
 type Logs = Extract<Awaited<ReturnType<DeveloperBridge['logs']>>, { ok: true }>['value'];
 export type DeveloperSection = 'Runtime' | 'API Designer' | 'API Playground' | 'Page Designer' | 'Requirements';
 type Run = <T>(label: string, operation: () => Promise<Result<T>>, done?: (value: T) => void) => Promise<void>;
@@ -168,7 +170,7 @@ export function DeveloperWorkspace({ project, signal, openTable }: { project: Op
             }}><Play size={14} />Approve and Run</Button>
           </div>}
           <dl className="dev-process-list">
-            {logs.map(({ process }) => <div key={process.id}>
+            {logs.filter(({ process }) => (runtimeTasks as readonly RuntimeTask[]).includes(process.task)).map(({ process }) => <div key={process.id}>
               <dt>{taskLabels[process.task]}</dt>
               <dd title={'Started ' + process.started + (process.pid ? ' · PID ' + process.pid : '')}><span>{process.state}{process.ready ? ' · listening' : ''}{process.port ? ' · ' + process.port : ''}
                 {process.code !== null ? ' · exit ' + process.code : ''}</span>

@@ -32,7 +32,7 @@ export const STARTER = {
   stackLabel: 'Node.js · TypeScript · Express · React · Vite · PostgreSQL',
 } as const;
 
-export const GENERATOR_LIMITS = { files: 96, fileBytes: 180_000, pending: 32 } as const;
+export const GENERATOR_LIMITS = { files: 128, fileBytes: 180_000, pending: 32 } as const;
 
 export interface LegacyStarterConfig {
   name: string;

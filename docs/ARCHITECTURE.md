@@ -83,3 +83,9 @@ Workspace authorization and watchers remain tied to a canonical checkout. Git ad
 The per-window developer service owns native editor and terminal handoff, toolchain probes, reviewed runtime plans, process groups and the bounded loopback HTTP client. It consumes the existing workspace grant and native Git context without exposing generic process, filesystem, shell or network primitives through preload. The runtime catalog is declared with the built-in stack descriptors.
 
 Portable developer design uses a versioned data document. The generator derives API and page observations from current local artifacts. Design and page mutations use the incremental planner and its durable journal. The first page extension uses a second Vite HTML entry so it can preserve the existing React root, CRUD workspace and custom application components. Project source and portable design data remain usable in external tools. See [Developer workspace](DEVELOPER_WORKSPACE.md).
+
+## Client delivery workbench
+
+Client Delivery reads existing incremental and runtime inspections. Quality jobs reuse the developer command planner and process lifecycle. A separate bounded history holds local quality records and artifact receipts scoped to the canonical worktree. Evidence joins native Git context and bounded byte-level source hashes. Builds record a digest of their supported production output. Archive planning requires current successful checks, a clean commit and matching output, then publishes a verified USTAR archive to an explicitly selected directory outside admitted workspaces.
+
+Shared library bundles use content-addressed canonical JSON. The team repository controls exchange and history, and the local library stages exact compatible imports as a single update. Existing projects keep their pinned portable inputs. Deployment and CI definitions are fixed built-in contributions in the incremental planner.

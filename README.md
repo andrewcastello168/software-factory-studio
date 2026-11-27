@@ -12,6 +12,10 @@ Use **Open Folder** in the desktop app to select a local directory. The project 
 
 **Recent Projects** stores folder references in Studio application data. Use **Locate** when a folder has moved, or remove its recent entry. If Studio cannot match the selected directory to the saved project, the native dialog asks which folder to use. An existing `.factory/project.json` with `version: 1` and a UUID `id` supplies portable identity. The optional `name`, `type`, `stackId`, and `profileId` fields provide display metadata. Studio reads this descriptor directly and leaves the project contents intact.
 
+## Deliver a client application
+
+Open **Client Delivery** in a generated worktree. Inspect project locks and ownership, exchange immutable profiles and templates through Git, review CI and Docker configuration, and collect current quality evidence before building a checksummed application archive. See the [client delivery guide](docs/CLIENT_DELIVERY.md).
+
 ## Use Developer Tools
 
 Open a project or worktree and select **Developer Tools**. Use Runtime to inspect tools, hand off to VS Code or a native terminal, and review the supported Node.js or Go commands before execution. Test this worktree’s local backend with API Playground. Save API contracts, generate a supported Node.js Business Workspace page, and link requirements to source and designs. See [Developer workspace](docs/DEVELOPER_WORKSPACE.md) for commands, local trust controls, and limitations.
